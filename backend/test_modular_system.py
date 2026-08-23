@@ -150,7 +150,7 @@ class TestModularSystem(unittest.TestCase):
         # 8. GET /api/mappings/script/services
         r_svc_script = self.client.get("/api/mappings/script/services")
         self.assertEqual(r_svc_script.status_code, 200)
-        self.assertIn("DM_PhongBan_DichVu", r_svc_script.text)
+        self.assertIn("DM_NhomDichVu", r_svc_script.text)
         
         # 9. GET /api/mappings/script/pharmacies
         r_phar_script = self.client.get("/api/mappings/script/pharmacies")
