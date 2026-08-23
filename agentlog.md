@@ -22,10 +22,11 @@ Nhật ký ghi lại các thay đổi, quyết định thiết kế và tiến t
 *   Tạo `backend/test_modular_system.py`: Bộ kiểm thử toàn diện cho module mapping, templates, actions và API.
 *   Nâng cấp `frontend/index.html`, `frontend/style.css`, `frontend/app.js`: Giao diện 5 Tab Glassmorphism, Template Builder modal, Matrix checkbox table, và Pharmacy chips selector.
 
-*   Tạo `Scripts/07_export_phan_quyen_dich_vu_theo_khoa.sql`: Script trích xuất quan hệ `DM_PhongBan_DichVu` JOIN `DM_DichVu` JOIN `DM_PhongBan`.
-*   Tạo `Scripts/08_export_anh_xa_kho_duoc_theo_khoa.sql`: Script trích xuất quan hệ `dm_khoduoc` (`PhongBan_Id`) và `DM_Duoc_TheoNoiSuDung`.
-*   Bổ sung API `POST /api/mappings/upload/services`, `POST /api/mappings/upload/pharmacies` và `GET /api/mappings/script/*` để lấy script và nạp trực tiếp kết quả Excel vào cấu hình.
-*   Nâng cấp giao diện Tab Cài đặt danh mục (Card 5 & Card 6) và Tab Phân quyền với các nút Lấy Script SQL và Tải lên Excel tiện lợi.
+*   Tạo `Scripts/07_export_phan_quyen_dich_vu_theo_khoa.sql`: Sửa lại câu truy vấn JOIN chuẩn xác qua `DM_NhomDichVu` / `DM_LoaiDichVu` để lấy đúng tên nhóm dịch vụ thay vì chữ 'X', đồng thời kiểm tra `CoGiaDichVu = 1` và `TamNgung = 0`.
+*   Cập nhật `Scripts/05_export_danh_muc_dich_vu.sql`: Trích xuất toàn bộ dịch vụ thỏa `CoGiaDichVu = 1` và `TamNgung = 0`, lấy tên nhóm trực tiếp từ bảng nhóm/loại dịch vụ để không bị sót dịch vụ.
+*   Cập nhật `frontend/app.js`: Tự động sao chép Script SQL trực tiếp vào clipboard (kèm fallback đa nền tảng) và hiện Toast thông báo khi bấm nút "Lấy script" trên mọi máy trạm.
+*   Tạo 2 file mẫu Excel: `data/catalogs/service_mappings.xlsx` và `data/catalogs/pharmacy_mappings.xlsx` cùng nút "Tải file mẫu" trên giao diện.
+*   Đồng bộ toàn bộ mã nguồn lên Git repository GitHub: `https://github.com/buinguyenhong/ThiBVTH`.
 
 ### 3. Xác minh:
 *   Toàn bộ 16 kiểm thử đơn vị và tích hợp trong backend đều đạt (`Ran 16 tests ... OK`).
