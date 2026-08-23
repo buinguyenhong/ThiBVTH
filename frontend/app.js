@@ -1153,27 +1153,73 @@ document.addEventListener('DOMContentLoaded', () => {
                 'patients.xlsx': { count: 'count-patients', time: 'time-patients', status: 'status-patients' },
                 'drugs.xlsx': { count: 'count-drugs', time: 'time-drugs', status: 'status-drugs' },
                 'services.xlsx': { count: 'count-services', time: 'time-services', status: 'status-services' },
-                'users.xlsx': { count: 'count-users', time: 'time-users', status: 'status-users' }
+                'users.xlsx': { count: 'count-users', time: 'time-users', status: 'status-users' },
+                'service_mappings.xlsx': { count: 'count-svc-mapping', status: 'status-svc-mapping' },
+                'pharmacy_mappings.xlsx': { count: 'count-phar-mapping', status: 'status-phar-mapping' }
             };
 
             for (const [file, info] of Object.entries(data)) {
                 const elMap = mapping[file];
                 if (!elMap) continue;
 
-                document.getElementById(elMap.count).textContent = info.count ? info.count.toLocaleString() : '0';
-                document.getElementById(elMap.time).textContent = info.last_modified || 'Chưa có file';
+                const countEl = document.getElementById(elMap.count);
+                if (countEl) countEl.textContent = info.count ? info.count.toLocaleString() : '0';
+
+                if (elMap.time) {
+                    const timeEl = document.getElementById(elMap.time);
+                    if (timeEl) timeEl.textContent = info.last_modified || 'Chưa có file';
+                }
 
                 const badge = document.getElementById(elMap.status);
-                if (info.exists) {
-                    badge.className = 'badge badge-success';
-                    badge.textContent = 'Đã nạp';
-                } else {
-                    badge.className = 'badge badge-danger';
-                    badge.textContent = 'Chưa nạp';
+                if (badge) {
+                    if (info.exists || info.count > 0) {
+                        badge.className = 'badge badge-success';
+                        badge.textContent = 'Đã nạp';
+                    } else {
+                        badge.className = 'badge badge-danger';
+                        badge.textContent = 'Chưa nạp';
+                    }
                 }
             }
         } catch (err) {
             console.error("Error loading catalogs status:", err);
+        }
+    }
+
+    // Helper: Copy to clipboard with robust fallback
+    function copyToClipboard(text, successMsg = "Đã sao chép Script vào bộ nhớ tạm!") {
+        if (!text) return;
+        if (navigator.clipboard && window.isSecureContext) {
+            navigator.clipboard.writeText(text).then(() => {
+                showToast(successMsg, "success");
+            }).catch(() => {
+                fallbackCopyText(text, successMsg);
+            });
+        } else {
+            fallbackCopyText(text, successMsg);
+        }
+    }
+
+    function fallbackCopyText(text, successMsg) {
+        try {
+            const textArea = document.createElement("textarea");
+            textArea.value = text;
+            textArea.style.position = "fixed";
+            textArea.style.left = "-999999px";
+            textArea.style.top = "-999999px";
+            textArea.setAttribute("readonly", "");
+            document.body.appendChild(textArea);
+            textArea.focus();
+            textArea.select();
+            const successful = document.execCommand('copy');
+            document.body.removeChild(textArea);
+            if (successful) {
+                showToast(successMsg, "success");
+            } else {
+                showToast("Đã lấy script. Vui lòng kiểm tra console hoặc thử lại.", "info");
+            }
+        } catch (err) {
+            showToast("Lỗi khi sao chép: " + err, "error");
         }
     }
 
@@ -1221,58 +1267,55 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     });
 
-    // Get Script Modal
+    // Get Script: Auto copy to clipboard directly
     document.querySelectorAll('.btn-get-script').forEach(btn => {
         btn.addEventListener('click', async (e) => {
             const file = e.target.getAttribute('data-file');
             try {
+                showToast(`Đang lấy script cho ${file}...`, "info");
                 const res = await fetch(`/api/catalogs/script/${file}`);
                 if (!res.ok) throw new Error("Không tìm thấy script trích xuất.");
                 const sql = await res.text();
-                document.getElementById('scriptModalTitle').textContent = `Script trích xuất: ${file}`;
-                scriptContentArea.value = sql;
-                scriptModal.style.display = 'flex';
+                copyToClipboard(sql, `Đã sao chép Script trích xuất "${file}" vào bộ nhớ tạm!`);
             } catch (err) {
                 showToast(err.message, "error");
             }
         });
     });
 
-    // Script 07: Services mapping script handlers
-    const showServiceMappingScript = async () => {
+    // Script 07: Services mapping script handlers (Auto copy)
+    const handleServiceMappingScript = async () => {
         try {
+            showToast("Đang lấy Script 07 (Phân quyền Dịch vụ)...", "info");
             const res = await fetch('/api/mappings/script/services');
             if (!res.ok) throw new Error("Không thể tải Script 07.");
             const sql = await res.text();
-            document.getElementById('scriptModalTitle').textContent = "Script 07: Trích xuất Phân quyền Dịch vụ theo Khoa";
-            scriptContentArea.value = sql;
-            scriptModal.style.display = 'flex';
+            copyToClipboard(sql, "Đã sao chép Script 07 (Phân quyền Dịch vụ) vào bộ nhớ tạm!");
         } catch (err) {
             showToast(err.message, "error");
         }
     };
     const btnGetSvcMappingScript = document.getElementById('btnGetSvcMappingScript');
-    if (btnGetSvcMappingScript) btnGetSvcMappingScript.addEventListener('click', showServiceMappingScript);
+    if (btnGetSvcMappingScript) btnGetSvcMappingScript.addEventListener('click', handleServiceMappingScript);
     const btnScriptSvcMappingCard = document.getElementById('btnScriptSvcMappingCard');
-    if (btnScriptSvcMappingCard) btnScriptSvcMappingCard.addEventListener('click', showServiceMappingScript);
+    if (btnScriptSvcMappingCard) btnScriptSvcMappingCard.addEventListener('click', handleServiceMappingScript);
 
-    // Script 08: Pharmacy mapping script handlers
-    const showPharmacyMappingScript = async () => {
+    // Script 08: Pharmacy mapping script handlers (Auto copy)
+    const handlePharmacyMappingScript = async () => {
         try {
+            showToast("Đang lấy Script 08 (Ánh xạ Kho Dược)...", "info");
             const res = await fetch('/api/mappings/script/pharmacies');
             if (!res.ok) throw new Error("Không thể tải Script 08.");
             const sql = await res.text();
-            document.getElementById('scriptModalTitle').textContent = "Script 08: Trích xuất Ánh xạ Kho Dược theo Khoa";
-            scriptContentArea.value = sql;
-            scriptModal.style.display = 'flex';
+            copyToClipboard(sql, "Đã sao chép Script 08 (Ánh xạ Kho Dược) vào bộ nhớ tạm!");
         } catch (err) {
             showToast(err.message, "error");
         }
     };
     const btnGetPharMappingScript = document.getElementById('btnGetPharMappingScript');
-    if (btnGetPharMappingScript) btnGetPharMappingScript.addEventListener('click', showPharmacyMappingScript);
+    if (btnGetPharMappingScript) btnGetPharMappingScript.addEventListener('click', handlePharmacyMappingScript);
     const btnScriptPharMappingCard = document.getElementById('btnScriptPharMappingCard');
-    if (btnScriptPharMappingCard) btnScriptPharMappingCard.addEventListener('click', showPharmacyMappingScript);
+    if (btnScriptPharMappingCard) btnScriptPharMappingCard.addEventListener('click', handlePharmacyMappingScript);
 
     // Upload Service Mapping Excel
     const uploadSvcMappingFile = document.getElementById('uploadSvcMappingFile');

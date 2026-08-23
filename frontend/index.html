@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Hệ thống Sinh đề thi và Nạp dữ liệu HIS - Bệnh viện Thiện Hạnh</title>
-    <link rel="stylesheet" href="style.css?v=20260822-2">
+    <link rel="stylesheet" href="style.css?v=20260823-1">
 </head>
 <body>
     <div class="container">
@@ -447,18 +447,19 @@
                                         <path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"></path>
                                     </svg>
                                 </div>
-                                <span class="badge badge-success">Script 07</span>
+                                <span class="badge badge-success" id="status-svc-mapping">Đã nạp</span>
                             </div>
                             <h3>Phân quyền Nhóm Dịch Vụ</h3>
-                            <p class="file-name">DM_PhongBan_DichVu</p>
+                            <p class="file-name">service_mappings.xlsx</p>
                             <div class="catalog-meta">
-                                <div>Mục đích: Tự động map Khoa x Nhóm DV</div>
+                                <div>Số liên kết: <span id="count-svc-mapping" class="count-value">-</span> mục</div>
                                 <div>Nguồn: Bảng phân quyền HIS eHospital</div>
                             </div>
                             <div class="catalog-actions">
                                 <button class="btn-card" id="btnScriptSvcMappingCard">Lấy script 07</button>
+                                <a href="/api/catalogs/download/service_mappings.xlsx" class="btn-card btn-download">Tải file mẫu</a>
                                 <label class="btn-card btn-upload">
-                                    Tải lên Excel
+                                    Tải lên
                                     <input type="file" id="uploadSvcMappingFile" accept=".xlsx" style="display: none;">
                                 </label>
                             </div>
@@ -473,18 +474,19 @@
                                         <path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"></path>
                                     </svg>
                                 </div>
-                                <span class="badge badge-success">Script 08</span>
+                                <span class="badge badge-success" id="status-phar-mapping">Đã nạp</span>
                             </div>
                             <h3>Ánh xạ Kho Dược & Tủ trực</h3>
-                            <p class="file-name">dm_khoduoc (PhongBan_Id)</p>
+                            <p class="file-name">pharmacy_mappings.xlsx</p>
                             <div class="catalog-meta">
-                                <div>Mục đích: Tự động map Kho Dược x Khoa</div>
+                                <div>Số liên kết: <span id="count-phar-mapping" class="count-value">-</span> mục</div>
                                 <div>Nguồn: Bảng danh mục kho HIS</div>
                             </div>
                             <div class="catalog-actions">
                                 <button class="btn-card" id="btnScriptPharMappingCard">Lấy script 08</button>
+                                <a href="/api/catalogs/download/pharmacy_mappings.xlsx" class="btn-card btn-download">Tải file mẫu</a>
                                 <label class="btn-card btn-upload">
-                                    Tải lên Excel
+                                    Tải lên
                                     <input type="file" id="uploadPharMappingFile" accept=".xlsx" style="display: none;">
                                 </label>
                             </div>
@@ -681,6 +683,6 @@
     <!-- Notification Toast -->
     <div id="toast" class="toast" style="display: none;"></div>
 
-    <script src="app.js?v=20260822-2"></script>
+    <script src="app.js?v=20260823-1"></script>
 </body>
 </html>

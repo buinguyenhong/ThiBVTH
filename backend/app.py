@@ -252,7 +252,9 @@ def get_catalogs_status():
         "patients.xlsx": len(cm.patients),
         "drugs.xlsx": len(cm.drugs),
         "services.xlsx": len(cm.services),
-        "users.xlsx": len(cm.users)
+        "users.xlsx": len(cm.users),
+        "service_mappings.xlsx": sum(len(v) for v in mm.service_mappings.values()),
+        "pharmacy_mappings.xlsx": sum(len(v) for v in mm.pharmacy_mappings.values())
     }
     
     for filename, count in files.items():
@@ -267,7 +269,7 @@ def get_catalogs_status():
             "exists": exists,
             "count": count,
             "last_modified": last_modified,
-            "script_available": filename in CATALOG_SCRIPTS,
+            "script_available": filename in CATALOG_SCRIPTS or filename in ["service_mappings.xlsx", "pharmacy_mappings.xlsx"],
         }
         if filename == "patients.xlsx":
             status[filename].update(cm.get_patient_usage_status())
@@ -607,7 +609,8 @@ def generate_exams(req: GenerateRequest, background_tasks: BackgroundTasks):
 @app.get("/api/catalogs/download/{filename}")
 def download_catalog(filename: str):
     """Serves the catalog Excel file for download."""
-    if filename not in ["patients.xlsx", "drugs.xlsx", "services.xlsx", "users.xlsx"]:
+    allowed = ["patients.xlsx", "drugs.xlsx", "services.xlsx", "users.xlsx", "service_mappings.xlsx", "pharmacy_mappings.xlsx"]
+    if filename not in allowed:
         raise HTTPException(status_code=400, detail="Invalid catalog filename.")
     path = os.path.join(CATALOG_DIR, filename)
     if not os.path.exists(path):
