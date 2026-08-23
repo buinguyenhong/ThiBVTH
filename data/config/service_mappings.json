@@ -1,0 +1,116 @@
+{
+  "Khoa Ngoại tổng hợp": [
+    "Siêu âm",
+    "Xét nghiệm"
+  ],
+  "Khoa Chấn thương chỉnh hình": [
+    "X-quang",
+    "CT Scan",
+    "Xét nghiệm",
+    "Siêu âm",
+    "Thủ thuật"
+  ],
+  "Khoa Ngoại thần kinh": [
+    "CT Scan",
+    "MRI",
+    "X-quang",
+    "Xét nghiệm",
+    "Siêu âm"
+  ],
+  "Khoa Hồi sức tích cực": [
+    "Xét nghiệm",
+    "X-quang",
+    "Siêu âm",
+    "Khí máu"
+  ],
+  "Khoa Nội": [
+    "Xét nghiệm",
+    "Siêu âm",
+    "X-quang",
+    "Nội soi",
+    "Điện tim"
+  ],
+  "Khoa Tim mạch": [
+    "Điện tim",
+    "Siêu âm tim",
+    "Xét nghiệm",
+    "X-quang",
+    "Holter"
+  ],
+  "Khoa Phụ Sản": [
+    "Siêu âm",
+    "Xét nghiệm",
+    "Monitor sản khoa",
+    "Thủ thuật"
+  ],
+  "Khoa Nhi": [
+    "Xét nghiệm",
+    "X-quang",
+    "Siêu âm"
+  ],
+  "Khoa Cấp cứu": [
+    "Xét nghiệm",
+    "X-quang",
+    "Siêu âm",
+    "CT Scan",
+    "Điện tim"
+  ],
+  "Khoa Mắt": [
+    "Khám mắt",
+    "Đo khúc xạ",
+    "Thủ thuật mắt",
+    "Xét nghiệm"
+  ],
+  "Khoa Tai Mũi Họng": [
+    "Nội soi TMH",
+    "Thủ thuật TMH",
+    "Xét nghiệm",
+    "X-quang"
+  ],
+  "Khoa Răng Hàm Mặt": [
+    "X-quang RHM",
+    "Thủ thuật RHM",
+    "Xét nghiệm"
+  ],
+  "Khoa Khám bệnh": [
+    "Khám bệnh",
+    "Xét nghiệm",
+    "Siêu âm",
+    "X-quang",
+    "Điện tim"
+  ],
+  "Thận nhân tạo": [
+    "Xét nghiệm",
+    "Lọc máu",
+    "Điện tim"
+  ],
+  "Khoa Xét Nghiệm": [
+    "Xét nghiệm",
+    "Huyết học",
+    "Hóa sinh",
+    "Vi sinh"
+  ],
+  "Khoa Chẩn đoán hình ảnh": [
+    "X-quang",
+    "Siêu âm",
+    "CT Scan",
+    "MRI"
+  ],
+  "Khoa Nội soi": [
+    "Nội soi tiêu hóa",
+    "Nội soi dạ dày",
+    "Nội soi đại tràng"
+  ],
+  "Khoa Phẫu thuật - GMHS": [
+    "Xét nghiệm",
+    "Thủ thuật",
+    "Gây mê hồi sức"
+  ],
+  "Khoa Dược": [
+    "Dược lâm sàng",
+    "Kiểm nghiệm"
+  ],
+  "Phòng Tài chính kế toán": [],
+  "Phòng Chăm sóc khách hàng": [],
+  "Phòng Tổ chức - Hành chính": []
+}

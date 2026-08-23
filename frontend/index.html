@@ -1,0 +1,686 @@
+<!DOCTYPE html>
+<html lang="vi" data-theme="light">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Hệ thống Sinh đề thi và Nạp dữ liệu HIS - Bệnh viện Thiện Hạnh</title>
+    <link rel="stylesheet" href="style.css?v=20260822-2">
+</head>
+<body>
+    <div class="container">
+        <!-- Header -->
+        <header>
+            <div>
+                <h1>Exam Generator & HIS Populator</h1>
+                <p>Hội đồng tuyển dụng Bệnh viện Đa khoa Thiện Hạnh</p>
+            </div>
+            <button id="themeToggle" class="btn-icon" title="Chuyển chế độ Sáng/Tối">
+                <svg viewBox="0 0 24 24">
+                    <path d="M12 7c-2.76 0-5 2.24-5 5s2.24 5 5 5 5-2.24 5-5-2.24-5-5-5zM2 13h2c.55 0 1-.45 1-1s-.45-1-1-1H2c-.55 0-1 .45-1 1s.45 1 1 1zm18 0h2c.55 0 1-.45 1-1s-.45-1-1-1h-2c-.55 0-1 .45-1 1s.45 1 1 1zM11 2v2c0 .55.45 1 1 1s1-.45 1-1V2c0-.55-.45-1-1-1s-1 .45-1 1zm0 18v2c0 .55.45 1 1 1s1-.45 1-1v-2c0-.55-.45-1-1-1s-1 .45-1 1zM5.99 4.58c-.39-.39-1.03-.39-1.41 0s-.39 1.03 0 1.41l1.06 1.06c.39.39 1.03.39 1.41 0s.39-1.03 0-1.41L5.99 4.58zm12.37 12.37c-.39-.39-1.03-.39-1.41 0s-.39 1.03 0 1.41l1.06 1.06c.39.39 1.03.39 1.41 0s.39-1.03 0-1.41l-1.06-1.06zm1.06-12.37c-.39-.39-1.03-.39-1.41 0s-.39 1.03 0 1.41l1.06 1.06c.39.39 1.03.39 1.41 0s.39-1.03 0-1.41l-1.06-1.06zM5.99 16.95l-1.06 1.06c-.39.39-.39 1.03 0 1.41s1.03.39 1.41 0l1.06-1.06c.39-.39.39-1.03 0-1.41s-1.02-.39-1.41 0z"/>
+                </svg>
+            </button>
+        </header>
+
+        <!-- Tab Navigation -->
+        <div class="tabs-nav">
+            <button class="tab-btn active" data-tab="execution-tab">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align: middle; margin-right: 6px;">
+                    <path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/>
+                </svg>
+                Thực thi tạo đề
+            </button>
+            <button class="tab-btn" data-tab="templates-tab">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align: middle; margin-right: 6px;">
+                    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                    <polyline points="14 2 14 8 20 8"></polyline>
+                    <line x1="16" y1="13" x2="8" y2="13"></line>
+                    <line x1="16" y1="17" x2="8" y2="17"></line>
+                    <polyline points="10 9 9 9 8 9"></polyline>
+                </svg>
+                Quản lý Mẫu đề
+            </button>
+            <button class="tab-btn" data-tab="mappings-tab">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align: middle; margin-right: 6px;">
+                    <rect x="3" y="3" width="7" height="7"></rect>
+                    <rect x="14" y="3" width="7" height="7"></rect>
+                    <rect x="14" y="14" width="7" height="7"></rect>
+                    <rect x="3" y="14" width="7" height="7"></rect>
+                </svg>
+                Phân quyền Dịch vụ & Kho
+            </button>
+            <button class="tab-btn" data-tab="settings-tab">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align: middle; margin-right: 6px;">
+                    <circle cx="12" cy="12" r="3"/>
+                    <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>
+                </svg>
+                Cài đặt & Danh mục
+            </button>
+            <button class="tab-btn" data-tab="inventory-tab">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align: middle; margin-right: 6px;">
+                    <path d="M21 8l-9 5-9-5"></path>
+                    <path d="M3 8l9-5 9 5v8l-9 5-9-5z"></path>
+                    <path d="M12 13v8"></path>
+                </svg>
+                Tra cứu tồn kho
+            </button>
+        </div>
+
+        <!-- Tab Panels -->
+        <div class="tab-content">
+            <!-- 1. EXECUTION PANEL -->
+            <div id="execution-tab" class="tab-panel active">
+                <div class="glass-panel">
+                    <h2>Cấu hình Ngày thi</h2>
+                    <div class="form-group" style="max-width: 300px; margin-bottom: 0;">
+                        <label for="examDate">Chọn Ngày thi</label>
+                        <input type="date" id="examDate">
+                    </div>
+                </div>
+
+                <div class="glass-panel">
+                    <h2>Danh sách Thí sinh & Sinh đề</h2>
+                    
+                    <!-- Candidate Form inputs -->
+                    <div class="cand-form-grid" style="margin-bottom: 1.5rem;">
+                        <div class="form-group">
+                            <label for="candName">Họ tên Thí sinh</label>
+                            <input type="text" id="candName" placeholder="Ví dụ: Nguyễn Văn A">
+                        </div>
+                        <div class="form-group">
+                            <label for="candId">Số báo danh (SBD)</label>
+                            <input type="text" id="candId" placeholder="Ví dụ: SBD001 (tùy chọn)">
+                        </div>
+                        <div class="form-group">
+                            <label for="candDept">Khoa / Phòng</label>
+                            <select id="candDept">
+                                <option value="">-- Chọn Khoa --</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label for="candTemplate">Mẫu Đề thi</label>
+                            <select id="candTemplate" disabled>
+                                <option value="">-- Chọn Khoa trước --</option>
+                            </select>
+                        </div>
+                    </div>
+                    
+                    <!-- Score Configuration Container -->
+                    <div id="scoreConfigContainer" class="score-config-box" style="display: none; background: rgba(255,255,255,0.04); border: 1px solid var(--card-border); border-radius: 12px; padding: 1.25rem; margin-bottom: 1.5rem;">
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.75rem;">
+                            <h4 style="color: var(--accent-color); font-size: 1rem; margin: 0;">Thang điểm chi tiết của Mẫu đề đang chọn</h4>
+                            <span id="scoreSummaryBadge" class="badge badge-success">Tổng: 10.0 đ</span>
+                        </div>
+                        <p style="font-size: 0.85rem; color: var(--text-secondary); margin-bottom: 1rem;">
+                            Bạn có thể điều chỉnh nhanh số điểm từng câu cho thí sinh này hoặc chọn <strong>"Bỏ qua câu"</strong> (0 điểm).
+                        </p>
+                        <div id="scoreFieldsGrid" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 1rem;"></div>
+                    </div>
+                    
+                    <div style="text-align: right; margin-bottom: 2rem;">
+                        <button id="btnAddCandidate" class="btn-primary-outline" style="height: 48px; border-radius: 10px;">
+                            Thêm Thí sinh vào danh sách
+                        </button>
+                    </div>
+
+                    <!-- Candidates List Builder -->
+                    <div class="candidates-builder">
+                        <div class="candidate-selection-toolbar">
+                            <span id="selectionSummary">Đã chọn 0/0 thí sinh</span>
+                            <div>
+                                <button id="btnSelectAllCandidates" class="btn-link-action" type="button">Chọn tất cả</button>
+                                <button id="btnClearCandidateSelection" class="btn-link-action" type="button">Bỏ chọn</button>
+                            </div>
+                        </div>
+                        <div class="builder-header">
+                            <label>Chọn</label>
+                            <label>Họ tên</label>
+                            <label>Khoa</label>
+                            <label>Mẫu Đề thi</label>
+                            <label>Thao tác</label>
+                        </div>
+                        <div id="candidatesList">
+                            <div class="empty-state">Chưa có thí sinh nào được thêm vào danh sách thi.</div>
+                        </div>
+                    </div>
+
+                    <div class="generation-actions">
+                        <button id="btnGenerateSelected" class="btn-primary-outline" disabled>
+                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3"/>
+                            </svg>
+                            Sinh phần đã chọn (.zip)
+                        </button>
+                        <button id="btnGenerate" class="btn-primary" disabled>
+                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3"/>
+                            </svg>
+                            Sinh cả đợt thi (.zip)
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 2. TEMPLATES BUILDER PANEL -->
+            <div id="templates-tab" class="tab-panel">
+                <div class="glass-panel">
+                    <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 1rem; margin-bottom: 1.5rem;">
+                        <div>
+                            <h2>Quản lý Mẫu đề thi (Template Builder)</h2>
+                            <p style="color: var(--text-secondary); font-size: 0.95rem; margin-top: 4px;">
+                                Tùy biến nghiệp vụ, cài đặt thang điểm, tạo mới hoặc nhân bản đề thi sang các khoa phòng khác.
+                            </p>
+                        </div>
+                        <div style="display: flex; gap: 0.75rem; align-items: center;">
+                            <select id="filterTemplateDept" style="width: auto; min-width: 200px;">
+                                <option value="">-- Tất cả Khoa / Phòng --</option>
+                            </select>
+                            <button id="btnOpenCreateTemplate" class="btn-primary">
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align: middle; margin-right: 6px;">
+                                    <line x1="12" y1="5" x2="12" y2="19"></line>
+                                    <line x1="5" y1="12" x2="19" y2="12"></line>
+                                </svg>
+                                Tạo Mẫu đề Mới
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Template Cards Grid -->
+                    <div id="templatesGrid" class="templates-grid">
+                        <!-- Loaded dynamically -->
+                    </div>
+                </div>
+            </div>
+
+            <!-- 3. MAPPINGS PANEL (MASTER-DETAIL SERVICE GROUPS & PHARMACIES) -->
+            <div id="mappings-tab" class="tab-panel">
+                <div class="glass-panel" style="padding: 1.5rem;">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.25rem; flex-wrap: wrap; gap: 1rem;">
+                        <div>
+                            <h2>Phân quyền Dịch vụ & Kho Dược theo Khoa</h2>
+                            <p style="color: var(--text-secondary); font-size: 0.95rem; margin-top: 4px;">
+                                Chọn khoa phòng bên trái để quản lý danh sách Nhóm dịch vụ và Kho dược được phép sử dụng.
+                            </p>
+                        </div>
+                        <div style="display: flex; gap: 0.75rem; flex-wrap: wrap;">
+                            <button id="btnGetSvcMappingScript" class="btn-secondary" title="Lấy SQL trích xuất phân quyền dịch vụ từ HIS">
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align: middle; margin-right: 6px;">
+                                    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                                    <polyline points="14 2 14 8 20 8"></polyline>
+                                </svg>
+                                Script Dịch vụ (SQL)
+                            </button>
+                            <button id="btnGetPharMappingScript" class="btn-secondary" title="Lấy SQL trích xuất ánh xạ kho dược từ HIS">
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align: middle; margin-right: 6px;">
+                                    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                                    <polyline points="14 2 14 8 20 8"></polyline>
+                                </svg>
+                                Script Kho Dược (SQL)
+                            </button>
+                            <button id="btnCopyDeptMapping" class="btn-secondary" title="Sao chép phân quyền từ khoa khác">
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align: middle; margin-right: 6px;">
+                                    <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+                                    <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+                                </svg>
+                                Sao chép từ khoa khác
+                            </button>
+                            <button id="btnSaveCurrentDeptMapping" class="btn-primary">
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align: middle; margin-right: 6px;">
+                                    <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"></path>
+                                    <polyline points="17 21 17 13 7 13 7 21"></polyline>
+                                    <polyline points="7 3 7 8 15 8"></polyline>
+                                </svg>
+                                Lưu cấu hình cho Khoa này
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Master-Detail Layout -->
+                    <div class="mapping-master-detail">
+                        <!-- Left: Department List Selector -->
+                        <div class="mapping-sidebar">
+                            <div class="mapping-search-box">
+                                <input type="text" id="mappingDeptSearch" placeholder="🔍 Tìm Khoa / Phòng...">
+                            </div>
+                            <div id="mappingDeptList" class="mapping-dept-list">
+                                <!-- Loaded dynamically -->
+                            </div>
+                        </div>
+
+                        <!-- Right: Active Department Configuration Detail -->
+                        <div class="mapping-detail">
+                            <div class="mapping-detail-header">
+                                <div>
+                                    <h3 id="mappingCurrentDeptTitle">Khoa Ngoại tổng hợp</h3>
+                                    <span id="mappingCurrentDeptSubtitle" style="font-size: 0.85rem; color: var(--text-secondary);">
+                                        Đang cấu hình phân quyền dịch vụ & kho
+                                    </span>
+                                </div>
+                            </div>
+
+                            <!-- Section 1: Clinical Service Groups -->
+                            <div class="mapping-section-box">
+                                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.75rem; flex-wrap: wrap; gap: 0.5rem;">
+                                    <label style="font-weight: 600; color: var(--text-primary); font-size: 0.95rem; margin: 0;">
+                                        1. Nhóm Dịch vụ Cận lâm sàng được chỉ định
+                                    </label>
+                                    <div class="quick-actions-bar">
+                                        <button id="btnSelectAllServicesForDept" class="btn-link-action" type="button">+ Chọn tất cả</button>
+                                        <button id="btnClearServicesForDept" class="btn-link-action" type="button">- Xóa tất cả</button>
+                                    </div>
+                                </div>
+
+                                <!-- Select2 style Searchable Dropdown / Chips Adder -->
+                                <div class="select2-like-container">
+                                    <input type="text" id="svcGroupSearchInput" class="select2-search-input" placeholder="🔍 Gõ để tìm và chọn thêm Nhóm Dịch Vụ...">
+                                    <div id="svcGroupSuggestionsDropdown" class="select2-suggestions-box" style="display: none;"></div>
+                                </div>
+
+                                <!-- Selected Service Groups Tags Container -->
+                                <div class="selected-tags-label">Các nhóm dịch vụ đã chọn (<span id="countSelectedServices">0</span>):</div>
+                                <div id="selectedServicesTags" class="selected-tags-container">
+                                    <!-- Dynamic Selected Tags with (x) remove -->
+                                </div>
+                            </div>
+
+                            <!-- Section 2: Pharmacy Warehouses -->
+                            <div class="mapping-section-box" style="margin-top: 1.5rem;">
+                                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.75rem; flex-wrap: wrap; gap: 0.5rem;">
+                                    <label style="font-weight: 600; color: var(--text-primary); font-size: 0.95rem; margin: 0;">
+                                        2. Mã Kho Dược & Tủ trực cung cấp
+                                    </label>
+                                    <div class="quick-actions-bar">
+                                        <button id="btnSelectAllPharmaciesForDept" class="btn-link-action" type="button">+ Chọn tất cả</button>
+                                        <button id="btnClearPharmaciesForDept" class="btn-link-action" type="button">- Xóa tất cả</button>
+                                    </div>
+                                </div>
+
+                                <!-- Select2 style Searchable Dropdown / Chips Adder for Warehouses -->
+                                <div class="select2-like-container">
+                                    <input type="text" id="pharmacySearchInput" class="select2-search-input" placeholder="🔍 Gõ để tìm và chọn thêm Mã Kho Dược...">
+                                    <div id="pharmacySuggestionsDropdown" class="select2-suggestions-box" style="display: none;"></div>
+                                </div>
+
+                                <!-- Selected Warehouses Tags Container -->
+                                <div class="selected-tags-label">Các kho dược đã liên kết (<span id="countSelectedPharmacies">0</span>):</div>
+                                <div id="selectedPharmaciesTags" class="selected-tags-container">
+                                    <!-- Dynamic Selected Tags with (x) remove -->
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 4. SETTINGS PANEL -->
+            <div id="settings-tab" class="tab-panel">
+                <div class="glass-panel">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem;">
+                        <h2>Quản lý Danh mục Dữ liệu & Phân quyền HIS</h2>
+                        <button id="btnReloadCatalogs" class="btn-secondary">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align: middle; margin-right: 6px;">
+                                <path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67"/>
+                            </svg>
+                            Làm mới Bộ nhớ
+                        </button>
+                    </div>
+                    <p style="color: var(--text-secondary); font-size: 0.95rem; margin-bottom: 2rem; line-height: 1.5;">
+                        Bạn có thể lấy Script SQL tương ứng để trích xuất dữ liệu từ CSDL HIS eHospital, xuất sang Excel rồi tải lên hệ thống để đồng bộ danh mục và phân quyền chuẩn xác.
+                    </p>
+
+                    <!-- Catalogs Grid -->
+                    <div class="catalogs-grid">
+                        <!-- Card 1: Patients -->
+                        <div class="catalog-card" id="card-patients">
+                            <div class="catalog-header">
+                                <div class="catalog-icon">
+                                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                        <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
+                                        <circle cx="9" cy="7" r="4"></circle>
+                                        <path d="M23 21v-2a4 4 0 0 0-3-3.87"></path>
+                                        <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
+                                    </svg>
+                                </div>
+                                <span class="badge" id="status-patients">Đang tải...</span>
+                            </div>
+                            <h3>Danh mục Bệnh nhân</h3>
+                            <p class="file-name">patients.xlsx</p>
+                            <div class="catalog-meta">
+                                <div>Số lượng: <span id="count-patients" class="count-value">-</span> dòng</div>
+                                <div>Cập nhật: <span id="time-patients" class="time-value">-</span></div>
+                            </div>
+                            <div class="catalog-actions">
+                                <button class="btn-card btn-get-script" data-file="patients.xlsx">Lấy script</button>
+                                <a href="/api/catalogs/download/patients.xlsx" class="btn-card btn-download">Tải về</a>
+                                <label class="btn-card btn-upload">
+                                    Tải lên
+                                    <input type="file" class="file-upload-input" data-file="patients.xlsx" accept=".xlsx" style="display: none;">
+                                </label>
+                            </div>
+                        </div>
+
+                        <!-- Card 2: Drugs -->
+                        <div class="catalog-card" id="card-drugs">
+                            <div class="catalog-header">
+                                <div class="catalog-icon">
+                                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                        <path d="M10.5 20.5l10-10a4.95 4.95 0 1 0-7-7l-10 10a4.95 4.95 0 1 0 7 7Z"></path>
+                                        <path d="m8.5 8.5 7 7"></path>
+                                    </svg>
+                                </div>
+                                <span class="badge" id="status-drugs">Đang tải...</span>
+                            </div>
+                            <h3>Danh mục Thuốc & VTYT (7 cột)</h3>
+                            <p class="file-name">drugs.xlsx</p>
+                            <div class="catalog-meta">
+                                <div>Số lượng: <span id="count-drugs" class="count-value">-</span> dòng</div>
+                                <div>Cập nhật: <span id="time-drugs" class="time-value">-</span></div>
+                            </div>
+                            <div class="catalog-actions">
+                                <button class="btn-card btn-get-script" data-file="drugs.xlsx">Lấy script</button>
+                                <a href="/api/catalogs/download/drugs.xlsx" class="btn-card btn-download">Tải về</a>
+                                <label class="btn-card btn-upload">
+                                    Tải lên
+                                    <input type="file" class="file-upload-input" data-file="drugs.xlsx" accept=".xlsx" style="display: none;">
+                                </label>
+                            </div>
+                        </div>
+
+                        <!-- Card 3: Services -->
+                        <div class="catalog-card" id="card-services">
+                            <div class="catalog-header">
+                                <div class="catalog-icon">
+                                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                        <path d="M22 12h-4l-3 9L9 3l-3 9H2"></path>
+                                    </svg>
+                                </div>
+                                <span class="badge" id="status-services">Đang tải...</span>
+                            </div>
+                            <h3>Danh mục Dịch vụ CLS</h3>
+                            <p class="file-name">services.xlsx</p>
+                            <div class="catalog-meta">
+                                <div>Số lượng: <span id="count-services" class="count-value">-</span> dòng</div>
+                                <div>Cập nhật: <span id="time-services" class="time-value">-</span></div>
+                            </div>
+                            <div class="catalog-actions">
+                                <button class="btn-card btn-get-script" data-file="services.xlsx">Lấy script</button>
+                                <a href="/api/catalogs/download/services.xlsx" class="btn-card btn-download">Tải về</a>
+                                <label class="btn-card btn-upload">
+                                    Tải lên
+                                    <input type="file" class="file-upload-input" data-file="services.xlsx" accept=".xlsx" style="display: none;">
+                                </label>
+                            </div>
+                        </div>
+
+                        <!-- Card 4: Users -->
+                        <div class="catalog-card" id="card-users">
+                            <div class="catalog-header">
+                                <div class="catalog-icon">
+                                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                        <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
+                                        <circle cx="12" cy="7" r="4"></circle>
+                                    </svg>
+                                </div>
+                                <span class="badge" id="status-users">Đang tải...</span>
+                            </div>
+                            <h3>Tài khoản HIS Khoa phòng</h3>
+                            <p class="file-name">users.xlsx</p>
+                            <div class="catalog-meta">
+                                <div>Số lượng: <span id="count-users" class="count-value">-</span> dòng</div>
+                                <div>Cập nhật: <span id="time-users" class="time-value">-</span></div>
+                            </div>
+                            <div class="catalog-actions">
+                                <button class="btn-card btn-get-script" data-file="users.xlsx">Lấy script</button>
+                                <a href="/api/catalogs/download/users.xlsx" class="btn-card btn-download">Tải về</a>
+                                <label class="btn-card btn-upload">
+                                    Tải lên
+                                    <input type="file" class="file-upload-input" data-file="users.xlsx" accept=".xlsx" style="display: none;">
+                                </label>
+                            </div>
+                        </div>
+
+                        <!-- Card 5: Service Mappings Import -->
+                        <div class="catalog-card" id="card-svc-mapping">
+                            <div class="catalog-header">
+                                <div class="catalog-icon">
+                                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                        <path d="M9 11l3 3L22 4"></path>
+                                        <path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"></path>
+                                    </svg>
+                                </div>
+                                <span class="badge badge-success">Script 07</span>
+                            </div>
+                            <h3>Phân quyền Nhóm Dịch Vụ</h3>
+                            <p class="file-name">DM_PhongBan_DichVu</p>
+                            <div class="catalog-meta">
+                                <div>Mục đích: Tự động map Khoa x Nhóm DV</div>
+                                <div>Nguồn: Bảng phân quyền HIS eHospital</div>
+                            </div>
+                            <div class="catalog-actions">
+                                <button class="btn-card" id="btnScriptSvcMappingCard">Lấy script 07</button>
+                                <label class="btn-card btn-upload">
+                                    Tải lên Excel
+                                    <input type="file" id="uploadSvcMappingFile" accept=".xlsx" style="display: none;">
+                                </label>
+                            </div>
+                        </div>
+
+                        <!-- Card 6: Pharmacy Mappings Import -->
+                        <div class="catalog-card" id="card-phar-mapping">
+                            <div class="catalog-header">
+                                <div class="catalog-icon">
+                                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                        <rect x="2" y="7" width="20" height="14" rx="2" ry="2"></rect>
+                                        <path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"></path>
+                                    </svg>
+                                </div>
+                                <span class="badge badge-success">Script 08</span>
+                            </div>
+                            <h3>Ánh xạ Kho Dược & Tủ trực</h3>
+                            <p class="file-name">dm_khoduoc (PhongBan_Id)</p>
+                            <div class="catalog-meta">
+                                <div>Mục đích: Tự động map Kho Dược x Khoa</div>
+                                <div>Nguồn: Bảng danh mục kho HIS</div>
+                            </div>
+                            <div class="catalog-actions">
+                                <button class="btn-card" id="btnScriptPharMappingCard">Lấy script 08</button>
+                                <label class="btn-card btn-upload">
+                                    Tải lên Excel
+                                    <input type="file" id="uploadPharMappingFile" accept=".xlsx" style="display: none;">
+                                </label>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 5. INVENTORY PANEL -->
+            <div id="inventory-tab" class="tab-panel">
+                <div class="glass-panel">
+                    <h2>Tra cứu ảnh chụp tồn kho Dược & Vật tư</h2>
+                    <p style="color: var(--text-secondary); font-size: 0.95rem; margin-bottom: 1.5rem;">
+                        Tra cứu số dư tồn kho theo file danh mục <code>drugs.xlsx</code> đã nạp vào hệ thống.
+                    </p>
+
+                    <div class="cand-form-grid" style="grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); margin-bottom: 1.5rem;">
+                        <div class="form-group">
+                            <label for="invDept">Khoa / Phòng</label>
+                            <select id="invDept">
+                                <option value="">-- Tất cả Khoa --</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label for="invWarehouse">Kho Dược</label>
+                            <select id="invWarehouse">
+                                <option value="">-- Tất cả Kho --</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label for="invSource">Nguồn</label>
+                            <select id="invSource">
+                                <option value="">-- Tất cả Nguồn --</option>
+                                <option value="BH">BHYT</option>
+                                <option value="VP">Viện phí</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label for="invKeyword">Mã hoặc Tên Dược</label>
+                            <input type="text" id="invKeyword" placeholder="Nhập tên thuốc/VTYT...">
+                        </div>
+                    </div>
+
+                    <div style="text-align: right; margin-bottom: 1.5rem;">
+                        <button id="btnSearchInventory" class="btn-primary" style="height: 44px; padding: 0 1.5rem;">
+                            Tra cứu
+                        </button>
+                    </div>
+
+                    <div class="matrix-table-container">
+                        <table class="matrix-table">
+                            <thead>
+                                <tr>
+                                    <th>Mã Dược</th>
+                                    <th>Tên Thuốc / VTYT</th>
+                                    <th>ĐVT</th>
+                                    <th>Kho Dược</th>
+                                    <th>Nguồn</th>
+                                    <th>Số Lượng Tồn</th>
+                                </tr>
+                            </thead>
+                            <tbody id="inventoryResultsBody">
+                                <tr>
+                                    <td colspan="6" style="text-align: center; color: var(--text-secondary); padding: 2rem;">
+                                        Nhấn "Tra cứu" để hiển thị dữ liệu tồn kho.
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL: TEMPLATE BUILDER (CREATE / EDIT) -->
+    <div id="templateModal" class="modal-overlay" style="display: none;">
+        <div class="modal-card" style="max-width: 750px;">
+            <div class="modal-header">
+                <h3 id="templateModalTitle">Thiết kế Mẫu Đề thi</h3>
+                <button class="modal-close" id="btnCloseTemplateModal">&times;</button>
+            </div>
+            <div class="modal-body" style="max-height: 70vh; overflow-y: auto;">
+                <input type="hidden" id="tplEditId">
+                <div class="form-group">
+                    <label for="tplName">Tên Mẫu Đề thi</label>
+                    <input type="text" id="tplName" placeholder="Ví dụ: Đề thi Điều dưỡng Ngoại tổng hợp - Mẫu chuẩn">
+                </div>
+                <div class="cand-form-grid" style="grid-template-columns: 1fr 1fr; margin-bottom: 1rem;">
+                    <div class="form-group">
+                        <label for="tplDept">Khoa / Phòng áp dụng</label>
+                        <select id="tplDept"></select>
+                    </div>
+                    <div class="form-group">
+                        <label for="tplPosition">Vị trí công tác</label>
+                        <input type="text" id="tplPosition" placeholder="Ví dụ: Điều dưỡng Nội trú">
+                    </div>
+                </div>
+
+                <div style="display: flex; justify-content: space-between; align-items: center; margin: 1.5rem 0 0.75rem 0;">
+                    <label style="font-weight: 600; color: var(--text-primary); font-size: 0.95rem; margin: 0;">
+                        Tích chọn các Nghiệp vụ trong Đề thi
+                    </label>
+                    <span id="tplScoreTotalBadge" class="badge badge-success">Tổng điểm: 10.0 / 10 đ</span>
+                </div>
+
+                <div id="tplActionsList" class="template-actions-builder-list">
+                    <!-- Loaded dynamically with checkboxes, descriptions, and score inputs -->
+                </div>
+            </div>
+            <div class="modal-footer" style="display: flex; justify-content: flex-end; gap: 0.75rem;">
+                <button class="btn-secondary" id="btnCancelTemplateModal">Hủy</button>
+                <button class="btn-primary" id="btnSaveTemplate">Lưu Mẫu Đề thi</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL: CLONE TEMPLATE -->
+    <div id="cloneModal" class="modal-overlay" style="display: none;">
+        <div class="modal-card" style="max-width: 500px;">
+            <div class="modal-header">
+                <h3>Nhân bản Mẫu Đề sang Khoa khác</h3>
+                <button class="modal-close" id="btnCloseCloneModal">&times;</button>
+            </div>
+            <div class="modal-body">
+                <input type="hidden" id="cloneSourceId">
+                <div class="form-group">
+                    <label>Mẫu đề gốc</label>
+                    <input type="text" id="cloneSourceName" disabled style="background: rgba(255,255,255,0.05);">
+                </div>
+                <div class="form-group">
+                    <label for="cloneTargetDept">Khoa đích cần nhân bản sang</label>
+                    <select id="cloneTargetDept"></select>
+                </div>
+                <div class="form-group">
+                    <label for="cloneNewName">Tên Mẫu đề mới tại Khoa đích</label>
+                    <input type="text" id="cloneNewName" placeholder="Tên đề mới...">
+                </div>
+            </div>
+            <div class="modal-footer" style="display: flex; justify-content: flex-end; gap: 0.75rem;">
+                <button class="btn-secondary" id="btnCancelCloneModal">Hủy</button>
+                <button class="btn-primary" id="btnConfirmClone">Tiến hành Nhân bản</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL: COPY MAPPING -->
+    <div id="copyMappingModal" class="modal-overlay" style="display: none;">
+        <div class="modal-card" style="max-width: 500px;">
+            <div class="modal-header">
+                <h3>Sao chép Phân quyền từ Khoa khác</h3>
+                <button class="modal-close" id="btnCloseCopyMappingModal">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="form-group">
+                    <label>Khoa đích (đang chọn)</label>
+                    <input type="text" id="copyTargetDeptName" disabled style="background: rgba(255,255,255,0.05); font-weight: bold;">
+                </div>
+                <div class="form-group">
+                    <label for="copySourceDeptSelect">Chọn Khoa nguồn để sao chép cấu hình:</label>
+                    <select id="copySourceDeptSelect"></select>
+                </div>
+                <p style="font-size: 0.85rem; color: var(--text-secondary); margin-top: 0.5rem;">
+                    * Lưu ý: Thao tác này sẽ sao chép toàn bộ danh sách Nhóm Dịch Vụ và Kho Dược từ khoa nguồn sang khoa đích.
+                </p>
+            </div>
+            <div class="modal-footer" style="display: flex; justify-content: flex-end; gap: 0.75rem;">
+                <button class="btn-secondary" id="btnCancelCopyMappingModal">Hủy</button>
+                <button class="btn-primary" id="btnConfirmCopyMapping">Sao chép ngay</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL: SCRIPT POPUP -->
+    <div id="scriptModal" class="modal-overlay" style="display: none;">
+        <div class="modal-card" style="max-width: 700px;">
+            <div class="modal-header">
+                <h3 id="scriptModalTitle">Script trích xuất CSDL HIS</h3>
+                <button class="modal-close" id="btnCloseScriptModal">&times;</button>
+            </div>
+            <div class="modal-body">
+                <p style="color: var(--text-secondary); font-size: 0.9rem; margin-bottom: 0.75rem;">
+                    Chạy script bên dưới trong SSMS, xuất kết quả sang file Excel đúng tên rồi tải lên hệ thống.
+                </p>
+                <textarea id="scriptContentArea" readonly style="width: 100%; height: 250px; font-family: monospace; font-size: 0.85rem; padding: 0.75rem; border-radius: 8px; background: rgba(0,0,0,0.2); color: var(--text-primary); border: 1px solid var(--card-border); resize: vertical;"></textarea>
+            </div>
+            <div class="modal-footer" style="display: flex; justify-content: flex-end; gap: 0.75rem;">
+                <button class="btn-secondary" id="btnCloseScriptBtn">Đóng</button>
+                <button class="btn-primary" id="btnCopyScript">Sao chép Script</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Notification Toast -->
+    <div id="toast" class="toast" style="display: none;"></div>
+
+    <script src="app.js?v=20260822-2"></script>
+</body>
+</html>

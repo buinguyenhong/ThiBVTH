@@ -1,0 +1,841 @@
+[
+  {
+    "id": "tpl_a34ee2a9",
+    "name": "Đề thi Điều dưỡng Nội trú (Khoa Ngoại tổng hợp)",
+    "dept": "Khoa Ngoại tổng hợp",
+    "position": "Điều dưỡng Nội trú",
+    "uses_his": true,
+    "actions": [
+      {
+        "action_code": "NT_NHAN_BENH_KHOA",
+        "score": 2.0,
+        "params": {}
+      },
+      {
+        "action_code": "YL_CHI_DINH_CLS",
+        "score": 2.0,
+        "params": {}
+      },
+      {
+        "action_code": "YL_CHI_DINH_THUOC_VTYT",
+        "score": 2.0,
+        "params": {
+          "num_drugs": 3,
+          "num_supplies": 2
+        }
+      },
+      {
+        "action_code": "YL_TRA_THUOC",
+        "score": 1.0,
+        "params": {}
+      },
+      {
+        "action_code": "YL_DOI_THEM_DICH_VU",
+        "score": 1.0,
+        "params": {}
+      },
+      {
+        "action_code": "TK_KIEM_TON_KHO",
+        "score": 1.0,
+        "params": {}
+      },
+      {
+        "action_code": "CK_CHUYEN_KHOA",
+        "score": 0.5,
+        "params": {}
+      },
+      {
+        "action_code": "RV_CHO_RA_VIEN",
+        "score": 0.5,
+        "params": {}
+      }
+    ]
+  },
+  {
+    "id": "tpl_bb0b127c",
+    "name": "Đề thi Lễ tân Khoa Nội trú (Khoa Ngoại tổng hợp)",
+    "dept": "Khoa Ngoại tổng hợp",
+    "position": "Lễ tân Khoa Nội trú",
+    "uses_his": true,
+    "actions": [
+      {
+        "action_code": "NT_NHAN_BENH_KHOA",
+        "score": 4.0,
+        "params": {}
+      },
+      {
+        "action_code": "TC_THU_TAM_UNG",
+        "score": 4.0,
+        "params": {}
+      },
+      {
+        "action_code": "TK_KIEM_TON_KHO",
+        "score": 2.0,
+        "params": {}
+      }
+    ]
+  },
+  {
+    "id": "tpl_9da374ee",
+    "name": "Đề thi Điều dưỡng Nội trú (Khoa Chấn thương chỉnh hình)",
+    "dept": "Khoa Chấn thương chỉnh hình",
+    "position": "Điều dưỡng Nội trú",
+    "uses_his": true,
+    "actions": [
+      {
+        "action_code": "NT_NHAN_BENH_KHOA",
+        "score": 2.0,
+        "params": {}
+      },
+      {
+        "action_code": "YL_CHI_DINH_CLS",
+        "score": 2.0,
+        "params": {}
+      },
+      {
+        "action_code": "YL_CHI_DINH_THUOC_VTYT",
+        "score": 2.0,
+        "params": {
+          "num_drugs": 3,
+          "num_supplies": 2
+        }
+      },
+      {
+        "action_code": "YL_TRA_THUOC",
+        "score": 1.0,
+        "params": {}
+      },
+      {
+        "action_code": "YL_DOI_THEM_DICH_VU",
+        "score": 1.0,
+        "params": {}
+      },
+      {
+        "action_code": "TK_KIEM_TON_KHO",
+        "score": 1.0,
+        "params": {}
+      },
+      {
+        "action_code": "CK_CHUYEN_KHOA",
+        "score": 0.5,
+        "params": {}
+      },
+      {
+        "action_code": "RV_CHO_RA_VIEN",
+        "score": 0.5,
+        "params": {}
+      }
+    ]
+  },
+  {
+    "id": "tpl_471270a9",
+    "name": "Đề thi Lễ tân Khoa Nội trú (Khoa Chấn thương chỉnh hình)",
+    "dept": "Khoa Chấn thương chỉnh hình",
+    "position": "Lễ tân Khoa Nội trú",
+    "uses_his": true,
+    "actions": [
+      {
+        "action_code": "NT_NHAN_BENH_KHOA",
+        "score": 4.0,
+        "params": {}
+      },
+      {
+        "action_code": "TC_THU_TAM_UNG",
+        "score": 4.0,
+        "params": {}
+      },
+      {
+        "action_code": "TK_KIEM_TON_KHO",
+        "score": 2.0,
+        "params": {}
+      }
+    ]
+  },
+  {
+    "id": "tpl_f0ec13c0",
+    "name": "Đề thi Điều dưỡng Nội trú (Khoa Ngoại thần kinh)",
+    "dept": "Khoa Ngoại thần kinh",
+    "position": "Điều dưỡng Nội trú",
+    "uses_his": true,
+    "actions": [
+      {
+        "action_code": "NT_NHAN_BENH_KHOA",
+        "score": 2.0,
+        "params": {}
+      },
+      {
+        "action_code": "YL_CHI_DINH_CLS",
+        "score": 2.0,
+        "params": {}
+      },
+      {
+        "action_code": "YL_CHI_DINH_THUOC_VTYT",
+        "score": 2.0,
+        "params": {
+          "num_drugs": 3,
+          "num_supplies": 2
+        }
+      },
+      {
+        "action_code": "YL_TRA_THUOC",
+        "score": 1.0,
+        "params": {}
+      },
+      {
+        "action_code": "YL_DOI_THEM_DICH_VU",
+        "score": 1.0,
+        "params": {}
+      },
+      {
+        "action_code": "TK_KIEM_TON_KHO",
+        "score": 1.0,
+        "params": {}
+      },
+      {
+        "action_code": "CK_CHUYEN_KHOA",
+        "score": 0.5,
+        "params": {}
+      },
+      {
+        "action_code": "RV_CHO_RA_VIEN",
+        "score": 0.5,
+        "params": {}
+      }
+    ]
+  },
+  {
+    "id": "tpl_7855e8bd",
+    "name": "Đề thi Lễ tân Khoa Nội trú (Khoa Ngoại thần kinh)",
+    "dept": "Khoa Ngoại thần kinh",
+    "position": "Lễ tân Khoa Nội trú",
+    "uses_his": true,
+    "actions": [
+      {
+        "action_code": "NT_NHAN_BENH_KHOA",
+        "score": 4.0,
+        "params": {}
+      },
+      {
+        "action_code": "TC_THU_TAM_UNG",
+        "score": 4.0,
+        "params": {}
+      },
+      {
+        "action_code": "TK_KIEM_TON_KHO",
+        "score": 2.0,
+        "params": {}
+      }
+    ]
+  },
+  {
+    "id": "tpl_37e9fd9c",
+    "name": "Đề thi Điều dưỡng Nội trú (Khoa Hồi sức tích cực)",
+    "dept": "Khoa Hồi sức tích cực",
+    "position": "Điều dưỡng Nội trú",
+    "uses_his": true,
+    "actions": [
+      {
+        "action_code": "NT_NHAN_BENH_KHOA",
+        "score": 2.0,
+        "params": {}
+      },
+      {
+        "action_code": "YL_CHI_DINH_CLS",
+        "score": 2.0,
+        "params": {}
+      },
+      {
+        "action_code": "YL_CHI_DINH_THUOC_VTYT",
+        "score": 2.0,
+        "params": {
+          "num_drugs": 3,
+          "num_supplies": 2
+        }
+      },
+      {
+        "action_code": "YL_TRA_THUOC",
+        "score": 1.0,
+        "params": {}
+      },
+      {
+        "action_code": "YL_DOI_THEM_DICH_VU",
+        "score": 1.0,
+        "params": {}
+      },
+      {
+        "action_code": "TK_KIEM_TON_KHO",
+        "score": 1.0,
+        "params": {}
+      },
+      {
+        "action_code": "CK_CHUYEN_KHOA",
+        "score": 0.5,
+        "params": {}
+      },
+      {
+        "action_code": "RV_CHO_RA_VIEN",
+        "score": 0.5,
+        "params": {}
+      }
+    ]
+  },
+  {
+    "id": "tpl_1b77f9d8",
+    "name": "Đề thi Lễ tân Khoa Nội trú (Khoa Hồi sức tích cực)",
+    "dept": "Khoa Hồi sức tích cực",
+    "position": "Lễ tân Khoa Nội trú",
+    "uses_his": true,
+    "actions": [
+      {
+        "action_code": "NT_NHAN_BENH_KHOA",
+        "score": 4.0,
+        "params": {}
+      },
+      {
+        "action_code": "TC_THU_TAM_UNG",
+        "score": 4.0,
+        "params": {}
+      },
+      {
+        "action_code": "TK_KIEM_TON_KHO",
+        "score": 2.0,
+        "params": {}
+      }
+    ]
+  },
+  {
+    "id": "tpl_a0063192",
+    "name": "Đề thi Điều dưỡng Nội trú (Khoa Nội)",
+    "dept": "Khoa Nội",
+    "position": "Điều dưỡng Nội trú",
+    "uses_his": true,
+    "actions": [
+      {
+        "action_code": "NT_NHAN_BENH_KHOA",
+        "score": 2.0,
+        "params": {}
+      },
+      {
+        "action_code": "YL_CHI_DINH_CLS",
+        "score": 2.0,
+        "params": {}
+      },
+      {
+        "action_code": "YL_CHI_DINH_THUOC_VTYT",
+        "score": 2.0,
+        "params": {
+          "num_drugs": 3,
+          "num_supplies": 2
+        }
+      },
+      {
+        "action_code": "YL_TRA_THUOC",
+        "score": 1.0,
+        "params": {}
+      },
+      {
+        "action_code": "YL_DOI_THEM_DICH_VU",
+        "score": 1.0,
+        "params": {}
+      },
+      {
+        "action_code": "TK_KIEM_TON_KHO",
+        "score": 1.0,
+        "params": {}
+      },
+      {
+        "action_code": "CK_CHUYEN_KHOA",
+        "score": 0.5,
+        "params": {}
+      },
+      {
+        "action_code": "RV_CHO_RA_VIEN",
+        "score": 0.5,
+        "params": {}
+      }
+    ]
+  },
+  {
+    "id": "tpl_b10da62e",
+    "name": "Đề thi Lễ tân Khoa Nội trú (Khoa Nội)",
+    "dept": "Khoa Nội",
+    "position": "Lễ tân Khoa Nội trú",
+    "uses_his": true,
+    "actions": [
+      {
+        "action_code": "NT_NHAN_BENH_KHOA",
+        "score": 4.0,
+        "params": {}
+      },
+      {
+        "action_code": "TC_THU_TAM_UNG",
+        "score": 4.0,
+        "params": {}
+      },
+      {
+        "action_code": "TK_KIEM_TON_KHO",
+        "score": 2.0,
+        "params": {}
+      }
+    ]
+  },
+  {
+    "id": "tpl_53a29d55",
+    "name": "Đề thi Điều dưỡng Tiếp nhận Trực tiếp (Khoa Cấp cứu)",
+    "dept": "Khoa Cấp cứu",
+    "position": "Điều dưỡng Tiếp nhận trực tiếp",
+    "uses_his": true,
+    "actions": [
+      {
+        "action_code": "TN_TIEP_NHAN",
+        "score": 3.0,
+        "params": {}
+      },
+      {
+        "action_code": "YL_CHI_DINH_CLS",
+        "score": 2.0,
+        "params": {}
+      },
+      {
+        "action_code": "YL_CHI_DINH_THUOC_VTYT",
+        "score": 2.0,
+        "params": {}
+      },
+      {
+        "action_code": "YL_TRA_THUOC",
+        "score": 1.0,
+        "params": {}
+      },
+      {
+        "action_code": "TK_KIEM_TON_KHO",
+        "score": 1.0,
+        "params": {}
+      },
+      {
+        "action_code": "RV_CHO_RA_VIEN",
+        "score": 1.0,
+        "params": {}
+      }
+    ]
+  },
+  {
+    "id": "tpl_797b7387",
+    "name": "Đề thi Lễ tân Tiếp nhận Trực tiếp (Khoa Cấp cứu)",
+    "dept": "Khoa Cấp cứu",
+    "position": "Lễ tân Tiếp nhận trực tiếp",
+    "uses_his": true,
+    "actions": [
+      {
+        "action_code": "TN_TIEP_NHAN",
+        "score": 5.0,
+        "params": {}
+      },
+      {
+        "action_code": "YL_CHI_DINH_CLS",
+        "score": 2.5,
+        "params": {}
+      },
+      {
+        "action_code": "TC_THU_TAM_UNG",
+        "score": 2.5,
+        "params": {}
+      }
+    ]
+  },
+  {
+    "id": "tpl_1f0ffa32",
+    "name": "Đề thi Điều dưỡng Tiếp nhận Trực tiếp (Khoa Phụ Sản)",
+    "dept": "Khoa Phụ Sản",
+    "position": "Điều dưỡng Tiếp nhận trực tiếp",
+    "uses_his": true,
+    "actions": [
+      {
+        "action_code": "TN_TIEP_NHAN",
+        "score": 3.0,
+        "params": {}
+      },
+      {
+        "action_code": "YL_CHI_DINH_CLS",
+        "score": 2.0,
+        "params": {}
+      },
+      {
+        "action_code": "YL_CHI_DINH_THUOC_VTYT",
+        "score": 2.0,
+        "params": {}
+      },
+      {
+        "action_code": "YL_TRA_THUOC",
+        "score": 1.0,
+        "params": {}
+      },
+      {
+        "action_code": "TK_KIEM_TON_KHO",
+        "score": 1.0,
+        "params": {}
+      },
+      {
+        "action_code": "RV_CHO_RA_VIEN",
+        "score": 1.0,
+        "params": {}
+      }
+    ]
+  },
+  {
+    "id": "tpl_1634eeb8",
+    "name": "Đề thi Lễ tân Tiếp nhận Trực tiếp (Khoa Phụ Sản)",
+    "dept": "Khoa Phụ Sản",
+    "position": "Lễ tân Tiếp nhận trực tiếp",
+    "uses_his": true,
+    "actions": [
+      {
+        "action_code": "TN_TIEP_NHAN",
+        "score": 5.0,
+        "params": {}
+      },
+      {
+        "action_code": "YL_CHI_DINH_CLS",
+        "score": 2.5,
+        "params": {}
+      },
+      {
+        "action_code": "TC_THU_TAM_UNG",
+        "score": 2.5,
+        "params": {}
+      }
+    ]
+  },
+  {
+    "id": "tpl_057220c2",
+    "name": "Đề thi Điều dưỡng Tiếp nhận Trực tiếp (Khoa Nhi)",
+    "dept": "Khoa Nhi",
+    "position": "Điều dưỡng Tiếp nhận trực tiếp",
+    "uses_his": true,
+    "actions": [
+      {
+        "action_code": "TN_TIEP_NHAN",
+        "score": 3.0,
+        "params": {}
+      },
+      {
+        "action_code": "YL_CHI_DINH_CLS",
+        "score": 2.0,
+        "params": {}
+      },
+      {
+        "action_code": "YL_CHI_DINH_THUOC_VTYT",
+        "score": 2.0,
+        "params": {}
+      },
+      {
+        "action_code": "YL_TRA_THUOC",
+        "score": 1.0,
+        "params": {}
+      },
+      {
+        "action_code": "TK_KIEM_TON_KHO",
+        "score": 1.0,
+        "params": {}
+      },
+      {
+        "action_code": "RV_CHO_RA_VIEN",
+        "score": 1.0,
+        "params": {}
+      }
+    ]
+  },
+  {
+    "id": "tpl_74a534cc",
+    "name": "Đề thi Lễ tân Tiếp nhận Trực tiếp (Khoa Nhi)",
+    "dept": "Khoa Nhi",
+    "position": "Lễ tân Tiếp nhận trực tiếp",
+    "uses_his": true,
+    "actions": [
+      {
+        "action_code": "TN_TIEP_NHAN",
+        "score": 5.0,
+        "params": {}
+      },
+      {
+        "action_code": "YL_CHI_DINH_CLS",
+        "score": 2.5,
+        "params": {}
+      },
+      {
+        "action_code": "TC_THU_TAM_UNG",
+        "score": 2.5,
+        "params": {}
+      }
+    ]
+  },
+  {
+    "id": "tpl_c5602421",
+    "name": "Đề thi Điều dưỡng Ngoại trú (Khoa Mắt)",
+    "dept": "Khoa Mắt",
+    "position": "Điều dưỡng Ngoại trú",
+    "uses_his": true,
+    "actions": [
+      {
+        "action_code": "TN_TIEP_NHAN",
+        "score": 3.0,
+        "params": {}
+      },
+      {
+        "action_code": "YL_CHI_DINH_CLS",
+        "score": 3.0,
+        "params": {}
+      },
+      {
+        "action_code": "YL_CHI_DINH_THUOC_VTYT",
+        "score": 2.0,
+        "params": {}
+      },
+      {
+        "action_code": "TC_THU_TAM_UNG",
+        "score": 2.0,
+        "params": {}
+      }
+    ]
+  },
+  {
+    "id": "tpl_33c38a2e",
+    "name": "Đề thi Điều dưỡng Ngoại trú (Khoa Tai Mũi Họng)",
+    "dept": "Khoa Tai Mũi Họng",
+    "position": "Điều dưỡng Ngoại trú",
+    "uses_his": true,
+    "actions": [
+      {
+        "action_code": "TN_TIEP_NHAN",
+        "score": 3.0,
+        "params": {}
+      },
+      {
+        "action_code": "YL_CHI_DINH_CLS",
+        "score": 3.0,
+        "params": {}
+      },
+      {
+        "action_code": "YL_CHI_DINH_THUOC_VTYT",
+        "score": 2.0,
+        "params": {}
+      },
+      {
+        "action_code": "TC_THU_TAM_UNG",
+        "score": 2.0,
+        "params": {}
+      }
+    ]
+  },
+  {
+    "id": "tpl_9e32e18e",
+    "name": "Đề thi Điều dưỡng Ngoại trú (Khoa Răng Hàm Mặt)",
+    "dept": "Khoa Răng Hàm Mặt",
+    "position": "Điều dưỡng Ngoại trú",
+    "uses_his": true,
+    "actions": [
+      {
+        "action_code": "TN_TIEP_NHAN",
+        "score": 3.0,
+        "params": {}
+      },
+      {
+        "action_code": "YL_CHI_DINH_CLS",
+        "score": 3.0,
+        "params": {}
+      },
+      {
+        "action_code": "YL_CHI_DINH_THUOC_VTYT",
+        "score": 2.0,
+        "params": {}
+      },
+      {
+        "action_code": "TC_THU_TAM_UNG",
+        "score": 2.0,
+        "params": {}
+      }
+    ]
+  },
+  {
+    "id": "tpl_41b217a7",
+    "name": "Đề thi Điều dưỡng Ngoại trú (Khoa Khám bệnh)",
+    "dept": "Khoa Khám bệnh",
+    "position": "Điều dưỡng Ngoại trú",
+    "uses_his": true,
+    "actions": [
+      {
+        "action_code": "TN_TIEP_NHAN",
+        "score": 3.0,
+        "params": {}
+      },
+      {
+        "action_code": "YL_CHI_DINH_CLS",
+        "score": 3.0,
+        "params": {}
+      },
+      {
+        "action_code": "YL_CHI_DINH_THUOC_VTYT",
+        "score": 2.0,
+        "params": {}
+      },
+      {
+        "action_code": "TC_THU_TAM_UNG",
+        "score": 2.0,
+        "params": {}
+      }
+    ]
+  },
+  {
+    "id": "tpl_7bf0f1d0",
+    "name": "Đề thi Điều dưỡng Ngoại trú (Thận nhân tạo)",
+    "dept": "Thận nhân tạo",
+    "position": "Điều dưỡng Ngoại trú",
+    "uses_his": true,
+    "actions": [
+      {
+        "action_code": "TN_TIEP_NHAN",
+        "score": 3.0,
+        "params": {}
+      },
+      {
+        "action_code": "YL_CHI_DINH_CLS",
+        "score": 3.0,
+        "params": {}
+      },
+      {
+        "action_code": "YL_CHI_DINH_THUOC_VTYT",
+        "score": 2.0,
+        "params": {}
+      },
+      {
+        "action_code": "TC_THU_TAM_UNG",
+        "score": 2.0,
+        "params": {}
+      }
+    ]
+  },
+  {
+    "id": "tpl_bd3cf9fe",
+    "name": "Đề thi Kỹ thuật viên (Khoa Xét Nghiệm)",
+    "dept": "Khoa Xét Nghiệm",
+    "position": "Kỹ thuật viên Cận lâm sàng",
+    "uses_his": true,
+    "actions": [
+      {
+        "action_code": "KQ_TRA_KET_QUA_CLS",
+        "score": 7.0,
+        "params": {
+          "sample_type": "HUYET_HOC_18"
+        }
+      },
+      {
+        "action_code": "TK_KIEM_TON_KHO",
+        "score": 3.0,
+        "params": {}
+      }
+    ]
+  },
+  {
+    "id": "tpl_ef78b18b",
+    "name": "Đề thi Kỹ thuật viên (Khoa Chẩn đoán hình ảnh)",
+    "dept": "Khoa Chẩn đoán hình ảnh",
+    "position": "Kỹ thuật viên Cận lâm sàng",
+    "uses_his": true,
+    "actions": [
+      {
+        "action_code": "KQ_TRA_KET_QUA_CLS",
+        "score": 7.0,
+        "params": {
+          "sample_type": "SIEU_AM"
+        }
+      },
+      {
+        "action_code": "TK_KIEM_TON_KHO",
+        "score": 3.0,
+        "params": {}
+      }
+    ]
+  },
+  {
+    "id": "tpl_9f1707db",
+    "name": "Đề thi Kỹ thuật viên (Khoa Nội soi)",
+    "dept": "Khoa Nội soi",
+    "position": "Kỹ thuật viên Cận lâm sàng",
+    "uses_his": true,
+    "actions": [
+      {
+        "action_code": "KQ_TRA_KET_QUA_CLS",
+        "score": 7.0,
+        "params": {
+          "sample_type": "SIEU_AM"
+        }
+      },
+      {
+        "action_code": "TK_KIEM_TON_KHO",
+        "score": 3.0,
+        "params": {}
+      }
+    ]
+  },
+  {
+    "id": "tpl_07ae4237",
+    "name": "Đề thi Thu ngân Quầy viện phí (Phòng TCKT)",
+    "dept": "Phòng Tài chính kế toán",
+    "position": "Thu ngân Quầy thu phí",
+    "uses_his": true,
+    "actions": [
+      {
+        "action_code": "TC_THU_TAM_UNG",
+        "score": 4.0,
+        "params": {}
+      },
+      {
+        "action_code": "TC_THANH_TOAN_RA_VIEN",
+        "score": 4.0,
+        "params": {}
+      },
+      {
+        "action_code": "TK_KIEM_TON_KHO",
+        "score": 2.0,
+        "params": {}
+      }
+    ]
+  },
+  {
+    "id": "tpl_b6ab52d8",
+    "name": "Đề thi Tin học Văn phòng (Phòng Chăm sóc khách hàng)",
+    "dept": "Phòng Chăm sóc khách hàng",
+    "position": "Nhân viên Văn phòng / CSKH",
+    "uses_his": false,
+    "actions": [
+      {
+        "action_code": "VP_SOAN_THAO_WORD",
+        "score": 5.0,
+        "params": {}
+      },
+      {
+        "action_code": "VP_XU_LY_EXCEL",
+        "score": 5.0,
+        "params": {}
+      }
+    ]
+  },
+  {
+    "id": "tpl_c456bc00",
+    "name": "Đề thi Tin học Văn phòng (Phòng Tổ chức - Hành chính)",
+    "dept": "Phòng Tổ chức - Hành chính",
+    "position": "Nhân viên Văn phòng / CSKH",
+    "uses_his": false,
+    "actions": [
+      {
+        "action_code": "VP_SOAN_THAO_WORD",
+        "score": 5.0,
+        "params": {}
+      },
+      {
+        "action_code": "VP_XU_LY_EXCEL",
+        "score": 5.0,
+        "params": {}
+      }
+    ]
+  }
+]
