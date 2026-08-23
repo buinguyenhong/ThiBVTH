@@ -320,11 +320,55 @@ def prepare_modular_candidate_data(
     dept_name = template.get("dept", "Khoa Ngoại tổng hợp")
     user = cm.get_user_for_dept(dept_name) if template.get("uses_his", True) else None
     
+    # 1. Pre-allocate primary BHYT and VP patients for this candidate if HIS is used
+    primary_bn_bhyt = None
+    primary_bn_vp = None
+    if template.get("uses_his", True):
+        try:
+            raw_bhyt = cm.get_patients(1, must_have_bhyt=True, valid_on=exam_date)[0]
+            source_card = str(raw_bhyt.get("SoBHYT") or "").strip().upper()
+            if len(source_card) == 15:
+                prefix = source_card[:5]
+                seed = f"{exam_date}|{candidate.id}|{candidate.name}|primary|{candidate_index}"
+                salt = 0
+                while True:
+                    digest = hashlib.sha256(f"{seed}|{salt}".encode("utf-8")).hexdigest()
+                    suffix = f"{int(digest[:16], 16) % 10_000_000_000:010d}"
+                    exam_card = prefix + suffix
+                    if exam_card != source_card and exam_card not in used_bhyt_cards:
+                        break
+                    salt += 1
+                used_bhyt_cards.add(exam_card)
+                primary_bn_bhyt = {
+                    **raw_bhyt,
+                    "SoBHYT": exam_card,
+                    "SoBHYT_Nguon": source_card,
+                }
+            else:
+                primary_bn_bhyt = raw_bhyt
+        except Exception:
+            primary_bn_bhyt = None
+            
+        try:
+            primary_bn_vp = cm.get_patients(1, must_have_bhyt=False)[0]
+        except Exception:
+            primary_bn_vp = None
+
+    context = {
+        "bn_bhyt": primary_bn_bhyt,
+        "bn_vp": primary_bn_vp,
+        "ordered_services": [],
+        "ordered_drugs": [],
+        "ordered_supplies": []
+    }
+
     cand_data = {
         "exam_date": exam_date,
         "dept_name": dept_name,
         "user": user,
         "uses_his": template.get("uses_his", True),
+        "bn_bhyt": primary_bn_bhyt,
+        "bn_vp": primary_bn_vp,
         "action_results": [],
         "action_codes": []
     }
@@ -337,31 +381,10 @@ def prepare_modular_candidate_data(
         
         action_spec = ACTION_REGISTRY.get(code)
         if action_spec and "prepare_data" in action_spec:
-            act_data = action_spec["prepare_data"](cm, mm, dept_name, exam_date, params)
+            act_data = action_spec["prepare_data"](cm, mm, dept_name, exam_date, params, context)
             
-            # If patient data is present, mutate BHYT card for safety
             if "bn_bhyt" in act_data:
-                bhyt_patient = act_data["bn_bhyt"]
-                source_card = str(bhyt_patient.get("SoBHYT") or "").strip().upper()
-                if len(source_card) == 15:
-                    prefix = source_card[:5]
-                    seed = f"{exam_date}|{candidate.id}|{candidate.name}|{code}|{candidate_index}"
-                    salt = 0
-                    while True:
-                        digest = hashlib.sha256(f"{seed}|{salt}".encode("utf-8")).hexdigest()
-                        suffix = f"{int(digest[:16], 16) % 10_000_000_000:010d}"
-                        exam_card = prefix + suffix
-                        if exam_card != source_card and exam_card not in used_bhyt_cards:
-                            break
-                        salt += 1
-                    used_bhyt_cards.add(exam_card)
-                    act_data["bn_bhyt"] = {
-                        **bhyt_patient,
-                        "SoBHYT": exam_card,
-                        "SoBHYT_Nguon": source_card,
-                    }
                 cand_data["bn_bhyt"] = act_data["bn_bhyt"]
-            
             if "bn_vp" in act_data:
                 cand_data["bn_vp"] = act_data["bn_vp"]
                 

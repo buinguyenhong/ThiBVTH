@@ -36,12 +36,24 @@ def get_cutoff_date(exam_date_str, days_back=30):
     return start_dt.strftime("%d/%m/%Y"), cutoff_dt.strftime("%d/%m/%Y")
 
 
-# --- ACTION IMPLEMENTATIONS ---
+# --- ACTION IMPLEMENTATIONS (WITH SHARED CANDIDATE CONTEXT) ---
 
 # 1. NT_NHAN_BENH_KHOA: Nhận bệnh nhân vào khoa điều trị (Hàng chờ HIS)
-def prepare_nhan_benh_khoa(cm, mm, dept_name, exam_date, params):
-    bn_bhyt = cm.get_patients(1, must_have_bhyt=True, valid_on=exam_date)[0]
-    bn_vp = cm.get_patients(1, must_have_bhyt=False)[0]
+def prepare_nhan_benh_khoa(cm, mm, dept_name, exam_date, params, context=None):
+    if context and context.get("bn_bhyt"):
+        bn_bhyt = context["bn_bhyt"]
+    else:
+        bn_bhyt = cm.get_patients(1, must_have_bhyt=True, valid_on=exam_date)[0]
+        if context is not None:
+            context["bn_bhyt"] = bn_bhyt
+
+    if context and context.get("bn_vp"):
+        bn_vp = context["bn_vp"]
+    else:
+        bn_vp = cm.get_patients(1, must_have_bhyt=False)[0]
+        if context is not None:
+            context["bn_vp"] = bn_vp
+
     return {
         "bn_bhyt": bn_bhyt,
         "bn_vp": bn_vp,
@@ -72,9 +84,21 @@ def render_docx_nhan_benh_khoa(doc, data, score, q_index):
 
 
 # 2. TN_TIEP_NHAN: Tự tiếp nhận mới bệnh nhân
-def prepare_tiep_nhan(cm, mm, dept_name, exam_date, params):
-    bn_bhyt = cm.get_patients(1, must_have_bhyt=True, valid_on=exam_date)[0]
-    bn_vp = cm.get_patients(1, must_have_bhyt=False)[0]
+def prepare_tiep_nhan(cm, mm, dept_name, exam_date, params, context=None):
+    if context and context.get("bn_bhyt"):
+        bn_bhyt = context["bn_bhyt"]
+    else:
+        bn_bhyt = cm.get_patients(1, must_have_bhyt=True, valid_on=exam_date)[0]
+        if context is not None:
+            context["bn_bhyt"] = bn_bhyt
+
+    if context and context.get("bn_vp"):
+        bn_vp = context["bn_vp"]
+    else:
+        bn_vp = cm.get_patients(1, must_have_bhyt=False)[0]
+        if context is not None:
+            context["bn_vp"] = bn_vp
+
     return {
         "bn_bhyt": bn_bhyt,
         "bn_vp": bn_vp,
@@ -111,12 +135,15 @@ def render_docx_tiep_nhan(doc, data, score, q_index):
     p2.add_run(f"- Lý do vào viện/Chẩn đoán: {bn_vp.get('LyDoKham', 'Sốt cao, ho kéo dài')}")
 
 
-# 3. YL_CHI_DINH_CLS: Chỉ định Cận lâm sàng
-def prepare_chi_dinh_cls(cm, mm, dept_name, exam_date, params):
-    # Retrieve allowed service groups from MappingManager
+# 3. YL_CHI_DINH_CLS: Chỉ định Cận lâm sàng (Thực hiện trên Bệnh nhân BHYT)
+def prepare_chi_dinh_cls(cm, mm, dept_name, exam_date, params, context=None):
+    bn_bhyt = context.get("bn_bhyt") if context else None
+    if not bn_bhyt:
+        bn_bhyt = cm.get_patients(1, must_have_bhyt=True, valid_on=exam_date)[0]
+        if context is not None:
+            context["bn_bhyt"] = bn_bhyt
+
     allowed_groups = mm.get_services_for_dept(dept_name)
-    
-    # Check if params specify counts per group
     counts_config = params.get("counts_by_group", {})
     selected_services = []
     
@@ -125,7 +152,6 @@ def prepare_chi_dinh_cls(cm, mm, dept_name, exam_date, params):
             svcs = cm.get_services(int(count), nhom=grp)
             selected_services.extend(svcs)
     else:
-        # Default: pick 1 imaging/diagnostic and 3 laboratory if available
         img_groups = [g for g in allowed_groups if any(k in g.lower() for k in ["siêu âm", "x-quang", "ct", "mri", "nội soi", "thủ thuật"])]
         lab_groups = [g for g in allowed_groups if any(k in g.lower() for k in ["xét nghiệm", "huyết học", "hóa sinh", "vi sinh", "khí máu"])]
         
@@ -139,13 +165,19 @@ def prepare_chi_dinh_cls(cm, mm, dept_name, exam_date, params):
         if not selected_services:
             selected_services = cm.get_services(3, nhom=allowed_groups if allowed_groups else None)
 
+    if context is not None:
+        context["ordered_services"] = selected_services
+
     return {
         "services": selected_services,
+        "bn_bhyt": bn_bhyt,
         "dept_name": dept_name
     }
 
 def render_docx_chi_dinh_cls(doc, data, score, q_index):
-    add_paragraph_with_run(doc, f"Câu {q_index}) Chỉ định các dịch vụ Cận lâm sàng ({score}đ):", bold=True, size_pt=11, space_after=4)
+    bn_bhyt = data.get("bn_bhyt")
+    pt_name = f" cho bệnh nhân BHYT {bn_bhyt['TenBenhNhan']}" if bn_bhyt else ""
+    add_paragraph_with_run(doc, f"Câu {q_index}) Chỉ định các dịch vụ Cận lâm sàng{pt_name} ({score}đ):", bold=True, size_pt=11, space_after=4)
     services = data.get("services", [])
     for idx, s in enumerate(services, 1):
         p = doc.add_paragraph()
@@ -154,22 +186,36 @@ def render_docx_chi_dinh_cls(doc, data, score, q_index):
         p.add_run(f"- {s['TenDichVu']} ({s.get('NhomDichVu', '')})")
 
 
-# 4. YL_CHI_DINH_THUOC_VTYT: Kê đơn / Lên y lệnh Thuốc & VTYT
-def prepare_chi_dinh_thuoc_vtyt(cm, mm, dept_name, exam_date, params):
+# 4. YL_CHI_DINH_THUOC_VTYT: Kê đơn / Lên y lệnh Thuốc & VTYT (Thực hiện trên Bệnh nhân BHYT)
+def prepare_chi_dinh_thuoc_vtyt(cm, mm, dept_name, exam_date, params, context=None):
+    bn_bhyt = context.get("bn_bhyt") if context else None
+    if not bn_bhyt:
+        bn_bhyt = cm.get_patients(1, must_have_bhyt=True, valid_on=exam_date)[0]
+        if context is not None:
+            context["bn_bhyt"] = bn_bhyt
+
     warehouses = mm.get_pharmacies_for_dept(dept_name)
     num_drugs = int(params.get("num_drugs", 3))
     num_supplies = int(params.get("num_supplies", 2))
     
     drugs = cm.get_drugs(num_drugs, nguon="BH", min_ton=5.0, warehouses=warehouses)
     supplies = cm.get_drugs(num_supplies, nguon="VP", min_ton=5.0, warehouses=warehouses)
+
+    if context is not None:
+        context["ordered_drugs"] = drugs
+        context["ordered_supplies"] = supplies
+
     return {
         "drugs": drugs,
         "supplies": supplies,
+        "bn_bhyt": bn_bhyt,
         "dept_name": dept_name
     }
 
 def render_docx_chi_dinh_thuoc_vtyt(doc, data, score, q_index):
-    add_paragraph_with_run(doc, f"Câu {q_index}) Lên y lệnh Thuốc và Vật tư y tế ({score}đ):", bold=True, size_pt=11, space_after=4)
+    bn_bhyt = data.get("bn_bhyt")
+    pt_name = f" cho bệnh nhân BHYT {bn_bhyt['TenBenhNhan']}" if bn_bhyt else ""
+    add_paragraph_with_run(doc, f"Câu {q_index}) Lên y lệnh Thuốc và Vật tư y tế{pt_name} ({score}đ):", bold=True, size_pt=11, space_after=4)
     
     drugs = data.get("drugs", [])
     if drugs:
@@ -196,46 +242,92 @@ def render_docx_chi_dinh_thuoc_vtyt(doc, data, score, q_index):
             p.add_run(f"- {s['TenDuoc']} ({s['DVTTinh']}) - Số lượng: {random.randint(1, 2)}")
 
 
-# 5. YL_TRA_THUOC: Trả thuốc thừa / Hủy y lệnh
-def prepare_tra_thuoc(cm, mm, dept_name, exam_date, params):
-    warehouses = mm.get_pharmacies_for_dept(dept_name)
-    drug = cm.get_drugs(1, nguon="BH", warehouses=warehouses)[0]
+# 5. YL_TRA_THUOC: Trả thuốc thừa / Hủy y lệnh (Thực hiện trên Thuốc đã kê của Bệnh nhân BHYT)
+def prepare_tra_thuoc(cm, mm, dept_name, exam_date, params, context=None):
+    bn_bhyt = context.get("bn_bhyt") if context else None
+    ordered_drugs = context.get("ordered_drugs", []) if context else []
+    ordered_supplies = context.get("ordered_supplies", []) if context else []
+    
+    if ordered_drugs:
+        drug = random.choice(ordered_drugs)
+    elif ordered_supplies:
+        drug = random.choice(ordered_supplies)
+    else:
+        warehouses = mm.get_pharmacies_for_dept(dept_name)
+        drug = cm.get_drugs(1, nguon="BH", warehouses=warehouses)[0]
+
     return {
         "drug": drug,
-        "quantity": random.randint(1, 2)
+        "quantity": 1,
+        "bn_bhyt": bn_bhyt,
+        "dept_name": dept_name
     }
 
 def render_docx_tra_thuoc(doc, data, score, q_index):
-    add_paragraph_with_run(doc, f"Câu {q_index}) Thực hiện trả thuốc / Hủy y lệnh ({score}đ):", bold=True, size_pt=11, space_after=4)
+    bn_bhyt = data.get("bn_bhyt")
+    pt_name = f" cho bệnh nhân BHYT {bn_bhyt['TenBenhNhan']}" if bn_bhyt else ""
+    add_paragraph_with_run(doc, f"Câu {q_index}) Thực hiện trả thuốc / Hủy y lệnh{pt_name} ({score}đ):", bold=True, size_pt=11, space_after=4)
     d = data["drug"]
     p = doc.add_paragraph()
     p.paragraph_format.space_after = Pt(6)
     p.paragraph_format.left_indent = Inches(0.2)
-    p.add_run(f"- Trả lại kho thuốc: {d['TenDuoc']} ({d['DVTTinh']}) - Số lượng hoàn trả: {data['quantity']} {d['DVTTinh']} (Lý do: Bệnh nhân đỡ đau / Đổi phác đồ).")
+    p.add_run(f"- Hoàn trả lại tủ trực/kho: {d['TenDuoc']} ({d['DVTTinh']}) - Số lượng hoàn trả: {data['quantity']} {d['DVTTinh']} (Lý do: Bệnh nhân đỡ đau / Đổi phác đồ điều trị).")
 
 
-# 6. YL_DOI_THEM_DICH_VU: Đổi hoặc bổ sung dịch vụ CLS
-def prepare_doi_them_dich_vu(cm, mm, dept_name, exam_date, params):
+# 6. YL_DOI_THEM_DICH_VU: Đổi hoặc bổ sung dịch vụ CLS (Đổi từ dịch vụ đã chỉ định trước đó)
+def prepare_doi_them_dich_vu(cm, mm, dept_name, exam_date, params, context=None):
+    bn_bhyt = context.get("bn_bhyt") if context else None
+    ordered = context.get("ordered_services", []) if context else []
+    
+    # 1. Choose swap_out from already ordered services
+    if ordered:
+        swap_out = random.choice(ordered)
+    else:
+        allowed_groups = mm.get_services_for_dept(dept_name)
+        svcs = cm.get_services(1, nhom=allowed_groups if allowed_groups else None)
+        swap_out = svcs[0] if svcs else cm.get_services(1)[0]
+
+    # 2. Choose swap_in and added from allowed groups not in ordered
     allowed_groups = mm.get_services_for_dept(dept_name)
-    svcs = cm.get_services(2, nhom=allowed_groups if allowed_groups else None)
+    ordered_ids = {s.get("MaDichVu") for s in ordered} | {swap_out.get("MaDichVu")}
+    
+    available_svcs = [
+        s for s in cm.services 
+        if s.get("MaDichVu") not in ordered_ids and (not allowed_groups or s.get("NhomDichVu") in allowed_groups)
+    ]
+    
+    if len(available_svcs) >= 2:
+        sampled = random.sample(available_svcs, 2)
+        swap_in, added = sampled[0], sampled[1]
+    elif len(available_svcs) == 1:
+        swap_in = available_svcs[0]
+        added = cm.get_services(1)[0]
+    else:
+        swap_in = cm.get_services(1)[0]
+        added = cm.get_services(1)[0]
+
     return {
-        "swap_out": svcs[0] if len(svcs) > 0 else cm.get_services(1)[0],
-        "swap_in": svcs[1] if len(svcs) > 1 else cm.get_services(1)[0],
-        "added": cm.get_services(1)[0]
+        "swap_out": swap_out,
+        "swap_in": swap_in,
+        "added": added,
+        "bn_bhyt": bn_bhyt,
+        "dept_name": dept_name
     }
 
 def render_docx_doi_them_dich_vu(doc, data, score, q_index):
-    add_paragraph_with_run(doc, f"Câu {q_index}) Thay đổi và bổ sung dịch vụ kỹ thuật ({score}đ):", bold=True, size_pt=11, space_after=4)
+    bn_bhyt = data.get("bn_bhyt")
+    pt_name = f" cho bệnh nhân BHYT {bn_bhyt['TenBenhNhan']}" if bn_bhyt else ""
+    add_paragraph_with_run(doc, f"Câu {q_index}) Thay đổi và bổ sung dịch vụ kỹ thuật{pt_name} ({score}đ):", bold=True, size_pt=11, space_after=4)
     p = doc.add_paragraph()
     p.paragraph_format.space_after = Pt(6)
     p.paragraph_format.left_indent = Inches(0.2)
     p.add_run(f"- Hủy chỉ định dịch vụ: {data['swap_out']['TenDichVu']}\n")
-    p.add_run(f"- Đổi sang dịch vụ: {data['swap_in']['TenDichVu']}\n")
+    p.add_run(f"- Đổi sang chỉ định dịch vụ: {data['swap_in']['TenDichVu']}\n")
     p.add_run(f"- Chỉ định bổ sung thêm: {data['added']['TenDichVu']}")
 
 
 # 7. TK_KIEM_TON_KHO: Tra cứu tồn kho Dược / Tủ trực
-def prepare_kiem_ton_kho(cm, mm, dept_name, exam_date, params):
+def prepare_kiem_ton_kho(cm, mm, dept_name, exam_date, params, context=None):
     warehouses = mm.get_pharmacies_for_dept(dept_name)
     drug = cm.get_drugs(1, warehouses=warehouses)[0]
     return {
@@ -252,7 +344,7 @@ def render_docx_kiem_ton_kho(doc, data, score, q_index):
 
 
 # 8. CK_CHUYEN_KHOA: Chuyển khoa điều trị ca cũ (-30 ngày)
-def prepare_chuyen_khoa(cm, mm, dept_name, exam_date, params):
+def prepare_chuyen_khoa(cm, mm, dept_name, exam_date, params, context=None):
     start_date, end_date = get_cutoff_date(exam_date, days_back=30)
     all_depts = [
         "Khoa Ngoại tổng hợp", "Khoa Chấn thương chỉnh hình", 
@@ -276,7 +368,7 @@ def render_docx_chuyen_khoa(doc, data, score, q_index):
 
 
 # 9. RV_CHO_RA_VIEN: Cho ra viện ca cũ (-30 ngày)
-def prepare_cho_ra_vien(cm, mm, dept_name, exam_date, params):
+def prepare_cho_ra_vien(cm, mm, dept_name, exam_date, params, context=None):
     start_date, end_date = get_cutoff_date(exam_date, days_back=30)
     return {
         "start_date": start_date,
@@ -293,7 +385,7 @@ def render_docx_cho_ra_vien(doc, data, score, q_index):
 
 
 # 10. TC_THU_TAM_UNG: Thu tạm ứng nội trú / ngoại trú
-def prepare_thu_tam_ung(cm, mm, dept_name, exam_date, params):
+def prepare_thu_tam_ung(cm, mm, dept_name, exam_date, params, context=None):
     cases = [
         {"ma_ba": "26004776", "tien": "1,500,000"},
         {"ma_ba": "26001724/NG", "tien": "500,000"}
@@ -312,7 +404,7 @@ def render_docx_thu_tam_ung(doc, data, score, q_index):
 
 
 # 11. TC_THANH_TOAN_RA_VIEN: Thanh toán ra viện
-def prepare_thanh_toan_ra_vien(cm, mm, dept_name, exam_date, params):
+def prepare_thanh_toan_ra_vien(cm, mm, dept_name, exam_date, params, context=None):
     start_date, end_date = get_cutoff_date(exam_date, days_back=30)
     return {
         "start_date": start_date,
@@ -328,7 +420,7 @@ def render_docx_thanh_toan_ra_vien(doc, data, score, q_index):
 
 
 # 12. KQ_TRA_KET_QUA_CLS: Nhập và trả kết quả Cận lâm sàng (Huyết học / Siêu âm / Nội soi)
-def prepare_tra_ket_qua_cls(cm, mm, dept_name, exam_date, params):
+def prepare_tra_ket_qua_cls(cm, mm, dept_name, exam_date, params, context=None):
     sample_type = params.get("sample_type", "HUYET_HOC_18")
     patient = cm.get_patients(1)[0]
     return {
@@ -342,10 +434,9 @@ def render_docx_tra_ket_qua_cls(doc, data, score, q_index):
     p_info = doc.add_paragraph()
     p_info.paragraph_format.space_after = Pt(4)
     p_info.paragraph_format.left_indent = Inches(0.2)
-    p_info.add_run(f"Bệnh nhân: {pt['TenBenhNhan']} - {pt['NamSinh']} ({pt['GioiTinh']})\n").bold = True
+    p_info.add_run(f"Bệnh nhân: {pt['TenBenhNhan']} - {pt.get('NgaySinh') or pt.get('NamSinh', '')} ({pt.get('GioiTinh', 'Nam')})\n").bold = True
     p_info.add_run("Nhập kết quả theo các thông số kỹ thuật bên dưới vào phần mềm:")
 
-    # Render table of 18 hematology parameters or ultrasound description
     sample_type = data.get("sample_type", "HUYET_HOC_18")
     if sample_type == "HUYET_HOC_18":
         table = doc.add_table(rows=1, cols=4)
@@ -383,7 +474,7 @@ def render_docx_tra_ket_qua_cls(doc, data, score, q_index):
 
 
 # 13. VP_SOAN_THAO_WORD: Soạn thảo văn bản hành chính theo NĐ 30
-def prepare_soan_thao_word(cm, mm, dept_name, exam_date, params):
+def prepare_soan_thao_word(cm, mm, dept_name, exam_date, params, context=None):
     return {}
 
 def render_docx_soan_thao_word(doc, data, score, q_index):
@@ -395,7 +486,7 @@ def render_docx_soan_thao_word(doc, data, score, q_index):
 
 
 # 14. VP_XU_LY_EXCEL: Xử lý bảng tính Excel
-def prepare_xu_ly_excel(cm, mm, dept_name, exam_date, params):
+def prepare_xu_ly_excel(cm, mm, dept_name, exam_date, params, context=None):
     return {}
 
 def render_docx_xu_ly_excel(doc, data, score, q_index):
@@ -438,7 +529,7 @@ ACTION_REGISTRY = {
         "code": "YL_CHI_DINH_CLS",
         "name": "Chỉ định dịch vụ Cận lâm sàng",
         "category": "Y lệnh Dịch vụ & Thuốc",
-        "description": "Chỉ định các dịch vụ CLS theo đúng Nhóm Dịch vụ được phân quyền cho Khoa.",
+        "description": "Chỉ định các dịch vụ CLS theo đúng Nhóm Dịch vụ được phân quyền cho Khoa (Thực hiện trên Bệnh nhân BHYT).",
         "default_score": 2.0,
         "uses_his": True,
         "prepare_data": prepare_chi_dinh_cls,
@@ -448,7 +539,7 @@ ACTION_REGISTRY = {
         "code": "YL_CHI_DINH_THUOC_VTYT",
         "name": "Lên y lệnh Thuốc và Vật tư y tế",
         "category": "Y lệnh Dịch vụ & Thuốc",
-        "description": "Lên y lệnh Thuốc BHYT và VTYT Viện phí từ kho dược tương ứng với Khoa.",
+        "description": "Lên y lệnh Thuốc BHYT và VTYT Viện phí từ kho dược tương ứng với Khoa (Thực hiện trên Bệnh nhân BHYT).",
         "default_score": 2.0,
         "uses_his": True,
         "prepare_data": prepare_chi_dinh_thuoc_vtyt,
@@ -458,7 +549,7 @@ ACTION_REGISTRY = {
         "code": "YL_TRA_THUOC",
         "name": "Trả thuốc thừa / Hủy y lệnh",
         "category": "Y lệnh Dịch vụ & Thuốc",
-        "description": "Thực hiện hoàn trả thuốc hoặc hủy y lệnh thuốc đã kê trên phần mềm.",
+        "description": "Thực hiện hoàn trả thuốc đã được kê ở câu Lên y lệnh của Bệnh nhân BHYT.",
         "default_score": 1.0,
         "uses_his": True,
         "prepare_data": prepare_tra_thuoc,
@@ -468,7 +559,7 @@ ACTION_REGISTRY = {
         "code": "YL_DOI_THEM_DICH_VU",
         "name": "Thay đổi và bổ sung dịch vụ kỹ thuật",
         "category": "Y lệnh Dịch vụ & Thuốc",
-        "description": "Đổi từ dịch vụ CLS này sang dịch vụ khác và chỉ định bổ sung thêm dịch vụ.",
+        "description": "Hủy dịch vụ đã chỉ định ở câu CLS, đổi sang dịch vụ mới và chỉ định bổ sung thêm dịch vụ.",
         "default_score": 1.0,
         "uses_his": True,
         "prepare_data": prepare_doi_them_dich_vu,

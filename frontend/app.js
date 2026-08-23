@@ -448,6 +448,39 @@ document.addEventListener('DOMContentLoaded', () => {
             return;
         }
 
+        if (!targetCandidates || targetCandidates.length === 0) {
+            // Auto add from form if user typed name & selected template
+            const name = candNameInput.value.trim();
+            const id = candIdInput.value.trim() || `SBD${String(candidates.length + 1).padStart(3, '0')}`;
+            const dept = candDeptSelect.value;
+            const templateId = candTemplateSelect.value;
+
+            if (name && templateId) {
+                const tpl = templates.find(t => t.id === templateId);
+                const currentScores = [];
+                scoreFieldsGrid.querySelectorAll('.score-input').forEach(inp => {
+                    currentScores.push(parseFloat(inp.value) || 0);
+                });
+
+                const newCand = {
+                    id: id,
+                    name: name,
+                    dept: dept,
+                    template_id: templateId,
+                    template_name: tpl ? tpl.name : 'Đề mặc định',
+                    position: tpl ? tpl.position : 'Điều dưỡng',
+                    scores: currentScores,
+                    selected: true
+                };
+                candidates.push(newCand);
+                renderCandidatesList();
+                targetCandidates = [newCand];
+            } else {
+                showToast("Vui lòng thêm ít nhất 1 thí sinh vào danh sách để sinh đề thi.", "warning");
+                return;
+            }
+        }
+
         const dateParts = examDateVal.split('-');
         const formattedDate = `${dateParts[2]}/${dateParts[1]}/${dateParts[0]}`;
 
@@ -612,6 +645,9 @@ document.addEventListener('DOMContentLoaded', () => {
         templateModalTitle.textContent = "Tạo Mẫu Đề thi Mới";
         tplEditId.value = "";
         tplName.value = "";
+        if (departments && departments.length > 0) {
+            tplDept.value = departments[0];
+        }
         tplPosition.value = "Điều dưỡng";
         renderActionBuilderRows([]);
         templateModal.style.display = "flex";

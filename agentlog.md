@@ -2,25 +2,27 @@
 
 Nhật ký ghi lại các thay đổi, quyết định thiết kế và tiến trình thực thi của Antigravity Coding Assistant trong suốt phiên làm việc.
 
-## [2026-08-22] Tái cấu trúc tổng thể sang Kiến trúc Mô-đun Nghiệp vụ & Trình tạo Mẫu đề (Template Builder)
+## [2026-08-23] Liên kết Nghiệp vụ Xuyên suốt trong Đề thi & Hoàn thiện Tạo Đề mới
 
 ### 1. Quyết định nghiệp vụ & Thiết kế:
-*   **Module hóa câu hỏi:** Tách rời 14 loại nghiệp vụ độc lập (`NT_NHAN_BENH_KHOA`, `TN_TIEP_NHAN`, `YL_CHI_DINH_CLS`, `YL_CHI_DINH_THUOC_VTYT`, `TK_KIEM_TON_KHO`...) trong `backend/exam_actions.py`.
-*   **Phân định rõ tiếp nhận và nhập khoa:** `NT_NHAN_BENH_KHOA` sinh T-SQL nạp sẵn bệnh nhân vào hàng chờ `NoiTru_NhapVien`. `TN_TIEP_NHAN` in đủ thông tin 1 ca BHYT và 1 ca Viện phí lên đề Word để thí sinh tự nhập tay vào HIS, SQL chỉ validate kiểm tra thẻ chưa trùng.
-*   **Dynamic Template Builder & Clone:** Cho phép người dùng tự do định nghĩa mẫu đề thi, tích chọn nghiệp vụ, đặt điểm từng câu (tổng = 10đ), lưu vào `data/config/exam_templates.json` và hỗ trợ nhân bản (clone) đề sang khoa khác.
-*   **Phân quyền Dịch vụ & Ánh xạ Kho Dược theo Khoa (Master-Detail & Select2 UI):** Thiết kế lại giao diện Tab Phân quyền theo mô hình Master-Detail (danh sách Khoa bên trái kèm tìm kiếm, bảng cấu hình chi tiết bên phải). Sử dụng thanh tìm kiếm autocomplete đa mục (Select2 style) kèm danh sách tag chips có nút `×` để gỡ bỏ trực quan, không bị tràn màn hình.
-*   **Format Dược 7 cột chuẩn:** Trở lại định dạng 7 cột gốc xuất trực tiếp từ HIS (`MaDuoc, TenDuoc, DVTTinh, MaKho, Nguon, SoLuongTon, TrangThai`).
-*   **Nâng cấp UI 5 Tab:** Thiết kế lại toàn bộ giao diện Web (Thực thi tạo đề, Quản lý Mẫu đề, Phân quyền Dịch vụ & Kho, Cài đặt danh mục, Tra cứu tồn kho) với modal tạo/sửa/clone đề trực quan.
+*   **Liên kết nghiệp vụ lâm sàng trong cùng 1 đề:**
+    - Toàn bộ các thao tác *Chỉ định Cận lâm sàng (CLS)*, *Lên y lệnh Thuốc & VTYT*, *Thay đổi/Bổ sung dịch vụ kỹ thuật*, *Hoàn trả thuốc thừa* đều được thực hiện trên **cùng Bệnh nhân BHYT** đã tiếp nhận/nhận bệnh ở câu đầu tiên.
+    - **Câu Đổi dịch vụ (`YL_DOI_THEM_DICH_VU`):** Bốc chính xác 1 dịch vụ đã nằm trong danh sách đã chỉ định ở câu Chỉ định CLS (`YL_CHI_DINH_CLS`) để yêu cầu hủy/đổi sang dịch vụ mới.
+    - **Câu Trả thuốc/VTYT (`YL_TRA_THUOC`):** Bốc chính xác 1 mặt hàng thuốc/VTYT đã được kê đơn ở câu Lên y lệnh (`YL_CHI_DINH_THUOC_VTYT`) để yêu cầu hoàn trả lại tủ trực/kho.
+*   **Cải tiến thao tác Tạo đề & Sinh đề trên Web:**
+    - Nếu người dùng nhập thông tin thí sinh nhưng chưa bấm "Thêm vào danh sách" mà bấm ngay "Sinh đề thi & Xuất file" $\rightarrow$ Hệ thống tự động thêm thí sinh và sinh đề ngay lập tức.
+    - Modal "Tạo Mẫu Đề Mới" (Tab 2) tự động chọn khoa phòng mặc định, kiểm tra tổng điểm 10đ và lưu qua API `POST /api/templates`.
 
 ### 2. Công việc đã thực hiện:
-*   Tạo `backend/mapping_manager.py`: Quản lý phân quyền Nhóm Dịch Vụ và Kho Dược theo Khoa.
-*   Tạo `backend/exam_actions.py`: Registry 14 nghiệp vụ nguyên tử (data generator, docx renderer, sql flag).
-*   Tạo `backend/template_manager.py`: Engine quản lý CRUD & Clone Mẫu đề thi kèm bộ Seed mẫu mặc định cho tất cả các khoa.
-*   Cập nhật `backend/catalog_manager.py`: Đọc chuẩn 7 cột cho thuốc, cung cấp `get_service_groups()`, `get_warehouses()`, và bộ lọc kết hợp `MappingManager`.
-*   Cập nhật `backend/exam_generator.py` & `backend/sql_generator.py`: Hỗ trợ kết xuất đề DOCX, file Excel và script T-SQL từ các actions trong Template.
-*   Cập nhật `backend/app.py`: Bổ sung toàn bộ REST APIs (`/api/actions`, `/api/templates`, `/api/mappings/*`, `/api/metadata/*`), nâng cấp endpoint sinh đề `/api/generate`.
-*   Tạo `backend/test_modular_system.py`: Bộ kiểm thử toàn diện cho module mapping, templates, actions và API.
-*   Nâng cấp `frontend/index.html`, `frontend/style.css`, `frontend/app.js`: Giao diện 5 Tab Glassmorphism, Template Builder modal, Matrix checkbox table, và Pharmacy chips selector.
+*   Cập nhật `backend/exam_actions.py`: Cung cấp `CandidateContext` cho tất cả 14 nghiệp vụ, liên kết bệnh nhân BHYT, lưu `ordered_services`, `ordered_drugs`, `ordered_supplies` và render đề thi Word logic, mạch lạc.
+*   Cập nhật `backend/app.py`: `prepare_modular_candidate_data` khởi tạo `candidate_context` với bệnh nhân BHYT (kèm mã thẻ BHYT ngẫu nhiên an toàn) và truyền vào từng action.
+*   Cập nhật `frontend/app.js`: Tự động nạp thí sinh khi sinh đề trực tiếp, hoàn thiện Modal tạo mẫu đề mới.
+*   Chuẩn hóa 6/6 cặp Script SQL $\leftrightarrow$ File mẫu Excel $\leftrightarrow$ Bộ nạp Backend.
+*   Đồng bộ toàn bộ mã nguồn lên Git repository GitHub: `https://github.com/buinguyenhong/ThiBVTH`.
+
+### 3. Xác minh:
+*   Toàn bộ 16 kiểm thử đơn vị (`Ran 16 tests ... OK`).
+*   Chạy kịch bản tích hợp sinh đề thi mẫu liên kết 5 câu hỏi: Kiểm tra file Word xuất ra chứa đúng tên bệnh nhân BHYT xuyên suốt, câu Đổi dịch vụ hủy đúng dịch vụ câu trước, câu Trả thuốc trả đúng thuốc đã kê.
 
 *   Tạo `Scripts/07_export_phan_quyen_dich_vu_theo_khoa.sql`: Sửa lại câu truy vấn JOIN chuẩn xác qua `DM_NhomDichVu` / `DM_LoaiDichVu` để lấy đúng tên nhóm dịch vụ thay vì chữ 'X', đồng thời kiểm tra `CoGiaDichVu = 1` và `TamNgung = 0`.
 *   Cập nhật `Scripts/05_export_danh_muc_dich_vu.sql`: Trích xuất toàn bộ dịch vụ thỏa `CoGiaDichVu = 1` và `TamNgung = 0`, lấy tên nhóm trực tiếp từ bảng nhóm/loại dịch vụ để không bị sót dịch vụ.
