@@ -46,6 +46,12 @@ CATALOG_SCRIPTS = {
     "users.xlsx": os.path.join(
         BASE_DIR, "Scripts", "06_export_user_theo_khoa_phong.sql"
     ),
+    "service_mappings.xlsx": os.path.join(
+        BASE_DIR, "Scripts", "07_export_phan_quyen_dich_vu_theo_khoa.sql"
+    ),
+    "pharmacy_mappings.xlsx": os.path.join(
+        BASE_DIR, "Scripts", "08_export_anh_xa_kho_duoc_theo_khoa.sql"
+    ),
 }
 
 # Initialize Managers

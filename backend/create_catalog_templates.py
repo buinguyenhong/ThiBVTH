@@ -1,46 +1,38 @@
 import openpyxl
 import os
 
+BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+CATALOG_DIR = os.path.join(BASE_DIR, "data", "catalogs")
+
 def create_folders():
-    paths = [
-        r"C:\Users\Admin\.gemini\antigravity\scratch\ExamGenerator\backend",
-        r"C:\Users\Admin\.gemini\antigravity\scratch\ExamGenerator\frontend",
-        r"C:\Users\Admin\.gemini\antigravity\scratch\ExamGenerator\data\catalogs",
-        r"C:\Users\Admin\.gemini\antigravity\scratch\ExamGenerator\data\output"
-    ]
-    for p in paths:
-        if not os.path.exists(p):
-            os.makedirs(p)
-            print(f"Created folder: {p}")
+    os.makedirs(CATALOG_DIR, exist_ok=True)
+    os.makedirs(os.path.join(BASE_DIR, "data", "output"), exist_ok=True)
+    os.makedirs(os.path.join(BASE_DIR, "data", "config"), exist_ok=True)
 
 def create_patients_catalog():
     wb = openpyxl.Workbook()
     ws = wb.active
     ws.title = "Patients"
-    
-    headers = ["MaYTe", "TenBenhNhan", "NgaySinh", "GioiTinh", "DiaChiLienHe", "SoBHYT", "BHYTTuNgay", "BHYTDenNgay", "DKKCB"]
-    ws.append(headers)
-    
-    sample_data = [
-        ["26034346", "Lê Rất Vui", "1991-11-02", "Nữ", "Thôn 1 , Xã Hòa Phú, Thành phố Buôn Ma Thuột, Đắk Lắk", "DN4666622153422", "2024-01-01", "2026-12-31", "66232"],
-        ["26000270", "Nguyễn Thị Hường", "1996-02-07", "Nữ", "Thôn 10, Xã Nam Bình , Huyện Đắk Song, Đắk Nông", "DN4666624113158", "2024-01-01", "2026-12-31", "66232"],
-        ["1127779", "Đồng Viết Thanh", "1994-06-23", "Nam", "21/1 Lý Tự Trọng, Phường Tân An, Thành phố Buôn Ma Thuột, Đắk Lắk", "DN4666621963533", "2024-01-01", "2026-12-31", "66232"],
-        ["26034344", "Lưu Thành Đạt", "1992-06-14", "Nam", "Thôn Sơn Cường , Xã Buôn Triết, Huyện Lắk, Đắk Lắk", "DK2666623568069", "2024-06-04", "2027-01-03", "66232"],
-        ["25032332", "Nguyễn Thị Tốt", "1988-12-15", "Nữ", "Tân Lợi, Buôn Ma Thuột, Đắk Lắk", "GD4666621303867", "2024-01-01", "2026-12-31", "66068"],
-        ["25032336", "Ksor H' Trâm", "1984-05-11", "Nữ", "EaTam, Buôn Ma Thuột, Đắk Lắk", "GD4666621303864", "2024-01-01", "2026-12-31", "66068"],
-        ["24047923", "Nguyễn Thị Hương", "1990-03-12", "Nữ", "Tân Lập, Buôn Ma Thuột, Đắk Lắk", "TE1666624722228", "2024-01-01", "2026-12-31", "66068"],
-        ["26029578", "Nguyễn Duy Bền", "1985-08-20", "Nam", "Tự An, Buôn Ma Thuột, Đắk Lắk", "", "", "", ""],
-        ["20161400", "Lê Phúc Thùy Linh", "2016-04-18", "Nữ", "Tân Tiến, Buôn Ma Thuột, Đắk Lắk", "TE1676624722370", "2024-01-01", "2026-12-31", "66068"],
-        ["26029570", "Hà Thị Phàng", "1975-10-02", "Nữ", "Khánh Xuân, Buôn Ma Thuột, Đắk Lắk", "", "", "", ""],
-        ["26029550", "Bùi Khắc Quý", "1968-11-22", "Nam", "Ea Kar, Đắk Lắk", "DN4666621963599", "2024-01-01", "2026-12-31", "66232"],
-        ["22000008", "Bùi Minh Thiên", "1983-07-14", "Nam", "Krông Pắc, Đắk Lắk", "GD4666621303899", "2024-01-01", "2026-12-31", "66068"],
-        ["19011994", "Bùi Thị Lừng", "1994-01-19", "Nữ", "Thành Nhất, Buôn Ma Thuột, Đắk Lắk", "DN4666622153400", "2024-01-01", "2026-12-31", "66232"],
-        ["23027807", "Bùi Thị Thận", "1955-09-05", "Nữ", "Ea H'leo, Đắk Lắk", "", "", "", ""]
+    ws.append(["MaYTe", "TenBenhNhan", "NgaySinh", "GioiTinh", "DiaChiLienHe", "SoBHYT", "BHYTTuNgay", "BHYTDenNgay", "DKKCB"])
+    patients = [
+        ["26034346", "Lê Rất Vui", "02/11/1991", "Nữ", "Thôn 1, Xã Hòa Phú, TP. Buôn Ma Thuột, Đắk Lắk", "DN4666622153422", "01/01/2024", "31/12/2026", "66232"],
+        ["26000270", "Nguyễn Thị Hường", "07/02/1996", "Nữ", "Thôn 10, Xã Nam Bình, Huyện Đắk Song, Đắk Nông", "DN4666624113158", "01/01/2024", "31/12/2026", "66232"],
+        ["1127779", "Đồng Viết Thanh", "23/06/1994", "Nam", "21/1 Lý Tự Trọng, P. Tân An, TP. Buôn Ma Thuột", "DN4666621963533", "01/01/2024", "31/12/2026", "66232"],
+        ["26034344", "Lưu Thành Đạt", "14/06/1992", "Nam", "Thôn Sơn Cường, Xã Buôn Triết, Huyện Lắk", "DK2666623568069", "04/06/2024", "03/01/2027", "66232"],
+        ["25032332", "Nguyễn Thị Tốt", "15/12/1988", "Nữ", "Tân Lợi, Buôn Ma Thuột, Đắk Lắk", "GD4666621303867", "01/01/2024", "31/12/2026", "66068"],
+        ["25032336", "Ksor H' Trâm", "11/05/1984", "Nữ", "EaTam, Buôn Ma Thuột, Đắk Lắk", "GD4666621303864", "01/01/2024", "31/12/2026", "66068"],
+        ["24047923", "Nguyễn Thị Hương", "12/03/1990", "Nữ", "Tân Lập, Buôn Ma Thuột, Đắk Lắk", "TE1666624722228", "01/01/2024", "31/12/2026", "66068"],
+        ["20161400", "Lê Phúc Thùy Linh", "18/04/2016", "Nữ", "Tân Tiến, Buôn Ma Thuột, Đắk Lắk", "TE1676624722370", "01/01/2024", "31/12/2026", "66068"],
+        ["26029578", "Nguyễn Duy Bền", "20/08/1985", "Nam", "Tự An, Buôn Ma Thuột, Đắk Lắk", "", "", "", ""],
+        ["26029570", "Hà Thị Phàng", "02/10/1975", "Nữ", "Khánh Xuân, Buôn Ma Thuột, Đắk Lắk", "", "", "", ""],
+        ["26029550", "Bùi Khắc Quý", "22/11/1968", "Nam", "Ea Kar, Đắk Lắk", "DN4666621963599", "01/01/2024", "31/12/2026", "66232"],
+        ["22000008", "Bùi Minh Thiên", "14/07/1983", "Nam", "Krông Pắc, Đắk Lắk", "GD4666621303899", "01/01/2024", "31/12/2026", "66068"],
+        ["19011994", "Bùi Thị Lừng", "19/01/1994", "Nữ", "Thành Nhất, Buôn Ma Thuột, Đắk Lắk", "DN4666622153400", "01/01/2024", "31/12/2026", "66232"],
+        ["23027807", "Bùi Thị Thận", "05/09/1955", "Nữ", "Ea H'leo, Đắk Lắk", "", "", "", ""]
     ]
-    for row in sample_data:
-        ws.append(row)
-        
-    file_path = r"C:\Users\Admin\.gemini\antigravity\scratch\ExamGenerator\data\catalogs\patients.xlsx"
+    for p in patients:
+        ws.append(p)
+    file_path = os.path.join(CATALOG_DIR, "patients.xlsx")
     wb.save(file_path)
     print(f"Saved patients catalog template to: {file_path}")
 
@@ -48,65 +40,23 @@ def create_drugs_catalog():
     wb = openpyxl.Workbook()
     ws = wb.active
     ws.title = "Drugs_Supplies"
-    
-    headers = [
-        "MaDuoc",
-        "TenDuoc",
-        "DVTTinh",
-        "MaKho",
-        "TenKho",
-        "KhoaPhong",
-        "Nguon",
-        "SoLuongTon",
-        "TrangThai",
-        "ThoiDiemChotTon",
+    ws.append(["MaDuoc", "TenDuoc", "DVTTinh", "MaKho", "TenKho", "KhoaPhong", "Nguon", "SoLuongTon", "TrangThai", "ThoiDiemChotTon"])
+    drugs = [
+        ["jart1", "Jardiance 10mg", "Viên", "KHO_LE_NOITRU", "Kho lẻ Nội trú", "Khoa Nội", "BH", 1500, 1, "23/08/2026 10:00:00"],
+        ["MEDT32", "MEDOLEB 200mg", "Viên", "KHO_LE_NOITRU", "Kho lẻ Nội trú", "Khoa Nội", "BH", 800, 1, "23/08/2026 10:00:00"],
+        ["NEMT1", "NEXIUM MUPS 40mg", "Gói", "KHO_LE_NOITRU", "Kho lẻ Nội trú", "Khoa Nội", "BH", 1200, 1, "23/08/2026 10:00:00"],
+        ["BoTV65", "Bơm tiêm MPV sử dụng 1 lần 20ml", "Cái", "KHO_VTYT_NOITRU", "Kho vật tư Nội trú", "Khoa Ngoại tổng hợp", "VP", 300, 1, "23/08/2026 10:00:00"],
+        ["KiTV7", "Kim tiêm MPV", "Cái", "KHO_VTYT_NOITRU", "Kho vật tư Nội trú", "Khoa Ngoại tổng hợp", "VP", 500, 1, "23/08/2026 10:00:00"],
+        ["ALLER1", "ALLERMINE 4mg", "Viên", "KHO_LE_NOITRU", "Kho lẻ Nội trú", "Khoa Nội", "VP", 600, 1, "23/08/2026 10:00:00"],
+        ["BARO1", "BAROLE 20 20mg", "Viên", "KHO_LE_NOITRU", "Kho lẻ Nội trú", "Khoa Nội", "VP", 1000, 1, "23/08/2026 10:00:00"],
+        ["BaTV2", "Băng thun 3 móc Urgoband 10cmx4,5m", "Cuộn", "KHO_VTYT_NOITRU", "Kho vật tư Nội trú", "Khoa Ngoại tổng hợp", "VP", 250, 1, "23/08/2026 10:00:00"],
+        ["GLU24", "GLUCOSE 5%, 5%/500ml", "Chai", "KHO_LE_NOITRU", "Kho lẻ Nội trú", "Khoa Cấp cứu", "BH", 400, 1, "23/08/2026 10:00:00"],
+        ["NuCT18", "NƯỚC CẤT TIÊM, 10ml, Ống", "Ống", "KHO_LE_NOITRU", "Kho lẻ Nội trú", "Khoa Cấp cứu", "BH", 3000, 1, "23/08/2026 10:00:00"],
+        ["QuXT2", "Que thử nước tiểu 10 thông số", "Que", "KHO_VTYT_XN", "Kho vật tư Xét nghiệm", "Khoa Xét Nghiệm", "VP", 400, 1, "23/08/2026 10:00:00"]
     ]
-    ws.append(headers)
-    
-    sample_data = [
-        ["jart1", "Jardiance 10mg", "Viên", "KHO_LE_NOITRU", "BH", 1500, 1],
-        ["MEDT32", "MEDOLEB 200mg", "Viên", "KHO_LE_NOITRU", "BH", 800, 1],
-        ["NEMT1", "NEXIUM MUPS 40mg", "Gói", "KHO_LE_NOITRU", "BH", 1200, 1],
-        ["BoTV65", "Bơm tiêm MPV sử dụng 1 lần 20ml", "Cái", "KHO_VTYT_NOITRU", "VP", 300, 1],
-        ["KiTV7", "Kim tiêm MPV", "Cái", "KHO_VTYT_NOITRU", "VP", 500, 1],
-        ["ALLER1", "ALLERMINE 4mg", "Viên", "KHO_LE_NOITRU", "VP", 600, 1],
-        ["BARO1", "BAROLE 20 20mg", "Viên", "KHO_LE_NOITRU", "VP", 1000, 1],
-        ["BaTV2", "Băng thun 3 móc Urgoband 10cmx4,5m", "Cuộn", "KHO_VTYT_NOITRU", "VP", 250, 1],
-        ["GaPV", "Gạc PT 10x10x12 lớp vô trùng KCQ", "Miếng", "KHO_VTYT_NOITRU", "VP", 2000, 1],
-        ["GaTV15", "Gạc tẩm cồn 5cm x 6 cm x 4 lớp", "Miếng", "KHO_VTYT_NOITRU", "VP", 1500, 1],
-        ["BoTV24", "Bơm tiêm MPV 3ml 25G x 1\"", "Cái", "KHO_VTYT_NOITRU", "VP", 800, 1],
-        ["GaTV5", "Găng tay phẫu thuật tiệt trùng số 7.5", "Đôi", "KHO_VTYT_NOITRU", "VP", 1000, 1],
-        ["GLU24", "GLUCOSE 5%, 5%/500ml, Chai (Fresenius Kabi VN)", "Chai", "KHO_LE_NOITRU", "BH", 400, 1],
-        ["VAIT3", "VAMINOLACT, 6.5%, 100ml, Chai (Fresenius Kabi Áo)", "Chai", "KHO_LE_NOITRU", "BH", 150, 1],
-        ["NuCT18", "NƯỚC CẤT TIÊM, 10ml, Ống (Dược Hải Dương)", "Ống", "KHO_LE_NOITRU", "BH", 3000, 1],
-        ["BOTV50", "Bơm tiêm MPV 3ml, Cái", "Cái", "KHO_VTYT_NOITRU", "BH", 1200, 1],
-        ["Rect1", "Rectiofar 3ml", "Tuýp", "KHO_LE_NOITRU", "VP", 200, 1],
-        ["BaCV20", "Bao cao su An Phú", "Hộp", "KHO_VTYT_NOITRU", "VP", 50, 1],
-        ["BoTV17", "Bơm tiêm 10ml MPV-VN", "Cái", "KHO_VTYT_NOITRU", "VP", 1000, 1],
-        ["CoSV3", "Cồn sát trùng 70 độ", "Lít", "KHO_VTYT_NOITRU", "VP", 10, 1],
-        ["GaTV26", "Găng tay hút đàm", "Đôi", "KHO_VTYT_NOITRU", "VP", 500, 1],
-        ["QuXT2", "Que thử nước tiểu 10 thông số", "Que", "KHO_VTYT_XN", "VP", 400, 1],
-        ["ThXT2", "Thuốc thử Glucose", "Hộp", "KHO_VTYT_XN", "VP", 15, 1],
-        ["ThXT3", "Thuốc thử Creatinin", "Hộp", "KHO_VTYT_XN", "VP", 12, 1],
-        ["ThXT24", "Thuốc thử CRP", "Hộp", "KHO_VTYT_XN", "VP", 8, 1],
-        ["ThXT4", "Thuốc thử Triglycerid", "Hộp", "KHO_VTYT_XN", "VP", 10, 1]
-    ]
-    for row in sample_data:
-        is_lab_stock = row[3] == "KHO_VTYT_XN"
-        warehouse_name = (
-            "Kho vật tư Xét nghiệm"
-            if is_lab_stock
-            else "Kho lẻ Nội trú"
-        )
-        department_name = "Khoa Xét Nghiệm" if is_lab_stock else "Khoa Nội"
-        ws.append(
-            row[:4]
-            + [warehouse_name, department_name]
-            + row[4:]
-            + [""]
-        )
-        
-    file_path = r"C:\Users\Admin\.gemini\antigravity\scratch\ExamGenerator\data\catalogs\drugs.xlsx"
+    for d in drugs:
+        ws.append(d)
+    file_path = os.path.join(CATALOG_DIR, "drugs.xlsx")
     wb.save(file_path)
     print(f"Saved drugs catalog template to: {file_path}")
 
@@ -114,44 +64,27 @@ def create_services_catalog():
     wb = openpyxl.Workbook()
     ws = wb.active
     ws.title = "Services"
-    
-    headers = ["MaDichVu", "TenDichVu", "NhomDichVu", "KhoaThucHien", "TrangThai"]
-    ws.append(headers)
-    
-    sample_data = [
-        ["SADT", "Siêu âm Doppler tim", "Siêu âm", "CDHA", 1],
-        ["SAOB", "Siêu âm bụng", "Siêu âm", "CDHA", 1],
-        ["SATG", "Siêu âm tuyến giáp", "Siêu âm", "CDHA", 1],
-        ["SAMP", "Siêu âm màng phổi", "Siêu âm", "CDHA", 1],
-        ["SADPM", "Siêu âm Doppler mạch máu", "Siêu âm", "CDHA", 1],
-        ["SAQT", "Siêu âm qua thóp", "Siêu âm", "CDHA", 1],
-        ["XQNT", "Chụp Xquang ngực thẳng [Số hóa 1 phim]", "X-quang", "CDHA", 1],
-        ["XQCC", "Chụp Xquang xương cổ chân thẳng, nghiêng hoặc chếch [Số hóa 2 phim]", "X-quang", "CDHA", 1],
-        ["CTAC", "Chụp cắt lớp vi tính động mạch chủ-chậu", "CT Scan", "CDHA", 1],
-        ["ABO", "Định nhóm máu hệ ABO (Kỹ thuật phiến đá)", "Xét nghiệm", "XN", 1],
-        ["RH", "Định nhóm máu hệ Rh(D) (Kỹ thuật phiến đá)", "Xét nghiệm", "XN", 1],
-        ["BLT", "Tổng phân tích tế bào máu ngoại vi (bằng máy đếm laser)", "Xét nghiệm", "XN", 1],
-        ["CRP", "CRP Định lượng", "Xét nghiệm", "XN", 1],
-        ["DGD", "Điện giải đồ (Na, K, Cl) [Máu]", "Xét nghiệm", "XN", 1],
-        ["CA", "Định lượng Calci toàn phần [Máu]", "Xét nghiệm", "XN", 1],
-        ["BILGT", "Định lượng Bilirubin gián tiếp [Máu]", "Xét nghiệm", "XN", 1],
-        ["BILT", "Định lượng Bilirubin toàn phần [Máu]", "Xét nghiệm", "XN", 1],
-        ["BILTT", "Định lượng Bilirubin trực tiếp [Máu]", "Xét nghiệm", "XN", 1],
-        ["UTEN", "Tổng phân tích nước tiểu (10 thông số) bằng máy tự động", "Xét nghiệm", "XN", 1],
-        ["GLUM", "Định lượng Glucose [Máu]", "Xét nghiệm", "XN", 1],
-        ["CREM", "Định lượng Creatinin [Máu]", "Xét nghiệm", "XN", 1],
-        ["TRIGM", "Định lượng Triglycerid [Máu]", "Xét nghiệm", "XN", 1],
-        ["NSDD", "Nội soi dạ dày tá tràng", "Nội soi", "CDHA", 1],
-        ["CDVD", "Chiếu đèn điều trị vàng da sơ sinh", "Thủ thuật", "Nhi", 1],
-        ["TB", "Tắm bé", "Thủ thuật", "Nhi", 1],
-        ["KNOI", "Khám nội", "Khám bệnh", "KKB", 1],
-        ["KNG", "Khám ngoại", "Khám bệnh", "KKB", 1],
-        ["KPS", "Khám phụ sản", "Khám bệnh", "KKB", 1]
+    ws.append(["MaDichVu", "TenDichVu", "NhomDichVu", "KhoaThucHien", "TrangThai"])
+    services = [
+        ["SADT", "Siêu âm Doppler tim", "Siêu âm", "Khoa Chẩn đoán hình ảnh", 1],
+        ["SAOB", "Siêu âm bụng tổng quát", "Siêu âm", "Khoa Chẩn đoán hình ảnh", 1],
+        ["SATG", "Siêu âm tuyến giáp", "Siêu âm", "Khoa Chẩn đoán hình ảnh", 1],
+        ["SAMP", "Siêu âm màng phổi", "Siêu âm", "Khoa Chẩn đoán hình ảnh", 1],
+        ["XQNT", "Chụp Xquang ngực thẳng [Số hóa 1 phim]", "X-quang", "Khoa Chẩn đoán hình ảnh", 1],
+        ["XQCS", "Chụp Xquang cột sống thắt lưng thẳng nghiêng", "X-quang", "Khoa Chẩn đoán hình ảnh", 1],
+        ["CTSN", "Chụp CLVT sọ não không tiêm thuốc cản quang", "CT Scan", "Khoa Chẩn đoán hình ảnh", 1],
+        ["BLT", "Tổng phân tích tế bào máu ngoại vi (bằng máy đếm laser)", "Xét nghiệm", "Khoa Xét Nghiệm", 1],
+        ["CRP", "CRP Định lượng [Máu]", "Xét nghiệm", "Khoa Xét Nghiệm", 1],
+        ["DGD", "Điện giải đồ (Na, K, Cl) [Máu]", "Xét nghiệm", "Khoa Xét Nghiệm", 1],
+        ["GLUM", "Định lượng Glucose [Máu]", "Xét nghiệm", "Khoa Xét Nghiệm", 1],
+        ["CREM", "Định lượng Creatinin [Máu]", "Xét nghiệm", "Khoa Xét Nghiệm", 1],
+        ["UTEN", "Tổng phân tích nước tiểu (10 thông số)", "Xét nghiệm", "Khoa Xét Nghiệm", 1],
+        ["NSDD", "Nội soi dạ dày tá tràng chẩn đoán", "Nội soi", "Khoa Thăm dò chức năng", 1],
+        ["DNT", "Điện tâm đồ (ECG)", "Thăm dò chức năng", "Khoa Thăm dò chức năng", 1]
     ]
-    for row in sample_data:
-        ws.append(row)
-        
-    file_path = r"C:\Users\Admin\.gemini\antigravity\scratch\ExamGenerator\data\catalogs\services.xlsx"
+    for s in services:
+        ws.append(s)
+    file_path = os.path.join(CATALOG_DIR, "services.xlsx")
     wb.save(file_path)
     print(f"Saved services catalog template to: {file_path}")
 
@@ -159,28 +92,78 @@ def create_users_catalog():
     wb = openpyxl.Workbook()
     ws = wb.active
     ws.title = "Users"
-    
-    headers = ["TenDangNhap", "MatKhau", "HoTen", "KhoaPhong"]
-    ws.append(headers)
-    
-    sample_data = [
-        ["LYCTK", "123", "Lê Yến Chi", "Nội"],
-        ["TRANNNH", "123", "Trần Nguyễn Ngọc Hân", "Nội"],
-        ["MENNT", "123", "Nguyễn Thị Mến", "Sản"],
-        ["TOABV", "123", "Bùi Viết Tỏa", "Cấp cứu"],
-        ["LACLH", "123", "Lê Anh Châu", "CDHA"],
-        ["NHIENVT", "123", "Nguyễn Hoàng Nhi", "Dược"],
-        ["TRUCPTN", "123", "Phan Thị Ngọc Trúc", "Xét nghiệm"],
-        ["SANGVD", "123", "Vũ Đăng Sang", "Dược"],
-        ["LINHHTT", "123", "Huỳnh Thị Linh", "Lâm sàng"],
-        ["NHANHTT", "123", "Nguyễn Thanh Nhân", "Dược"]
+    ws.append(["TenDangNhap", "MatKhau", "HoTen", "KhoaPhong"])
+    users = [
+        ["LYCTK", "123", "Lê Yến Chi", "Khoa Nội"],
+        ["TRANNNH", "123", "Trần Nguyễn Ngọc Hân", "Khoa Nội"],
+        ["MENNT", "123", "Nguyễn Thị Mến", "Khoa Phụ Sản"],
+        ["TOABV", "123", "Bùi Viết Tỏa", "Khoa Cấp cứu"],
+        ["LACLH", "123", "Lê Anh Châu", "Khoa Ngoại tổng hợp"],
+        ["NHONPT", "123", "Phạm Trọng Nhơn", "Khoa Ngoại"],
+        ["NHIENVT", "123", "Nguyễn Hoàng Nhi", "Khoa Dược"],
+        ["TRUCPTN", "123", "Phan Thị Ngọc Trúc", "Khoa Xét Nghiệm"],
+        ["SANGVD", "123", "Vũ Đăng Sang", "Khoa Phẫu thuật - GMHS"],
+        ["LINHHTT", "123", "Huỳnh Thị Linh", "Khoa Khám bệnh"],
+        ["NHANHTT", "123", "Nguyễn Thanh Nhân", "Khoa Dược"]
     ]
-    for row in sample_data:
-        ws.append(row)
-        
-    file_path = r"C:\Users\Admin\.gemini\antigravity\scratch\ExamGenerator\data\catalogs\users.xlsx"
+    for u in users:
+        ws.append(u)
+    file_path = os.path.join(CATALOG_DIR, "users.xlsx")
     wb.save(file_path)
     print(f"Saved users catalog template to: {file_path}")
+
+def create_service_mappings_catalog():
+    wb = openpyxl.Workbook()
+    ws = wb.active
+    ws.title = "ServiceMappings"
+    ws.append(["TenKhoaPhong", "NhomDichVu"])
+    svc_maps = [
+        ["Khoa Ngoại tổng hợp", "Siêu âm"],
+        ["Khoa Ngoại tổng hợp", "X-quang"],
+        ["Khoa Ngoại tổng hợp", "Xét nghiệm"],
+        ["Khoa Ngoại tổng hợp", "CT Scan"],
+        ["Khoa Ngoại tổng hợp", "Nội soi"],
+        ["Khoa Nội", "Siêu âm"],
+        ["Khoa Nội", "X-quang"],
+        ["Khoa Nội", "Xét nghiệm"],
+        ["Khoa Nội", "Thăm dò chức năng"],
+        ["Khoa Cấp cứu", "Siêu âm"],
+        ["Khoa Cấp cứu", "X-quang"],
+        ["Khoa Cấp cứu", "Xét nghiệm"],
+        ["Khoa Cấp cứu", "CT Scan"],
+        ["Khoa Phụ Sản", "Siêu âm"],
+        ["Khoa Phụ Sản", "Xét nghiệm"],
+        ["Khoa Phẫu thuật - GMHS", "Xét nghiệm"],
+        ["Khoa Phẫu thuật - GMHS", "X-quang"]
+    ]
+    for sm in svc_maps:
+        ws.append(sm)
+    file_path = os.path.join(CATALOG_DIR, "service_mappings.xlsx")
+    wb.save(file_path)
+    print(f"Saved service mappings template to: {file_path}")
+
+def create_pharmacy_mappings_catalog():
+    wb = openpyxl.Workbook()
+    ws = wb.active
+    ws.title = "PharmacyMappings"
+    ws.append(["TenKhoaPhong", "MaKho", "TenKho"])
+    phar_maps = [
+        ["Khoa Ngoại tổng hợp", "KHO_LE_NOITRU", "Kho lẻ Nội trú"],
+        ["Khoa Ngoại tổng hợp", "KHO_VTYT_NOITRU", "Kho vật tư Nội trú"],
+        ["Khoa Nội", "KHO_LE_NOITRU", "Kho lẻ Nội trú"],
+        ["Khoa Nội", "KHO_VTYT_NOITRU", "Kho vật tư Nội trú"],
+        ["Khoa Cấp cứu", "KHO_CAPCUU", "Kho Cấp cứu"],
+        ["Khoa Cấp cứu", "KHO_LE_NOITRU", "Kho lẻ Nội trú"],
+        ["Khoa Phụ Sản", "KHO_LE_NOITRU", "Kho lẻ Nội trú"],
+        ["Khoa Phụ Sản", "KHO_VTYT_NOITRU", "Kho vật tư Nội trú"],
+        ["Khoa Phẫu thuật - GMHS", "KHO_GMHS", "Kho Phẫu thuật - GMHS"],
+        ["Khoa Xét Nghiệm", "KHO_VTYT_XN", "Kho vật tư Xét nghiệm"]
+    ]
+    for pm in phar_maps:
+        ws.append(pm)
+    file_path = os.path.join(CATALOG_DIR, "pharmacy_mappings.xlsx")
+    wb.save(file_path)
+    print(f"Saved pharmacy mappings template to: {file_path}")
 
 if __name__ == "__main__":
     create_folders()
@@ -188,3 +171,5 @@ if __name__ == "__main__":
     create_drugs_catalog()
     create_services_catalog()
     create_users_catalog()
+    create_service_mappings_catalog()
+    create_pharmacy_mappings_catalog()
