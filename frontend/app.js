@@ -162,7 +162,24 @@ document.addEventListener('DOMContentLoaded', () => {
         ]);
         departments = await deptsRes.json();
         serviceGroups = await svcsRes.json();
-        warehouses = await whsRes.json();
+        const rawWhs = await whsRes.json();
+        warehouses = rawWhs.map(item => {
+            if (typeof item === 'string') {
+                return { code: item, name: item, display: item };
+            }
+            return {
+                code: item.code,
+                name: item.name || item.code,
+                display: item.display || (item.name && item.name !== item.code ? `${item.name} (${item.code})` : item.code)
+            };
+        });
+    }
+
+    function getWarehouseDisplayName(code) {
+        if (!code) return "";
+        const wh = warehouses.find(w => w.code === code);
+        if (wh && wh.name) return wh.name;
+        return code;
     }
 
     async function loadActions() {
@@ -204,7 +221,7 @@ document.addEventListener('DOMContentLoaded', () => {
         // Inventory Warehouses dropdown
         invWarehouse.innerHTML = '<option value="">-- Tất cả Kho --</option>';
         warehouses.forEach(wh => {
-            invWarehouse.innerHTML += `<option value="${wh}">${wh}</option>`;
+            invWarehouse.innerHTML += `<option value="${wh.code}">${wh.display}</option>`;
         });
     }
 
@@ -1070,27 +1087,28 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         selectedPharmaciesTags.innerHTML = '';
-        currentPhars.forEach(wh => {
+        currentPhars.forEach(whCode => {
+            const whName = getWarehouseDisplayName(whCode);
             const chip = document.createElement('span');
             chip.className = 'selected-tag-chip pharmacy-tag';
             chip.innerHTML = `
-                <span>${wh}</span>
-                <button class="selected-tag-remove" data-wh="${wh}" title="Gỡ kho này">&times;</button>
+                <span title="Mã kho: ${whCode}"><strong>${whName}</strong> <small style="opacity: 0.75; font-size: 0.75rem; margin-left: 4px;">(${whCode})</small></span>
+                <button class="selected-tag-remove" data-wh="${whCode}" title="Gỡ kho ${whName}">&times;</button>
             `;
             chip.querySelector('.selected-tag-remove').addEventListener('click', (e) => {
                 e.stopPropagation();
-                removePharmacyFromDept(wh);
+                removePharmacyFromDept(whCode);
             });
             selectedPharmaciesTags.appendChild(chip);
         });
     }
 
-    function addPharmacyToDept(wh) {
+    function addPharmacyToDept(whCode) {
         if (!pharmacyMappings[selectedMappingDept]) {
             pharmacyMappings[selectedMappingDept] = [];
         }
-        if (!pharmacyMappings[selectedMappingDept].includes(wh)) {
-            pharmacyMappings[selectedMappingDept].push(wh);
+        if (!pharmacyMappings[selectedMappingDept].includes(whCode)) {
+            pharmacyMappings[selectedMappingDept].push(whCode);
             renderSelectedPharmaciesTags();
             renderMappingDeptList();
         }
@@ -1099,9 +1117,9 @@ document.addEventListener('DOMContentLoaded', () => {
         pharmacySearchInput.focus();
     }
 
-    function removePharmacyFromDept(wh) {
+    function removePharmacyFromDept(whCode) {
         if (pharmacyMappings[selectedMappingDept]) {
-            pharmacyMappings[selectedMappingDept] = pharmacyMappings[selectedMappingDept].filter(w => w !== wh);
+            pharmacyMappings[selectedMappingDept] = pharmacyMappings[selectedMappingDept].filter(w => w !== whCode);
             renderSelectedPharmaciesTags();
             renderMappingDeptList();
         }
@@ -1110,25 +1128,32 @@ document.addEventListener('DOMContentLoaded', () => {
     function showPharmacySuggestions() {
         const query = pharmacySearchInput.value.trim().toLowerCase();
         const currentPhars = pharmacyMappings[selectedMappingDept] || [];
-        const available = warehouses.filter(w => w.toLowerCase().includes(query));
+        const available = warehouses.filter(w => {
+            const codeMatch = (w.code || '').toLowerCase().includes(query);
+            const nameMatch = (w.name || '').toLowerCase().includes(query);
+            return codeMatch || nameMatch;
+        });
 
         if (available.length === 0) {
-            pharmacySuggestionsDropdown.innerHTML = '<div style="padding: 0.75rem 1rem; font-size: 0.85rem; color: var(--text-secondary);">Không có mã kho phù hợp.</div>';
+            pharmacySuggestionsDropdown.innerHTML = '<div style="padding: 0.75rem 1rem; font-size: 0.85rem; color: var(--text-secondary);">Không có kho dược phù hợp.</div>';
             pharmacySuggestionsDropdown.style.display = 'block';
             return;
         }
 
         pharmacySuggestionsDropdown.innerHTML = '';
         available.forEach(wh => {
-            const isAlreadySelected = currentPhars.includes(wh);
+            const isAlreadySelected = currentPhars.includes(wh.code);
             const item = document.createElement('div');
             item.className = `select2-suggestion-item ${isAlreadySelected ? 'disabled' : ''}`;
             item.innerHTML = `
-                <span>${wh}</span>
+                <div style="display: flex; flex-direction: column; gap: 2px;">
+                    <span style="font-weight: 600; color: var(--text-primary);">${wh.name}</span>
+                    <span style="font-size: 0.75rem; color: var(--text-secondary);">Mã kho: ${wh.code}</span>
+                </div>
                 <span style="font-size: 0.75rem; opacity: 0.8;">${isAlreadySelected ? '✓ Đã chọn' : '+ Thêm'}</span>
             `;
             if (!isAlreadySelected) {
-                item.addEventListener('click', () => addPharmacyToDept(wh));
+                item.addEventListener('click', () => addPharmacyToDept(wh.code));
             }
             pharmacySuggestionsDropdown.appendChild(item);
         });
@@ -1139,7 +1164,7 @@ document.addEventListener('DOMContentLoaded', () => {
     pharmacySearchInput.addEventListener('focus', showPharmacySuggestions);
 
     btnSelectAllPharmaciesForDept.addEventListener('click', () => {
-        pharmacyMappings[selectedMappingDept] = [...warehouses];
+        pharmacyMappings[selectedMappingDept] = warehouses.map(w => w.code);
         renderSelectedPharmaciesTags();
         renderMappingDeptList();
         showToast("Đã chọn tất cả kho dược cho khoa này.", "info");
@@ -1454,12 +1479,13 @@ document.addEventListener('DOMContentLoaded', () => {
         const dept = invDept.value;
         invWarehouse.innerHTML = '<option value="">-- Tất cả Kho --</option>';
         if (dept && pharmacyMappings[dept] && pharmacyMappings[dept].length > 0) {
-            pharmacyMappings[dept].forEach(wh => {
-                invWarehouse.innerHTML += `<option value="${wh}">${wh}</option>`;
+            pharmacyMappings[dept].forEach(whCode => {
+                const whName = getWarehouseDisplayName(whCode);
+                invWarehouse.innerHTML += `<option value="${whCode}">${whName} (${whCode})</option>`;
             });
         } else {
             warehouses.forEach(wh => {
-                invWarehouse.innerHTML += `<option value="${wh}">${wh}</option>`;
+                invWarehouse.innerHTML += `<option value="${wh.code}">${wh.display}</option>`;
             });
         }
         doSearchInventory();
@@ -1504,11 +1530,12 @@ document.addEventListener('DOMContentLoaded', () => {
             inventoryResultsBody.innerHTML = '';
             items.slice(0, 200).forEach(item => {
                 const tr = document.createElement('tr');
+                const whDisplayName = item.TenKho || getWarehouseDisplayName(item.MaKho) || item.MaKho || '-';
                 tr.innerHTML = `
                     <td><code>${item.MaDuoc}</code></td>
                     <td><strong>${item.TenDuoc}</strong></td>
                     <td>${item.DVTTinh || '-'}</td>
-                    <td>${item.TenKho || item.MaKho || '-'}</td>
+                    <td>${whDisplayName}</td>
                     <td><span class="badge ${item.Nguon === 'BH' ? 'badge-success' : 'badge-info'}">${item.Nguon}</span></td>
                     <td class="inventory-stock">${(item.SoLuongTon || 0).toLocaleString()}</td>
                 `;

@@ -100,8 +100,9 @@ def get_service_groups():
 
 @app.get("/api/metadata/warehouses")
 def get_warehouses():
-    """Returns unique warehouse codes from drugs.xlsx."""
-    return cm.get_warehouses()
+    """Returns list of warehouse objects with code and friendly name."""
+    catalog_whs = cm.get_warehouses()
+    return mm.get_all_warehouse_metadata(catalog_warehouses=catalog_whs)
 
 @app.get("/api/metadata/departments")
 def get_departments():

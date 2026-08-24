@@ -501,6 +501,13 @@ class CatalogManager:
                     key = self.patient_key(patient)
                     if key not in excluded_keys and key not in unique_pool:
                         unique_pool[key] = patient
+                
+                if len(unique_pool) < count:
+                    for patient in pool:
+                        key = self.patient_key(patient)
+                        if key not in self._reserved_patient_keys and key not in unique_pool:
+                            unique_pool[key] = patient
+
                 pool = list(unique_pool.values())
 
             if not pool:

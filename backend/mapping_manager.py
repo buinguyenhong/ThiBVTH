@@ -14,10 +14,12 @@ class MappingManager:
         
         self.service_mapping_path = os.path.join(self.config_dir, "service_mappings.json")
         self.pharmacy_mapping_path = os.path.join(self.config_dir, "pharmacy_mappings.json")
+        self.warehouse_names_path = os.path.join(self.config_dir, "warehouse_names.json")
         self._lock = threading.RLock()
         
         self.service_mappings = self._load_json(self.service_mapping_path, default=self._default_service_mappings())
         self.pharmacy_mappings = self._load_json(self.pharmacy_mapping_path, default=self._default_pharmacy_mappings())
+        self.warehouse_names = self._load_json(self.warehouse_names_path, default=self._default_warehouse_names())
 
     def _load_json(self, path, default):
         if not os.path.exists(path):
@@ -88,6 +90,59 @@ class MappingManager:
             "Khoa Phẫu thuật - GMHS": ["KHO_PTGM", "KHO_CHUNG"],
             "Khoa Dược": ["KHO_DUOCTONG", "KHO_CHUNG"]
         }
+
+    def _default_warehouse_names(self):
+        return {
+            "KHO_LE": "Kho lẻ Dược",
+            "KHO_BHYT": "Kho BHYT",
+            "KHO_LE_NOITRU": "Kho lẻ Nội trú",
+            "KHO_VTYT_NOITRU": "Kho vật tư Nội trú",
+            "KHO_NGOAI": "Kho Dược Ngoại",
+            "KHO_NOI": "Kho Dược Nội",
+            "KHO_CHUNG": "Kho Dược dùng chung",
+            "KHO_DUOCTONG": "Kho Dược Tổng",
+            "KHO_CAPCUU": "Kho Cấp cứu",
+            "KHO_HSTC": "Kho Hồi sức tích cực",
+            "KHO_CTCH": "Kho Chấn thương chỉnh hình",
+            "KHO_NGOAITK": "Kho Ngoại thần kinh",
+            "KHO_TIMMACH": "Kho Tim mạch",
+            "KHO_SAN": "Kho Phụ Sản",
+            "KHO_NHI": "Kho Nhi",
+            "KHO_MAT": "Kho Mắt",
+            "KHO_TMH": "Kho Tai Mũi Họng",
+            "KHO_RHM": "Kho Răng Hàm Mặt",
+            "KHO_PK": "Kho Phòng khám",
+            "KHO_TNT": "Kho Thận nhân tạo",
+            "KHO_PTGM": "Kho Phẫu thuật - GMHS",
+            "KHO_GMHS": "Kho Gây mê hồi sức",
+            "KHO_VTYT_XN": "Kho VTYT Xét nghiệm"
+        }
+
+    def get_warehouse_name(self, code):
+        if not code:
+            return ""
+        with self._lock:
+            return self.warehouse_names.get(code, code)
+
+    def get_all_warehouse_metadata(self, catalog_warehouses=None):
+        """Returns list of warehouse dicts: [{code, name, display}, ...]"""
+        with self._lock:
+            all_codes = set(self.warehouse_names.keys())
+            if catalog_warehouses:
+                all_codes.update(catalog_warehouses)
+            for wh_list in self.pharmacy_mappings.values():
+                all_codes.update(wh_list)
+            
+            result = []
+            for code in sorted(list(all_codes)):
+                name = self.warehouse_names.get(code, code)
+                display = f"{name} ({code})" if name != code else code
+                result.append({
+                    "code": code,
+                    "name": name,
+                    "display": display
+                })
+            return result
 
     def get_services_for_dept(self, dept_name):
         with self._lock:
@@ -174,33 +229,41 @@ class MappingManager:
         headers = [str(cell.value or "").strip().lower() for cell in sheet[1]]
         dept_idx = -1
         wh_idx = -1
+        name_idx = -1
         
         for idx, h in enumerate(headers):
             if any(k in h for k in ["tenkhoaphong", "tenphongban", "khoa", "phongban"]):
                 dept_idx = idx
             elif "makho" in h or h == "kho" or "warehouse" in h or "ma_kho" in h:
                 wh_idx = idx
+            elif any(k in h for k in ["tenkho", "ten_kho", "name", "warehouse_name"]):
+                name_idx = idx
 
         if dept_idx == -1 or wh_idx == -1:
             raise ValueError("File Excel cần có các cột: TenKhoaPhong và MaKho.")
 
         new_map = {}
         row_count = 0
-        for row in sheet.iter_rows(min_row=2, values_only=True):
-            if not row or len(row) <= max(dept_idx, wh_idx):
-                continue
-            dept = str(row[dept_idx] or "").strip()
-            wh = str(row[wh_idx] or "").strip()
-            if not dept or not wh or wh.lower() == "none":
-                continue
-            if dept not in new_map:
-                new_map[dept] = set()
-            new_map[dept].add(wh)
-            row_count += 1
-
         with self._lock:
+            for row in sheet.iter_rows(min_row=2, values_only=True):
+                if not row or len(row) <= max(dept_idx, wh_idx):
+                    continue
+                dept = str(row[dept_idx] or "").strip()
+                wh = str(row[wh_idx] or "").strip()
+                if not dept or not wh or wh.lower() == "none":
+                    continue
+                if name_idx != -1 and len(row) > name_idx and row[name_idx]:
+                    wh_name = str(row[name_idx]).strip()
+                    if wh_name:
+                        self.warehouse_names[wh] = wh_name
+                if dept not in new_map:
+                    new_map[dept] = set()
+                new_map[dept].add(wh)
+                row_count += 1
+
             for dept, whs in new_map.items():
                 self.pharmacy_mappings[dept] = sorted(list(whs))
             self._save_json(self.pharmacy_mapping_path, self.pharmacy_mappings)
+            self._save_json(self.warehouse_names_path, self.warehouse_names)
 
         return len(new_map), row_count
