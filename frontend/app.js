@@ -640,11 +640,29 @@ document.addEventListener('DOMContentLoaded', () => {
         openCreateTemplateModal();
     });
 
-    function openCreateTemplateModal() {
+    function populateTemplateDeptDropdown(selectedDept) {
+        tplDept.innerHTML = '';
+        const deptSet = new Set(departments);
+        templates.forEach(t => { if (t.dept) deptSet.add(t.dept); });
+        if (selectedDept) deptSet.add(selectedDept);
+        
+        Array.from(deptSet).sort().forEach(dept => {
+            tplDept.innerHTML += `<option value="${dept}">${dept}</option>`;
+        });
+    }
+
+    async function openCreateTemplateModal() {
+        if (!actions || actions.length === 0) {
+            await loadActions();
+        }
+        if (!departments || departments.length === 0) {
+            await loadMetadata();
+        }
         currentEditingTemplate = null;
         templateModalTitle.textContent = "Tạo Mẫu Đề thi Mới";
         tplEditId.value = "";
         tplName.value = "";
+        populateTemplateDeptDropdown();
         if (departments && departments.length > 0) {
             tplDept.value = departments[0];
         }
@@ -653,13 +671,23 @@ document.addEventListener('DOMContentLoaded', () => {
         templateModal.style.display = "flex";
     }
 
-    function openEditTemplateModal(id) {
+    async function openEditTemplateModal(id) {
+        if (!actions || actions.length === 0) {
+            await loadActions();
+        }
+        if (!departments || departments.length === 0) {
+            await loadMetadata();
+        }
         const tpl = templates.find(t => t.id === id);
-        if (!tpl) return;
+        if (!tpl) {
+            showToast("Không tìm thấy thông tin mẫu đề thi.", "error");
+            return;
+        }
         currentEditingTemplate = tpl;
         templateModalTitle.textContent = "Chỉnh sửa Mẫu Đề thi";
         tplEditId.value = tpl.id;
         tplName.value = tpl.name;
+        populateTemplateDeptDropdown(tpl.dept);
         tplDept.value = tpl.dept;
         tplPosition.value = tpl.position || "Điều dưỡng";
         renderActionBuilderRows(tpl.actions || []);
@@ -738,6 +766,11 @@ document.addEventListener('DOMContentLoaded', () => {
 
     btnCloseTemplateModal.addEventListener('click', () => templateModal.style.display = 'none');
     btnCancelTemplateModal.addEventListener('click', () => templateModal.style.display = 'none');
+    templateModal.addEventListener('click', (e) => {
+        if (e.target === templateModal) {
+            templateModal.style.display = 'none';
+        }
+    });
 
     btnSaveTemplate.addEventListener('click', async () => {
         const name = tplName.value.trim();
