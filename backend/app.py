@@ -559,7 +559,8 @@ def generate_exams(req: GenerateRequest, background_tasks: BackgroundTasks):
                 cand.id, 
                 tmpl.get("position", tmpl.get("name", "Thí sinh")), 
                 doc_path,
-                scores=scores_to_use
+                scores=scores_to_use,
+                dept=tmpl.get("dept", cand.dept or "")
             )
             generated_files.append(doc_path)
 

@@ -10,17 +10,17 @@ def set_cell_background(cell, fill_color):
     shading_xml = f'<w:shd {nsdecls("w")} w:fill="{fill_color}"/>'
     cell._tc.get_or_add_tcPr().append(parse_xml(shading_xml))
 
-def set_font(run, font_name="Arial", size_pt=11, bold=False, italic=False):
+def set_font(run, font_name="Times New Roman", size_pt=11, bold=False, italic=False):
     run.font.name = font_name
     run.font.size = Pt(size_pt)
     run.bold = bold
     run.italic = italic
 
-def add_paragraph_with_run(doc, text="", font_name="Arial", size_pt=11, bold=False, italic=False, align=WD_ALIGN_PARAGRAPH.LEFT, space_after=6):
+def add_paragraph_with_run(doc, text="", font_name="Times New Roman", size_pt=11, bold=False, italic=False, align=WD_ALIGN_PARAGRAPH.LEFT, space_after=4, line_spacing=1.15):
     p = doc.add_paragraph()
     p.alignment = align
     p.paragraph_format.space_after = Pt(space_after)
-    p.paragraph_format.line_spacing = 1.15
+    p.paragraph_format.line_spacing = line_spacing
     if text:
         run = p.add_run(text)
         set_font(run, font_name, size_pt, bold, italic)
@@ -62,7 +62,7 @@ def prepare_nhan_benh_khoa(cm, mm, dept_name, exam_date, params, context=None):
     }
 
 def render_docx_nhan_benh_khoa(doc, data, score, q_index):
-    add_paragraph_with_run(doc, f"Câu {q_index}) Nhận bệnh nhân vào khoa ({score}đ):", bold=True, size_pt=11, space_after=4)
+    add_paragraph_with_run(doc, f"Câu {q_index}) Nhận bệnh nhân vào khoa điều trị ({score} điểm):", bold=True, size_pt=11.5, space_after=4)
     
     bn_bhyt = data["bn_bhyt"]
     birth_bhyt = bn_bhyt.get("NgaySinh") or bn_bhyt.get("NamSinh") or ""
@@ -71,17 +71,34 @@ def render_docx_nhan_benh_khoa(doc, data, score, q_index):
     p1 = doc.add_paragraph()
     p1.paragraph_format.space_after = Pt(2)
     p1.paragraph_format.left_indent = Inches(0.2)
-    p1.add_run("- Bệnh nhân BHYT: ").bold = True
-    p1.add_run(f"Họ tên: {bn_bhyt['TenBenhNhan']} - {birth_bhyt} - {bn_bhyt.get('GioiTinh', 'Nam')} - Số BHYT: {bn_bhyt.get('SoBHYT', '')} (Nơi ĐKKCB: {dkkcb_bhyt}) - Đối tượng: {doi_tuong_bhyt}")
+    p1.paragraph_format.line_spacing = 1.15
+    r1 = p1.add_run("a. Bệnh nhân BHYT: ")
+    set_font(r1, font_name="Times New Roman", bold=True, size_pt=11)
+    r1_text = p1.add_run(f"Họ tên: {bn_bhyt['TenBenhNhan']}  -  Ngày sinh: {birth_bhyt}  -  Giới tính: {bn_bhyt.get('GioiTinh', 'Nam')}\n   Số thẻ BHYT: {bn_bhyt.get('SoBHYT', '')} (Nơi ĐKKCB: {dkkcb_bhyt})  -  Đối tượng: {doi_tuong_bhyt}")
+    set_font(r1_text, font_name="Times New Roman", size_pt=11)
     
     bn_vp = data["bn_vp"]
     birth_vp = bn_vp.get("NgaySinh") or bn_vp.get("NamSinh") or ""
     doi_tuong_vp = bn_vp.get("DoiTuong", "Viện phí")
     p2 = doc.add_paragraph()
-    p2.paragraph_format.space_after = Pt(6)
+    p2.paragraph_format.space_after = Pt(4)
     p2.paragraph_format.left_indent = Inches(0.2)
-    p2.add_run("- Bệnh nhân Viện phí: ").bold = True
-    p2.add_run(f"Họ tên: {bn_vp['TenBenhNhan']} - {birth_vp} - {bn_vp.get('GioiTinh', 'Nam')} - Đối tượng: {doi_tuong_vp}")
+    p2.paragraph_format.line_spacing = 1.15
+    r2 = p2.add_run("b. Bệnh nhân Viện phí: ")
+    set_font(r2, font_name="Times New Roman", bold=True, size_pt=11)
+    r2_text = p2.add_run(f"Họ tên: {bn_vp['TenBenhNhan']}  -  Ngày sinh: {birth_vp}  -  Giới tính: {bn_vp.get('GioiTinh', 'Nam')}  -  Đối tượng: {doi_tuong_vp}")
+    set_font(r2_text, font_name="Times New Roman", size_pt=11)
+
+    p3 = doc.add_paragraph()
+    p3.paragraph_format.space_after = Pt(4)
+    p3.paragraph_format.left_indent = Inches(0.2)
+    p3.paragraph_format.line_spacing = 1.2
+    r3 = p3.add_run("Yêu cầu thí sinh thực hiện nhận bệnh nhân vào khoa trên phần mềm HIS và ghi nhận kết quả:\n")
+    set_font(r3, font_name="Times New Roman", italic=True, size_pt=10.5)
+    r3_svv1 = p3.add_run("- Số vào viện (SVV) Bệnh nhân BHYT       : ………………………………………………………………\n")
+    set_font(r3_svv1, font_name="Times New Roman", size_pt=11)
+    r3_svv2 = p3.add_run("- Số vào viện (SVV) Bệnh nhân Viện phí : ………………………………………………………………")
+    set_font(r3_svv2, font_name="Times New Roman", size_pt=11)
 
 
 # 2. TN_TIEP_NHAN: Tự tiếp nhận mới bệnh nhân
@@ -108,7 +125,7 @@ def prepare_tiep_nhan(cm, mm, dept_name, exam_date, params, context=None):
     }
 
 def render_docx_tiep_nhan(doc, data, score, q_index):
-    add_paragraph_with_run(doc, f"Câu {q_index}) Trực tiếp tiếp nhận thông tin bệnh nhân ({score}đ):", bold=True, size_pt=11, space_after=4)
+    add_paragraph_with_run(doc, f"Câu {q_index}) Trực tiếp tiếp nhận thông tin bệnh nhân ({score} điểm):", bold=True, size_pt=11.5, space_after=4)
     
     bn_bhyt = data["bn_bhyt"]
     birth_bhyt = bn_bhyt.get("NgaySinh") or bn_bhyt.get("NamSinh") or ""
@@ -119,22 +136,34 @@ def render_docx_tiep_nhan(doc, data, score, q_index):
     p1 = doc.add_paragraph()
     p1.paragraph_format.space_after = Pt(2)
     p1.paragraph_format.left_indent = Inches(0.2)
-    p1.add_run("a. Bệnh nhân BHYT:\n").bold = True
-    p1.add_run(f"- Họ và tên: {bn_bhyt['TenBenhNhan']}        - Ngày/Năm sinh: {birth_bhyt} ({bn_bhyt.get('GioiTinh', 'Nam')})\n")
-    p1.add_run(f"- Số thẻ BHYT: {bn_bhyt.get('SoBHYT', '')} (Hạn thẻ: {han_bhyt} - Nơi ĐKKCB: {dkkcb_bhyt})\n")
-    p1.add_run(f"- Địa chỉ: {addr_bhyt}\n")
-    p1.add_run(f"- Lý do vào viện/Chẩn đoán: {bn_bhyt.get('LyDoKham', 'Đau bụng cấp / Theo dõi viêm ruột thừa')}")
+    p1.paragraph_format.line_spacing = 1.15
+    r1 = p1.add_run("a. Bệnh nhân BHYT:\n")
+    set_font(r1, font_name="Times New Roman", bold=True, size_pt=11)
+    r1_text = p1.add_run(f"- Họ và tên: {bn_bhyt['TenBenhNhan']}  -  Ngày sinh: {birth_bhyt} ({bn_bhyt.get('GioiTinh', 'Nam')})\n- Số thẻ BHYT: {bn_bhyt.get('SoBHYT', '')} (Hạn thẻ: {han_bhyt}  -  Nơi ĐKKCB: {dkkcb_bhyt})\n- Địa chỉ: {addr_bhyt}\n- Lý do vào viện / Chẩn đoán: {bn_bhyt.get('LyDoKham', 'Đau bụng cấp / Theo dõi viêm ruột thừa')}")
+    set_font(r1_text, font_name="Times New Roman", size_pt=11)
     
     bn_vp = data["bn_vp"]
     birth_vp = bn_vp.get("NgaySinh") or bn_vp.get("NamSinh") or ""
     addr_vp = bn_vp.get("DiaChiLienHe") or bn_vp.get("DiaChi") or "Buôn Ma Thuột, Đắk Lắk"
     p2 = doc.add_paragraph()
-    p2.paragraph_format.space_after = Pt(6)
+    p2.paragraph_format.space_after = Pt(4)
     p2.paragraph_format.left_indent = Inches(0.2)
-    p2.add_run("b. Bệnh nhân Viện phí:\n").bold = True
-    p2.add_run(f"- Họ và tên: {bn_vp['TenBenhNhan']}        - Ngày/Năm sinh: {birth_vp} ({bn_vp.get('GioiTinh', 'Nam')})\n")
-    p2.add_run(f"- Địa chỉ: {addr_vp}\n")
-    p2.add_run(f"- Lý do vào viện/Chẩn đoán: {bn_vp.get('LyDoKham', 'Sốt cao, ho kéo dài')}")
+    p2.paragraph_format.line_spacing = 1.15
+    r2 = p2.add_run("b. Bệnh nhân Viện phí:\n")
+    set_font(r2, font_name="Times New Roman", bold=True, size_pt=11)
+    r2_text = p2.add_run(f"- Họ và tên: {bn_vp['TenBenhNhan']}  -  Ngày sinh: {birth_vp} ({bn_vp.get('GioiTinh', 'Nam')})\n- Địa chỉ: {addr_vp}\n- Lý do vào viện / Chẩn đoán: {bn_vp.get('LyDoKham', 'Sốt cao, ho kéo dài')}")
+    set_font(r2_text, font_name="Times New Roman", size_pt=11)
+
+    p3 = doc.add_paragraph()
+    p3.paragraph_format.space_after = Pt(4)
+    p3.paragraph_format.left_indent = Inches(0.2)
+    p3.paragraph_format.line_spacing = 1.2
+    r3 = p3.add_run("Yêu cầu thí sinh nhập mới thông tin bệnh nhân trên phần mềm HIS và ghi lại:\n")
+    set_font(r3, font_name="Times New Roman", italic=True, size_pt=10.5)
+    r3_svv1 = p3.add_run("- Mã y tế / Số tiếp nhận Bn BHYT       : ………………………………………………………………\n")
+    set_font(r3_svv1, font_name="Times New Roman", size_pt=11)
+    r3_svv2 = p3.add_run("- Mã y tế / Số tiếp nhận Bn Viện phí : ………………………………………………………………")
+    set_font(r3_svv2, font_name="Times New Roman", size_pt=11)
 
 
 # 3. YL_CHI_DINH_CLS: Chỉ định Cận lâm sàng (Thực hiện trên Bệnh nhân BHYT)
@@ -178,14 +207,16 @@ def prepare_chi_dinh_cls(cm, mm, dept_name, exam_date, params, context=None):
 
 def render_docx_chi_dinh_cls(doc, data, score, q_index):
     bn_bhyt = data.get("bn_bhyt")
-    pt_name = f" cho bệnh nhân BHYT {bn_bhyt['TenBenhNhan']}" if bn_bhyt else ""
-    add_paragraph_with_run(doc, f"Câu {q_index}) Chỉ định các dịch vụ Cận lâm sàng{pt_name} ({score}đ):", bold=True, size_pt=11, space_after=4)
+    pt_name = f" cho bệnh nhân BHYT ({bn_bhyt['TenBenhNhan']})" if bn_bhyt else ""
+    add_paragraph_with_run(doc, f"Câu {q_index}) Chỉ định các dịch vụ Cận lâm sàng{pt_name} ({score} điểm):", bold=True, size_pt=11.5, space_after=4)
     services = data.get("services", [])
     for idx, s in enumerate(services, 1):
         p = doc.add_paragraph()
         p.paragraph_format.space_after = Pt(2)
         p.paragraph_format.left_indent = Inches(0.2)
-        p.add_run(f"- {s['TenDichVu']} ({s.get('NhomDichVu', '')})")
+        p.paragraph_format.line_spacing = 1.15
+        r = p.add_run(f"- {s['TenDichVu']} ({s.get('NhomDichVu', '')})")
+        set_font(r, font_name="Times New Roman", size_pt=11)
 
 
 # 4. YL_CHI_DINH_THUOC_VTYT: Kê đơn / Lên y lệnh Thuốc & VTYT (Thực hiện trên Bệnh nhân BHYT)
@@ -216,15 +247,17 @@ def prepare_chi_dinh_thuoc_vtyt(cm, mm, dept_name, exam_date, params, context=No
 
 def render_docx_chi_dinh_thuoc_vtyt(doc, data, score, q_index):
     bn_bhyt = data.get("bn_bhyt")
-    pt_name = f" cho bệnh nhân BHYT {bn_bhyt['TenBenhNhan']}" if bn_bhyt else ""
-    add_paragraph_with_run(doc, f"Câu {q_index}) Lên y lệnh Thuốc và Vật tư y tế{pt_name} ({score}đ):", bold=True, size_pt=11, space_after=4)
+    pt_name = f" cho bệnh nhân BHYT ({bn_bhyt['TenBenhNhan']})" if bn_bhyt else ""
+    add_paragraph_with_run(doc, f"Câu {q_index}) Lên y lệnh Thuốc và Vật tư y tế{pt_name} ({score} điểm):", bold=True, size_pt=11.5, space_after=4)
     
     drugs = data.get("drugs", [])
     if drugs:
         p_d = doc.add_paragraph()
         p_d.paragraph_format.space_after = Pt(2)
         p_d.paragraph_format.left_indent = Inches(0.2)
-        p_d.add_run("+ Thuốc Bảo hiểm y tế:").bold = True
+        p_d.paragraph_format.line_spacing = 1.15
+        r_d = p_d.add_run("+ Thuốc Bảo hiểm y tế:")
+        set_font(r_d, font_name="Times New Roman", bold=True, size_pt=11)
         for d in drugs:
             dvt = d.get('DVTTinh') or 'Viên'
             sl = random.randint(1, 3)
@@ -232,21 +265,27 @@ def render_docx_chi_dinh_thuoc_vtyt(doc, data, score, q_index):
             p = doc.add_paragraph()
             p.paragraph_format.space_after = Pt(2)
             p.paragraph_format.left_indent = Inches(0.4)
-            p.add_run(f"- {d['TenDuoc']} ({dvt}) - Số lượng: {sl} - Cách dùng: {cachdung}")
+            p.paragraph_format.line_spacing = 1.15
+            r = p.add_run(f"- {d['TenDuoc']} ({dvt}) - Số lượng: {sl} - Cách dùng: {cachdung}")
+            set_font(r, font_name="Times New Roman", size_pt=11)
             
     supplies = data.get("supplies", [])
     if supplies:
         p_s = doc.add_paragraph()
         p_s.paragraph_format.space_after = Pt(2)
         p_s.paragraph_format.left_indent = Inches(0.2)
-        p_s.add_run("+ Vật tư y tế / Thuốc Viện phí:").bold = True
+        p_s.paragraph_format.line_spacing = 1.15
+        r_s = p_s.add_run("+ Vật tư y tế / Thuốc Viện phí:")
+        set_font(r_s, font_name="Times New Roman", bold=True, size_pt=11)
         for s in supplies:
             svt = s.get('DVTTinh') or 'Cái'
             sl = random.randint(1, 2)
             p = doc.add_paragraph()
             p.paragraph_format.space_after = Pt(2)
             p.paragraph_format.left_indent = Inches(0.4)
-            p.add_run(f"- {s['TenDuoc']} ({svt}) - Số lượng: {sl}")
+            p.paragraph_format.line_spacing = 1.15
+            r = p.add_run(f"- {s['TenDuoc']} ({svt}) - Số lượng: {sl}")
+            set_font(r, font_name="Times New Roman", size_pt=11)
 
 
 # 5. YL_TRA_THUOC: Trả thuốc thừa / Hủy y lệnh (Thực hiện trên Thuốc đã kê của Bệnh nhân BHYT)
@@ -272,14 +311,16 @@ def prepare_tra_thuoc(cm, mm, dept_name, exam_date, params, context=None):
 
 def render_docx_tra_thuoc(doc, data, score, q_index):
     bn_bhyt = data.get("bn_bhyt")
-    pt_name = f" cho bệnh nhân BHYT {bn_bhyt['TenBenhNhan']}" if bn_bhyt else ""
-    add_paragraph_with_run(doc, f"Câu {q_index}) Thực hiện trả thuốc / Hủy y lệnh{pt_name} ({score}đ):", bold=True, size_pt=11, space_after=4)
+    pt_name = f" cho bệnh nhân BHYT ({bn_bhyt['TenBenhNhan']})" if bn_bhyt else ""
+    add_paragraph_with_run(doc, f"Câu {q_index}) Thực hiện trả thuốc / Hủy y lệnh{pt_name} ({score} điểm):", bold=True, size_pt=11.5, space_after=4)
     d = data["drug"]
     dvt = d.get('DVTTinh') or 'Viên'
     p = doc.add_paragraph()
-    p.paragraph_format.space_after = Pt(6)
+    p.paragraph_format.space_after = Pt(4)
     p.paragraph_format.left_indent = Inches(0.2)
-    p.add_run(f"- Hoàn trả lại tủ trực/kho: {d['TenDuoc']} ({dvt}) - Số lượng hoàn trả: {data['quantity']} {dvt} (Lý do: Bệnh nhân đỡ đau / Đổi phác đồ điều trị).")
+    p.paragraph_format.line_spacing = 1.15
+    r = p.add_run(f"- Hoàn trả lại tủ trực / kho: {d['TenDuoc']} ({dvt}) - Số lượng hoàn trả: {data['quantity']} {dvt} (Lý do: Bệnh nhân đỡ đau / Đổi phác đồ điều trị).")
+    set_font(r, font_name="Times New Roman", size_pt=11)
 
 
 # 6. YL_DOI_THEM_DICH_VU: Đổi hoặc bổ sung dịch vụ CLS (Đổi từ dịch vụ đã chỉ định trước đó)
@@ -324,14 +365,18 @@ def prepare_doi_them_dich_vu(cm, mm, dept_name, exam_date, params, context=None)
 
 def render_docx_doi_them_dich_vu(doc, data, score, q_index):
     bn_bhyt = data.get("bn_bhyt")
-    pt_name = f" cho bệnh nhân BHYT {bn_bhyt['TenBenhNhan']}" if bn_bhyt else ""
-    add_paragraph_with_run(doc, f"Câu {q_index}) Thay đổi và bổ sung dịch vụ kỹ thuật{pt_name} ({score}đ):", bold=True, size_pt=11, space_after=4)
+    pt_name = f" cho bệnh nhân BHYT ({bn_bhyt['TenBenhNhan']})" if bn_bhyt else ""
+    add_paragraph_with_run(doc, f"Câu {q_index}) Thay đổi và bổ sung dịch vụ kỹ thuật{pt_name} ({score} điểm):", bold=True, size_pt=11.5, space_after=4)
     p = doc.add_paragraph()
-    p.paragraph_format.space_after = Pt(6)
+    p.paragraph_format.space_after = Pt(4)
     p.paragraph_format.left_indent = Inches(0.2)
-    p.add_run(f"- Hủy chỉ định dịch vụ: {data['swap_out']['TenDichVu']}\n")
-    p.add_run(f"- Đổi sang chỉ định dịch vụ: {data['swap_in']['TenDichVu']}\n")
-    p.add_run(f"- Chỉ định bổ sung thêm: {data['added']['TenDichVu']}")
+    p.paragraph_format.line_spacing = 1.15
+    r1 = p.add_run(f"- Hủy chỉ định dịch vụ: {data['swap_out']['TenDichVu']}\n")
+    r2 = p.add_run(f"- Đổi sang chỉ định dịch vụ: {data['swap_in']['TenDichVu']}\n")
+    r3 = p.add_run(f"- Chỉ định bổ sung thêm: {data['added']['TenDichVu']}")
+    set_font(r1, font_name="Times New Roman", size_pt=11)
+    set_font(r2, font_name="Times New Roman", size_pt=11)
+    set_font(r3, font_name="Times New Roman", size_pt=11)
 
 
 # 7. TK_KIEM_TON_KHO: Tra cứu tồn kho Dược / Tủ trực
@@ -343,12 +388,23 @@ def prepare_kiem_ton_kho(cm, mm, dept_name, exam_date, params, context=None):
     }
 
 def render_docx_kiem_ton_kho(doc, data, score, q_index):
-    add_paragraph_with_run(doc, f"Câu {q_index}) Tra cứu và kiểm tra số lượng tồn kho tủ trực ({score}đ):", bold=True, size_pt=11, space_after=4)
+    add_paragraph_with_run(doc, f"Câu {q_index}) Tra cứu và kiểm tra số lượng tồn kho tủ trực ({score} điểm):", bold=True, size_pt=11.5, space_after=4)
     d = data["drug"]
     p = doc.add_paragraph()
-    p.paragraph_format.space_after = Pt(6)
+    p.paragraph_format.space_after = Pt(4)
     p.paragraph_format.left_indent = Inches(0.2)
-    p.add_run(f"- Kiểm tra số lượng tồn hiện tại của mặt hàng: {d['TenDuoc']} (Mã: {d['MaDuoc']}) trong kho tủ trực khoa và ghi nhận số lượng.")
+    p.paragraph_format.line_spacing = 1.15
+    r = p.add_run(f"- Kiểm tra số lượng tồn khả dụng hiện tại của mặt hàng: {d['TenDuoc']} (Mã: {d['MaDuoc']}) trong kho / tủ trực khoa.\n")
+    set_font(r, font_name="Times New Roman", size_pt=11)
+    
+    p2 = doc.add_paragraph()
+    p2.paragraph_format.space_after = Pt(4)
+    p2.paragraph_format.left_indent = Inches(0.2)
+    p2.paragraph_format.line_spacing = 1.2
+    r_blank1 = p2.add_run("- Số lượng tồn thực tế tra cứu được : ………………………………………………………………\n")
+    set_font(r_blank1, font_name="Times New Roman", size_pt=11)
+    r_blank2 = p2.add_run("- Ghi chú / Tên kho kiểm tra         : ………………………………………………………………")
+    set_font(r_blank2, font_name="Times New Roman", size_pt=11)
 
 
 # 8. CK_CHUYEN_KHOA: Chuyển khoa điều trị ca cũ (-30 ngày)
@@ -367,12 +423,24 @@ def prepare_chuyen_khoa(cm, mm, dept_name, exam_date, params, context=None):
     }
 
 def render_docx_chuyen_khoa(doc, data, score, q_index):
-    add_paragraph_with_run(doc, f"Câu {q_index}) Chuyển khoa điều trị ({score}đ):", bold=True, size_pt=11, space_after=4)
+    add_paragraph_with_run(doc, f"Câu {q_index}) Chuyển khoa điều trị ({score} điểm):", bold=True, size_pt=11.5, space_after=4)
     p = doc.add_paragraph()
-    p.paragraph_format.space_after = Pt(6)
+    p.paragraph_format.space_after = Pt(4)
     p.paragraph_format.left_indent = Inches(0.2)
-    p.add_run(f"- Tìm 01 bệnh nhân bất kỳ đã vào khoa trong khoảng thời gian từ ngày {data['start_date']} đến ngày {data['end_date']}.\n")
-    p.add_run(f"- Thực hiện chuyển bệnh nhân sang {data['target_dept']} (Ghi nhận mã bệnh án hoặc họ tên bệnh nhân đã chuyển).")
+    p.paragraph_format.line_spacing = 1.15
+    r1 = p.add_run(f"- Tìm 01 bệnh nhân bất kỳ đã vào khoa trong khoảng thời gian từ ngày {data['start_date']} đến ngày {data['end_date']}.\n")
+    r2 = p.add_run(f"- Thực hiện chuyển bệnh nhân sang {data['target_dept']}.\n")
+    set_font(r1, font_name="Times New Roman", size_pt=11)
+    set_font(r2, font_name="Times New Roman", size_pt=11)
+    
+    p2 = doc.add_paragraph()
+    p2.paragraph_format.space_after = Pt(4)
+    p2.paragraph_format.left_indent = Inches(0.2)
+    p2.paragraph_format.line_spacing = 1.2
+    r_b1 = p2.add_run("- Họ và tên bệnh nhân đã chuyển  : ………………………………………………………………\n")
+    r_b2 = p2.add_run("- Mã bệnh án / Số vào viện (SVV) : ………………………………………………………………")
+    set_font(r_b1, font_name="Times New Roman", size_pt=11)
+    set_font(r_b2, font_name="Times New Roman", size_pt=11)
 
 
 # 9. RV_CHO_RA_VIEN: Cho ra viện ca cũ (-30 ngày)
@@ -384,12 +452,26 @@ def prepare_cho_ra_vien(cm, mm, dept_name, exam_date, params, context=None):
     }
 
 def render_docx_cho_ra_vien(doc, data, score, q_index):
-    add_paragraph_with_run(doc, f"Câu {q_index}) Cho bệnh nhân ra viện ({score}đ):", bold=True, size_pt=11, space_after=4)
+    add_paragraph_with_run(doc, f"Câu {q_index}) Cho bệnh nhân ra viện ({score} điểm):", bold=True, size_pt=11.5, space_after=4)
     p = doc.add_paragraph()
-    p.paragraph_format.space_after = Pt(6)
+    p.paragraph_format.space_after = Pt(4)
     p.paragraph_format.left_indent = Inches(0.2)
-    p.add_run(f"- Tìm 01 bệnh nhân đang nằm điều trị nội trú trong khoảng thời gian từ ngày {data['start_date']} đến {data['end_date']}.\n")
-    p.add_run("- Thực hiện các thủ tục cho bệnh nhân xuất viện trên phần mềm (Ghi nhận mã bệnh án hoặc họ tên bệnh nhân).")
+    p.paragraph_format.line_spacing = 1.15
+    r1 = p.add_run(f"- Tìm 01 bệnh nhân đang nằm điều trị nội trú trong khoảng thời gian từ ngày {data['start_date']} đến {data['end_date']}.\n")
+    r2 = p.add_run("- Thực hiện các thủ tục cho bệnh nhân xuất viện trên phần mềm HIS.\n")
+    set_font(r1, font_name="Times New Roman", size_pt=11)
+    set_font(r2, font_name="Times New Roman", size_pt=11)
+    
+    p2 = doc.add_paragraph()
+    p2.paragraph_format.space_after = Pt(4)
+    p2.paragraph_format.left_indent = Inches(0.2)
+    p2.paragraph_format.line_spacing = 1.2
+    r_b1 = p2.add_run("- Họ và tên bệnh nhân cho ra viện : ………………………………………………………………\n")
+    r_b2 = p2.add_run("- Mã bệnh án / Số vào viện (SVV) : ………………………………………………………………\n")
+    r_b3 = p2.add_run("- Ngày giờ xuất viện ghi nhận    : ………………………………………………………………")
+    set_font(r_b1, font_name="Times New Roman", size_pt=11)
+    set_font(r_b2, font_name="Times New Roman", size_pt=11)
+    set_font(r_b3, font_name="Times New Roman", size_pt=11)
 
 
 # 10. TC_THU_TAM_UNG: Thu tạm ứng nội trú / ngoại trú
@@ -403,12 +485,25 @@ def prepare_thu_tam_ung(cm, mm, dept_name, exam_date, params, context=None):
     }
 
 def render_docx_thu_tam_ung(doc, data, score, q_index):
-    add_paragraph_with_run(doc, f"Câu {q_index}) Thu tạm ứng viện phí ({score}đ):", bold=True, size_pt=11, space_after=4)
-    for c in data["cases"]:
-        p = doc.add_paragraph()
-        p.paragraph_format.space_after = Pt(2)
-        p.paragraph_format.left_indent = Inches(0.2)
-        p.add_run(f"- Mã bệnh nhân/Mã đợt khám: {c['ma_ba']} - Số tiền tạm ứng: {c['tien']} VNĐ.")
+    add_paragraph_with_run(doc, f"Câu {q_index}) Thu tạm ứng viện phí ({score} điểm):", bold=True, size_pt=11.5, space_after=4)
+    p = doc.add_paragraph()
+    p.paragraph_format.space_after = Pt(4)
+    p.paragraph_format.left_indent = Inches(0.2)
+    p.paragraph_format.line_spacing = 1.15
+    r_intro = p.add_run("Tìm và lập phiếu thu tạm ứng viện phí cho các ca bệnh sau:\n")
+    set_font(r_intro, font_name="Times New Roman", size_pt=11)
+    for idx, c in enumerate(data["cases"], 1):
+        r_c = p.add_run(f"  + Ca {idx}: Mã BN / Mã đợt khám: {c['ma_ba']}  -  Số tiền tạm ứng: {c['tien']} VNĐ\n")
+        set_font(r_c, font_name="Times New Roman", size_pt=11)
+        
+    p2 = doc.add_paragraph()
+    p2.paragraph_format.space_after = Pt(4)
+    p2.paragraph_format.left_indent = Inches(0.2)
+    p2.paragraph_format.line_spacing = 1.2
+    r_b1 = p2.add_run("- Số biên lai / Mã phiếu thu Ca 1 : ………………………………………………………………\n")
+    r_b2 = p2.add_run("- Số biên lai / Mã phiếu thu Ca 2 : ………………………………………………………………")
+    set_font(r_b1, font_name="Times New Roman", size_pt=11)
+    set_font(r_b2, font_name="Times New Roman", size_pt=11)
 
 
 # 11. TC_THANH_TOAN_RA_VIEN: Thanh toán ra viện
@@ -420,11 +515,24 @@ def prepare_thanh_toan_ra_vien(cm, mm, dept_name, exam_date, params, context=Non
     }
 
 def render_docx_thanh_toan_ra_vien(doc, data, score, q_index):
-    add_paragraph_with_run(doc, f"Câu {q_index}) Thanh toán viện phí ra viện ({score}đ):", bold=True, size_pt=11, space_after=4)
+    add_paragraph_with_run(doc, f"Câu {q_index}) Thanh toán viện phí ra viện ({score} điểm):", bold=True, size_pt=11.5, space_after=4)
     p = doc.add_paragraph()
-    p.paragraph_format.space_after = Pt(6)
+    p.paragraph_format.space_after = Pt(4)
     p.paragraph_format.left_indent = Inches(0.2)
-    p.add_run(f"- Tìm 01 bệnh nhân đã có chỉ định ra viện từ ngày {data['start_date']} đến {data['end_date']}, thực hiện quyết toán chi phí và in phiếu thanh toán.")
+    p.paragraph_format.line_spacing = 1.15
+    r = p.add_run(f"- Tìm 01 bệnh nhân đã có chỉ định ra viện từ ngày {data['start_date']} đến {data['end_date']}, thực hiện quyết toán chi phí và in phiếu thanh toán.\n")
+    set_font(r, font_name="Times New Roman", size_pt=11)
+    
+    p2 = doc.add_paragraph()
+    p2.paragraph_format.space_after = Pt(4)
+    p2.paragraph_format.left_indent = Inches(0.2)
+    p2.paragraph_format.line_spacing = 1.2
+    r_b1 = p2.add_run("- Họ và tên bệnh nhân thanh toán : ………………………………………………………………\n")
+    r_b2 = p2.add_run("- Mã hóa đơn / Số phiếu thanh toán : ………………………………………………………………\n")
+    r_b3 = p2.add_run("- Tổng số tiền thanh toán thực tế  : ………………………………………………………………")
+    set_font(r_b1, font_name="Times New Roman", size_pt=11)
+    set_font(r_b2, font_name="Times New Roman", size_pt=11)
+    set_font(r_b3, font_name="Times New Roman", size_pt=11)
 
 
 # 12. KQ_TRA_KET_QUA_CLS: Nhập và trả kết quả Cận lâm sàng (Huyết học / Siêu âm / Nội soi)
@@ -437,13 +545,16 @@ def prepare_tra_ket_qua_cls(cm, mm, dept_name, exam_date, params, context=None):
     }
 
 def render_docx_tra_ket_qua_cls(doc, data, score, q_index):
-    add_paragraph_with_run(doc, f"Câu {q_index}) Nhập và trả kết quả Cận lâm sàng ({score}đ):", bold=True, size_pt=11, space_after=4)
+    add_paragraph_with_run(doc, f"Câu {q_index}) Nhập và trả kết quả Cận lâm sàng ({score} điểm):", bold=True, size_pt=11.5, space_after=4)
     pt = data["patient"]
     p_info = doc.add_paragraph()
     p_info.paragraph_format.space_after = Pt(4)
     p_info.paragraph_format.left_indent = Inches(0.2)
-    p_info.add_run(f"Bệnh nhân: {pt['TenBenhNhan']} - {pt.get('NgaySinh') or pt.get('NamSinh', '')} ({pt.get('GioiTinh', 'Nam')})\n").bold = True
-    p_info.add_run("Nhập kết quả theo các thông số kỹ thuật bên dưới vào phần mềm:")
+    p_info.paragraph_format.line_spacing = 1.15
+    r_pt = p_info.add_run(f"Bệnh nhân: {pt['TenBenhNhan']} - {pt.get('NgaySinh') or pt.get('NamSinh', '')} ({pt.get('GioiTinh', 'Nam')})\n")
+    set_font(r_pt, font_name="Times New Roman", bold=True, size_pt=11)
+    r_msg = p_info.add_run("Nhập kết quả theo các thông số kỹ thuật bên dưới vào phần mềm HIS:")
+    set_font(r_msg, font_name="Times New Roman", italic=True, size_pt=10.5)
 
     sample_type = data.get("sample_type", "HUYET_HOC_18")
     if sample_type == "HUYET_HOC_18":
@@ -455,9 +566,11 @@ def render_docx_tra_ket_qua_cls(doc, data, score, q_index):
         hdr_cells = table.rows[0].cells
         for i, h in enumerate(headers):
             hdr_cells[i].text = h
-            hdr_cells[i].paragraphs[0].runs[0].font.bold = True
+            p_hdr = hdr_cells[i].paragraphs[0]
+            p_hdr.alignment = WD_ALIGN_PARAGRAPH.CENTER
+            set_font(p_hdr.runs[0], font_name="Times New Roman", bold=True, size_pt=10)
             hdr_cells[i].width = widths[i]
-            set_cell_background(hdr_cells[i], "EAEAEA")
+            set_cell_background(hdr_cells[i], "F2F2F2")
             
         params_list = [
             ("1", "WBC (Số lượng bạch cầu)", "7.2", "4.0 - 10.0 G/L"),
@@ -473,12 +586,29 @@ def render_docx_tra_ket_qua_cls(doc, data, score, q_index):
             for idx, text in enumerate(row_data):
                 row_cells[idx].text = text
                 row_cells[idx].width = widths[idx]
-                row_cells[idx].paragraphs[0].runs[0].font.size = Pt(9.5)
-        doc.add_paragraph().paragraph_format.space_after = Pt(6)
+                p_cell = row_cells[idx].paragraphs[0]
+                if idx in [0, 2]:
+                    p_cell.alignment = WD_ALIGN_PARAGRAPH.CENTER
+                set_font(p_cell.runs[0], font_name="Times New Roman", size_pt=10)
+        
+        p_spacer = doc.add_paragraph()
+        p_spacer.paragraph_format.space_after = Pt(4)
     else:
         p_desc = doc.add_paragraph()
+        p_desc.paragraph_format.space_after = Pt(4)
         p_desc.paragraph_format.left_indent = Inches(0.2)
-        p_desc.add_run("- Mô tả: Gan kích thước bình thường, bờ đều, nhu mô đồng nhất. Túi mật thành mỏng, không có sỏi. Thận hai bên không ứ nước.\n- Kết luận: Hình ảnh siêu âm ổ bụng chưa phát hiện bất thường.")
+        p_desc.paragraph_format.line_spacing = 1.15
+        r_desc = p_desc.add_run("- Mô tả: Gan kích thước bình thường, bờ đều, nhu mô đồng nhất. Túi mật thành mỏng, không có sỏi. Thận hai bên không ứ nước.\n- Kết luận: Hình ảnh siêu âm ổ bụng chưa phát hiện bất thường.")
+        set_font(r_desc, font_name="Times New Roman", size_pt=11)
+
+    p2 = doc.add_paragraph()
+    p2.paragraph_format.space_after = Pt(4)
+    p2.paragraph_format.left_indent = Inches(0.2)
+    p2.paragraph_format.line_spacing = 1.2
+    r_b1 = p2.add_run("- Số phiếu chỉ định / Mã kết quả HIS : ………………………………………………………………\n")
+    r_b2 = p2.add_run("- Trạng thái kết quả (Đã duyệt / Chưa duyệt) : ………………………………………………………………")
+    set_font(r_b1, font_name="Times New Roman", size_pt=11)
+    set_font(r_b2, font_name="Times New Roman", size_pt=11)
 
 
 # 13. VP_SOAN_THAO_WORD: Soạn thảo văn bản hành chính theo NĐ 30
@@ -486,11 +616,20 @@ def prepare_soan_thao_word(cm, mm, dept_name, exam_date, params, context=None):
     return {}
 
 def render_docx_soan_thao_word(doc, data, score, q_index):
-    add_paragraph_with_run(doc, f"Câu {q_index}) Soạn thảo văn bản hành chính theo Nghị định 30/2020/NĐ-CP ({score}đ):", bold=True, size_pt=11, space_after=4)
+    add_paragraph_with_run(doc, f"Câu {q_index}) Soạn thảo văn bản hành chính theo Nghị định 30/2020/NĐ-CP ({score} điểm):", bold=True, size_pt=11.5, space_after=4)
     p = doc.add_paragraph()
-    p.paragraph_format.space_after = Pt(6)
+    p.paragraph_format.space_after = Pt(4)
     p.paragraph_format.left_indent = Inches(0.2)
-    p.add_run("- Soạn thảo một Thông báo hoặc Tờ trình nội bộ theo đúng quy chuẩn thể thức văn bản hành chính (Quốc hiệu, Tiêu ngữ, Tên cơ quan ban hành, Số/Ký hiệu, Trích yếu nội dung, Nơi nhận và Thẩm quyền ký ban hành).")
+    p.paragraph_format.line_spacing = 1.15
+    r = p.add_run("- Soạn thảo một Thông báo hoặc Tờ trình nội bộ theo đúng quy chuẩn thể thức văn bản hành chính (Quốc hiệu, Tiêu ngữ, Tên cơ quan ban hành, Số/Ký hiệu, Trích yếu nội dung, Nơi nhận và Thẩm quyền ký ban hành).\n")
+    set_font(r, font_name="Times New Roman", size_pt=11)
+    
+    p2 = doc.add_paragraph()
+    p2.paragraph_format.space_after = Pt(4)
+    p2.paragraph_format.left_indent = Inches(0.2)
+    p2.paragraph_format.line_spacing = 1.2
+    r_b = p2.add_run("- Tên file Word đã lưu trên máy tính : ………………………………………………………………")
+    set_font(r_b, font_name="Times New Roman", size_pt=11)
 
 
 # 14. VP_XU_LY_EXCEL: Xử lý bảng tính Excel
@@ -498,14 +637,26 @@ def prepare_xu_ly_excel(cm, mm, dept_name, exam_date, params, context=None):
     return {}
 
 def render_docx_xu_ly_excel(doc, data, score, q_index):
-    add_paragraph_with_run(doc, f"Câu {q_index}) Xử lý dữ liệu bảng tính Excel ({score}đ):", bold=True, size_pt=11, space_after=4)
+    add_paragraph_with_run(doc, f"Câu {q_index}) Xử lý dữ liệu bảng tính Excel ({score} điểm):", bold=True, size_pt=11.5, space_after=4)
     p = doc.add_paragraph()
-    p.paragraph_format.space_after = Pt(6)
+    p.paragraph_format.space_after = Pt(4)
     p.paragraph_format.left_indent = Inches(0.2)
-    p.add_run("- Mở file dữ liệu Excel đi kèm trong đề thi thực hiện các yêu cầu:\n")
-    p.add_run("  + Dùng hàm VLOOKUP để tra cứu Tên Khoa/Phòng và Đơn giá từ Sheet Danh mục sang Sheet Dữ liệu.\n")
-    p.add_run("  + Dùng hàm IF / SUMIF / AVERAGE để tính Thành tiền và thống kê số liệu theo điều kiện.\n")
-    p.add_run("  + Vẽ biểu đồ hình cột so sánh số liệu giữa các khoa và lưu file.")
+    p.paragraph_format.line_spacing = 1.15
+    r1 = p.add_run("- Mở file dữ liệu Excel đi kèm trong đề thi thực hiện các yêu cầu sau:\n")
+    r2 = p.add_run("  + Dùng hàm VLOOKUP để tra cứu Tên Khoa/Phòng và Đơn giá từ Sheet Danh mục sang Sheet Dữ liệu.\n")
+    r3 = p.add_run("  + Dùng hàm IF / SUMIF / AVERAGE để tính Thành tiền và thống kê số liệu theo điều kiện.\n")
+    r4 = p.add_run("  + Vẽ biểu đồ hình cột so sánh số liệu giữa các khoa và lưu file.\n")
+    set_font(r1, font_name="Times New Roman", size_pt=11)
+    set_font(r2, font_name="Times New Roman", size_pt=11)
+    set_font(r3, font_name="Times New Roman", size_pt=11)
+    set_font(r4, font_name="Times New Roman", size_pt=11)
+
+    p2 = doc.add_paragraph()
+    p2.paragraph_format.space_after = Pt(4)
+    p2.paragraph_format.left_indent = Inches(0.2)
+    p2.paragraph_format.line_spacing = 1.2
+    r_b = p2.add_run("- Tên file Excel đã lưu trên máy tính : ………………………………………………………………")
+    set_font(r_b, font_name="Times New Roman", size_pt=11)
 
 
 # --- REGISTRY DICTIONARY ---

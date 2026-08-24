@@ -21,17 +21,17 @@ def set_cell_background(cell, fill_color):
     shading_xml = f'<w:shd {nsdecls("w")} w:fill="{fill_color}"/>'
     cell._tc.get_or_add_tcPr().append(parse_xml(shading_xml))
 
-def set_font(run, font_name="Arial", size_pt=11, bold=False, italic=False):
+def set_font(run, font_name="Times New Roman", size_pt=11, bold=False, italic=False):
     run.font.name = font_name
     run.font.size = Pt(size_pt)
     run.bold = bold
     run.italic = italic
 
-def add_paragraph_with_run(doc, text="", font_name="Arial", size_pt=11, bold=False, italic=False, align=WD_ALIGN_PARAGRAPH.LEFT, space_after=6):
+def add_paragraph_with_run(doc, text="", font_name="Times New Roman", size_pt=11, bold=False, italic=False, align=WD_ALIGN_PARAGRAPH.LEFT, space_after=5, line_spacing=1.15):
     p = doc.add_paragraph()
     p.alignment = align
     p.paragraph_format.space_after = Pt(space_after)
-    p.paragraph_format.line_spacing = 1.15
+    p.paragraph_format.line_spacing = line_spacing
     if text:
         run = p.add_run(text)
         set_font(run, font_name, size_pt, bold, italic)
@@ -49,47 +49,112 @@ def create_signature_table(doc):
     
     p1 = cells[0].paragraphs[0]
     p1.alignment = WD_ALIGN_PARAGRAPH.LEFT
-    r1 = p1.add_run("Điểm:")
-    set_font(r1, bold=True, size_pt=11)
+    p1.paragraph_format.space_after = Pt(2)
+    r1 = p1.add_run("Điểm bài thi:\n")
+    set_font(r1, font_name="Times New Roman", bold=True, size_pt=11)
     for _ in range(3):
-        cells[0].add_paragraph()
+        p_empty = cells[0].add_paragraph()
+        p_empty.paragraph_format.space_after = Pt(0)
         
     p2 = cells[1].paragraphs[0]
     p2.alignment = WD_ALIGN_PARAGRAPH.CENTER
-    r2 = p2.add_run("Chữ ký của cán bộ chấm thi:")
-    set_font(r2, italic=True, size_pt=10)
-    for _ in range(3):
-        cells[1].add_paragraph()
+    p2.paragraph_format.space_after = Pt(2)
+    r2 = p2.add_run("Chữ ký Cán bộ chấm thi:\n")
+    set_font(r2, font_name="Times New Roman", bold=True, size_pt=10.5)
+    r2_sub = p2.add_run("(Ký và ghi rõ họ tên)")
+    set_font(r2_sub, font_name="Times New Roman", italic=True, size_pt=9.5)
+    for _ in range(2):
+        p_empty = cells[1].add_paragraph()
+        p_empty.paragraph_format.space_after = Pt(0)
         
     p3 = cells[2].paragraphs[0]
     p3.alignment = WD_ALIGN_PARAGRAPH.CENTER
-    r3 = p3.add_run("Chữ ký của cán bộ coi thi:")
-    set_font(r3, italic=True, size_pt=10)
-    for _ in range(3):
-        cells[2].add_paragraph()
+    p3.paragraph_format.space_after = Pt(2)
+    r3 = p3.add_run("Chữ ký Cán bộ coi thi:\n")
+    set_font(r3, font_name="Times New Roman", bold=True, size_pt=10.5)
+    r3_sub = p3.add_run("(Ký và ghi rõ họ tên)")
+    set_font(r3_sub, font_name="Times New Roman", italic=True, size_pt=9.5)
+    for _ in range(2):
+        p_empty = cells[2].add_paragraph()
+        p_empty.paragraph_format.space_after = Pt(0)
         
-    doc.add_paragraph().paragraph_format.space_after = Pt(12)
+    p_after = doc.add_paragraph()
+    p_after.paragraph_format.space_after = Pt(6)
 
-def render_header(doc, position, candidate_name, candidate_id, exam_date):
-    add_paragraph_with_run(doc, "BỆNH VIỆN ĐA KHOA THIỆN HẠNH", bold=True, size_pt=11)
-    add_paragraph_with_run(doc, "HỘI ĐỒNG THI TUYỂN DỤNG", bold=True, size_pt=11)
+def render_header(doc, position, candidate_name, candidate_id, exam_date, dept=""):
+    top_p1 = doc.add_paragraph()
+    top_p1.paragraph_format.space_after = Pt(2)
+    top_p1.paragraph_format.line_spacing = 1.15
+    r_hosp = top_p1.add_run("BỆNH VIỆN ĐA KHOA THIỆN HẠNH\n")
+    set_font(r_hosp, font_name="Times New Roman", bold=True, size_pt=11)
+    r_council = top_p1.add_run("HỘI ĐỒNG THI TUYỂN DỤNG")
+    set_font(r_council, font_name="Times New Roman", bold=True, size_pt=11)
+
     create_signature_table(doc)
     
-    add_paragraph_with_run(doc, "BÀI THI VI TÍNH", bold=True, size_pt=16, align=WD_ALIGN_PARAGRAPH.CENTER, space_after=4)
-    add_paragraph_with_run(doc, f"Vị trí: {position}", italic=True, size_pt=12, align=WD_ALIGN_PARAGRAPH.CENTER, space_after=18)
+    title_p = doc.add_paragraph()
+    title_p.alignment = WD_ALIGN_PARAGRAPH.CENTER
+    title_p.paragraph_format.space_after = Pt(3)
+    r_title = title_p.add_run("BÀI THI KỸ NĂNG TIN HỌC / THAO TÁC PHẦN MỀM")
+    set_font(r_title, font_name="Times New Roman", bold=True, size_pt=14.5)
     
-    p_info = doc.add_paragraph()
-    p_info.paragraph_format.space_after = Pt(12)
-    r_name = p_info.add_run(f"Họ và tên thí sinh: {candidate_name}           ")
-    set_font(r_name, bold=True, size_pt=11)
-    if candidate_id:
-        r_id = p_info.add_run(f"Số báo danh: {candidate_id}\n")
-        set_font(r_id, bold=True, size_pt=11)
-    else:
-        p_info.add_run("\n")
-    r_date = p_info.add_run(f"Ngày thi: {exam_date}")
-    set_font(r_date, size_pt=11)
-    doc.add_paragraph().paragraph_format.space_after = Pt(6)
+    sub_title_p = doc.add_paragraph()
+    sub_title_p.alignment = WD_ALIGN_PARAGRAPH.CENTER
+    sub_title_p.paragraph_format.space_after = Pt(10)
+    dept_str = f" - Khoa / Phòng: {dept}" if dept else ""
+    r_sub = sub_title_p.add_run(f"Vị trí dự thi: {position}{dept_str}")
+    set_font(r_sub, font_name="Times New Roman", italic=True, size_pt=11.5)
+    
+    # Candidate Info Table Box (2 columns)
+    info_table = doc.add_table(rows=2, cols=2)
+    info_table.style = 'Table Grid'
+    widths = [Inches(4.2), Inches(2.8)]
+    for row in info_table.rows:
+        for idx, width in enumerate(widths):
+            row.cells[idx].width = width
+
+    # Row 1, Col 0: Họ tên
+    c00 = info_table.rows[0].cells[0]
+    p00 = c00.paragraphs[0]
+    p00.paragraph_format.space_after = Pt(2)
+    p00.paragraph_format.line_spacing = 1.15
+    r_l1 = p00.add_run("Họ và tên thí sinh: ")
+    set_font(r_l1, font_name="Times New Roman", size_pt=11)
+    r_val1 = p00.add_run(f"{candidate_name or '……………………………………………………'}")
+    set_font(r_val1, font_name="Times New Roman", bold=True, size_pt=11.5)
+
+    # Row 1, Col 1: SBD
+    c01 = info_table.rows[0].cells[1]
+    p01 = c01.paragraphs[0]
+    p01.paragraph_format.space_after = Pt(2)
+    p01.paragraph_format.line_spacing = 1.15
+    r_l2 = p01.add_run("Số báo danh (SBD): ")
+    set_font(r_l2, font_name="Times New Roman", size_pt=11)
+    r_val2 = p01.add_run(f"{candidate_id or '……………'}")
+    set_font(r_val2, font_name="Times New Roman", bold=True, size_pt=11.5)
+
+    # Row 2, Col 0: Khoa phòng dự tuyển
+    c10 = info_table.rows[1].cells[0]
+    p10 = c10.paragraphs[0]
+    p10.paragraph_format.space_after = Pt(2)
+    p10.paragraph_format.line_spacing = 1.15
+    r_l3 = p10.add_run("Khoa / Phòng dự tuyển: ")
+    set_font(r_l3, font_name="Times New Roman", size_pt=11)
+    r_val3 = p10.add_run(f"{dept or 'Toàn viện'}")
+    set_font(r_val3, font_name="Times New Roman", bold=True, size_pt=11)
+
+    # Row 2, Col 1: Ngày thi
+    c11 = info_table.rows[1].cells[1]
+    p11 = c11.paragraphs[0]
+    p11.paragraph_format.space_after = Pt(2)
+    p11.paragraph_format.line_spacing = 1.15
+    r_l4 = p11.add_run("Ngày thi: ")
+    set_font(r_l4, font_name="Times New Roman", size_pt=11)
+    r_val4 = p11.add_run(f"{exam_date}")
+    set_font(r_val4, font_name="Times New Roman", size_pt=11)
+
+    p_spacer = doc.add_paragraph()
+    p_spacer.paragraph_format.space_after = Pt(8)
 
 # 1. NURSE_INPATIENT DOCX
 def generate_nurse_inpatient_docx(doc, data, candidate_name, candidate_id, position, scores):
@@ -542,14 +607,14 @@ def generate_office_excel_file(output_path, row_count=20):
 
 
 # MAIN ENTRY POINT FOR DOCX GENERATION
-def generate_docx_file(data, template_type, candidate_name, candidate_id, position, output_path, scores=None):
+def generate_docx_file(data, template_type, candidate_name, candidate_id, position, output_path, scores=None, dept=""):
     doc = docx.Document()
     
     for section in doc.sections:
-        section.top_margin = Inches(1.0)
-        section.bottom_margin = Inches(1.0)
-        section.left_margin = Inches(1.0)
-        section.right_margin = Inches(1.0)
+        section.top_margin = Inches(0.8)
+        section.bottom_margin = Inches(0.8)
+        section.left_margin = Inches(0.9)
+        section.right_margin = Inches(0.75)
         
     if scores is None:
         scores = []
@@ -557,7 +622,7 @@ def generate_docx_file(data, template_type, candidate_name, candidate_id, positi
     # Check for modular action results
     if "action_results" in data and data["action_results"]:
         from exam_actions import ACTION_REGISTRY
-        render_header(doc, position, candidate_name, candidate_id, data.get("exam_date", ""))
+        render_header(doc, position, candidate_name, candidate_id, data.get("exam_date", ""), dept=dept or data.get("dept_name", ""))
         q_num = 1
         for item in data["action_results"]:
             act_code = item.get("action_code")
@@ -569,7 +634,7 @@ def generate_docx_file(data, template_type, candidate_name, candidate_id, positi
             action_spec = ACTION_REGISTRY.get(act_code)
             if action_spec and "render_docx" in action_spec:
                 action_spec["render_docx"](doc, act_data, score, q_num)
-                add_paragraph_with_run(doc, "Số điểm đạt được:………(đ)", size_pt=10, italic=True, space_after=12)
+                add_paragraph_with_run(doc, f"Điểm đạt được: …… / {score} đ", font_name="Times New Roman", size_pt=10.5, italic=True, align=WD_ALIGN_PARAGRAPH.RIGHT, space_after=14)
                 q_num += 1
         
         doc.save(output_path)
