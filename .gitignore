@@ -13,6 +13,13 @@ server.stderr.log
 data/output/*
 !data/output/.gitkeep
 
+# Catalog Excel Data Files (Do NOT push catalog Excel data to GitHub)
+data/catalogs/*
+!data/catalogs/.gitkeep
+
+# Runtime JSON data
+data/used_patients.json
+
 # OS and Editor files
 .DS_Store
 Thumbs.db

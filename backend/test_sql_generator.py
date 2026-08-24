@@ -150,7 +150,7 @@ class SqlGeneratorTests(unittest.TestCase):
         self.assertEqual(standard["BHYTTuNgay"], "01/01/2026")
         self.assertEqual(standard["BHYTDenNgay"], "31/12/2026")
         self.assertEqual(child["BHYTTuNgay"], "01/01/2026")
-        self.assertEqual(child["BHYTDenNgay"], "31/12/2030")
+        self.assertEqual(child["BHYTDenNgay"], "31/12/2026")
 
 
 if __name__ == "__main__":

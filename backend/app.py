@@ -774,6 +774,10 @@ def search_inventory(
             detail="Giới hạn kết quả phải nằm trong khoảng 1 đến 500.",
         )
 
+    mapped_warehouses = []
+    if department:
+        mapped_warehouses = mm.get_pharmacies_for_dept(department)
+
     result = cm.search_inventory(
         department=department,
         warehouse=warehouse,
@@ -781,6 +785,7 @@ def search_inventory(
         source=source,
         min_stock=min_stock,
         limit=limit,
+        mapped_warehouses=mapped_warehouses,
     )
     context = get_inventory_catalog_context()
     return {

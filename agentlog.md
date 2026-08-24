@@ -2,6 +2,34 @@
 
 Nhật ký ghi lại các thay đổi, quyết định thiết kế và tiến trình thực thi của Antigravity Coding Assistant trong suốt phiên làm việc.
 
+## [2026-08-24] Chuẩn hóa DKKCB 66232, Đơn vị tính Dược, Sửa Lọc Tồn kho & Không theo dõi Data trên Git
+
+### 1. Quyết định nghiệp vụ & Thiết kế:
+*   **Chuẩn hóa Dữ liệu Bệnh nhân BHYT:**
+    - Mặc định nơi đăng ký KCB ban đầu (`DKKCB`) là `66232` (Bệnh viện Đa khoa Thiện Hạnh).
+    - Hạn thẻ BHYT chuẩn hóa từ đầu năm đến cuối năm của năm thi (Ví dụ: thi năm 2027 thì hạn từ `01/01/2027` đến `31/12/2027`).
+*   **Trình bày Cách dùng Thuốc theo Đơn vị tính (`DVTTinh`):**
+    - Bỏ các từ hành động thừa như "uống", "tiêm".
+    - Trình bày trực tiếp theo ĐVT của loại dược: Ví dụ `Sáng 1 Viên, chiều 1 Viên`, `Sáng 1 Gói`, `Sáng 1 Chai, chiều 1 Chai`.
+*   **Sửa Lỗi Bộ lọc Tra cứu Tồn kho Dược (Tab 5):**
+    - Đồng bộ tên tham số API giữa Frontend và Backend (`department`, `warehouse`, `source`, `query`).
+    - Hỗ trợ lọc theo Khoa thông qua ánh xạ kho dược (`MappingManager`), tự động cập nhật danh sách kho theo Khoa được chọn.
+    - Hỗ trợ nhấn phím `Enter` và tự động tìm kiếm khi thay đổi tiêu chí lọc.
+*   **Nút Lưu cấu hình Phân quyền Dịch vụ & Kho (Tab 3):**
+    - Bổ sung nút "Lưu cấu hình Dịch vụ & Kho Dược" nổi bật ở cả trên và dưới bảng chi tiết.
+*   **Loại bỏ Dữ liệu Test khỏi Git Repo:**
+    - Cập nhật `.gitignore` loại trừ toàn bộ `data/catalogs/*.xlsx` và `data/used_patients.json`, chỉ giữ `.gitkeep`.
+    - Gỡ bỏ tracking toàn bộ file catalog test khỏi Git index.
+
+### 2. Công việc đã thực hiện:
+*   Cập nhật `backend/catalog_manager.py`: Mặc định `DKKCB = 66232`, chuẩn hóa hạn thẻ `01/01/{nam}` đến `31/12/{nam}`, nâng cấp `search_inventory` hỗ trợ lọc theo Khoa qua `mapped_warehouses`.
+*   Cập nhật `backend/sql_generator.py`: Mặc định `hospital_code = 66232`.
+*   Cập nhật `backend/exam_actions.py`: Ghi rõ `DKKCB: 66232`, hiển thị cách dùng thuốc dựa trên `DVTTinh` chuẩn xác.
+*   Cập nhật `backend/app.py`: Truyền `mapped_warehouses` cho `search_inventory`.
+*   Cập nhật `frontend/index.html` & `frontend/app.js`: Thêm nút lưu cấu hình Tab 3, sửa tham số tìm kiếm Tab 5, tự động cascade kho dược theo khoa.
+*   Cập nhật `.gitignore` và chạy `git rm --cached data/catalogs/*.xlsx`.
+*   Chạy toàn bộ 16 backend unit tests đạt 100% OK.
+
 ## [2026-08-23] Liên kết Nghiệp vụ Xuyên suốt trong Đề thi & Hoàn thiện Tạo Đề mới
 
 ### 1. Quyết định nghiệp vụ & Thiết kế:

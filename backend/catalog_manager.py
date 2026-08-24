@@ -171,7 +171,7 @@ class CatalogManager:
                     "SoBHYT": str(row[5]).strip() if row[5] else "",
                     "BHYTTuNgay": row[6] if isinstance(row[6], datetime) else (str(row[6]).strip() if row[6] else ""),
                     "BHYTDenNgay": row[7] if isinstance(row[7], datetime) else (str(row[7]).strip() if row[7] else ""),
-                    "DKKCB": str(row[8]).strip() if row[8] else ""
+                    "DKKCB": str(row[8]).strip() if (len(row) > 8 and row[8]) else "66232"
                 }
                 
                 # Format datetime to string for easy display
@@ -396,8 +396,7 @@ class CatalogManager:
             raise ValueError("Năm thi phải nằm trong khoảng 2000 đến 2100.")
 
         valid_from = datetime(exam_year, 1, 1)
-        valid_to_year = exam_year + 4 if card.startswith("TE1") else exam_year
-        valid_to = datetime(valid_to_year, 12, 31)
+        valid_to = datetime(exam_year, 12, 31)
         return valid_from, valid_to
 
     @classmethod
@@ -408,10 +407,12 @@ class CatalogManager:
         valid_from, valid_to = cls.get_exam_insurance_period(
             patient.get("SoBHYT"), exam_year
         )
+        dkkcb = str(patient.get("DKKCB") or "").strip() or "66232"
         return {
             **patient,
             "BHYTTuNgay": valid_from.strftime("%d/%m/%Y"),
             "BHYTDenNgay": valid_to.strftime("%d/%m/%Y"),
+            "DKKCB": dkkcb if dkkcb else "66232",
         }
 
     def normalize_patient_catalog(self, exam_year, file_path=None):
@@ -753,33 +754,37 @@ class CatalogManager:
         source=None,
         min_stock=0.0,
         limit=200,
+        mapped_warehouses=None,
     ):
         """Filters the uploaded stock snapshot without querying HIS."""
         pool = list(self.drugs)
 
         if department:
             normalized_department = self._normalize_department(department)
+            wh_set = {str(w).strip().casefold() for w in (mapped_warehouses or []) if w}
             pool = [
                 drug
                 for drug in pool
-                if self._normalize_department(drug.get("KhoaPhong"))
-                == normalized_department
+                if (
+                    (drug.get("KhoaPhong") and self._normalize_department(drug.get("KhoaPhong")) == normalized_department)
+                    or (str(drug.get("MaKho") or "").strip().casefold() in wh_set)
+                    or (str(drug.get("TenKho") or "").strip().casefold() in wh_set)
+                )
             ]
         if warehouse:
             normalized_warehouse = str(warehouse).strip().casefold()
             pool = [
                 drug
                 for drug in pool
-                if str(drug.get("MaKho") or "").strip().casefold()
-                == normalized_warehouse
+                if str(drug.get("MaKho") or "").strip().casefold() == normalized_warehouse
+                or str(drug.get("TenKho") or "").strip().casefold() == normalized_warehouse
             ]
         if source:
             normalized_source = str(source).strip().upper()
             pool = [
                 drug
                 for drug in pool
-                if str(drug.get("Nguon") or "").strip().upper()
-                == normalized_source
+                if str(drug.get("Nguon") or "").strip().upper() == normalized_source
             ]
 
         pool = [

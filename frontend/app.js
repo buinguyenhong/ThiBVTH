@@ -1127,9 +1127,12 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     // Save All Mappings (for current and all depts)
-    btnSaveCurrentDeptMapping.addEventListener('click', async () => {
+    const handleSaveDeptMapping = async () => {
         try {
-            btnSaveCurrentDeptMapping.disabled = true;
+            if (btnSaveCurrentDeptMapping) btnSaveCurrentDeptMapping.disabled = true;
+            const btnBottom = document.getElementById('btnSaveCurrentDeptMappingBottom');
+            if (btnBottom) btnBottom.disabled = true;
+
             const [resSvc, resPhar] = await Promise.all([
                 fetch('/api/mappings/services', {
                     method: 'POST',
@@ -1144,13 +1147,19 @@ document.addEventListener('DOMContentLoaded', () => {
             ]);
 
             if (!resSvc.ok || !resPhar.ok) throw new Error("Lỗi khi lưu cấu hình phân quyền.");
-            showToast(`Đã lưu cấu hình Dịch vụ & Kho cho "${selectedMappingDept}" thành công!`, "success");
+            showToast(`Đã lưu cấu hình Dịch vụ & Kho cho "${selectedMappingDept || 'tất cả các khoa'}" thành công!`, "success");
         } catch (err) {
             showToast(err.message, "error");
         } finally {
-            btnSaveCurrentDeptMapping.disabled = false;
+            if (btnSaveCurrentDeptMapping) btnSaveCurrentDeptMapping.disabled = false;
+            const btnBottom = document.getElementById('btnSaveCurrentDeptMappingBottom');
+            if (btnBottom) btnBottom.disabled = false;
         }
-    });
+    };
+
+    if (btnSaveCurrentDeptMapping) btnSaveCurrentDeptMapping.addEventListener('click', handleSaveDeptMapping);
+    const btnSaveCurrentDeptMappingBottom = document.getElementById('btnSaveCurrentDeptMappingBottom');
+    if (btnSaveCurrentDeptMappingBottom) btnSaveCurrentDeptMappingBottom.addEventListener('click', handleSaveDeptMapping);
 
     // --- COPY MAPPING MODAL ---
     btnCopyDeptMapping.addEventListener('click', () => {
@@ -1407,20 +1416,34 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
-    btnCloseScriptModal.addEventListener('click', () => scriptModal.style.display = 'none');
-    btnCloseScriptBtn.addEventListener('click', () => scriptModal.style.display = 'none');
-
-    btnCopyScript.addEventListener('click', () => {
-        scriptContentArea.select();
-        navigator.clipboard.writeText(scriptContentArea.value).then(() => {
-            showToast("Đã sao chép script vào bộ nhớ tạm!", "success");
-        }).catch(() => {
-            showToast("Không thể sao chép script.", "error");
-        });
+    // --- TAB 5: INVENTORY LOOKUP ---
+    invDept.addEventListener('change', () => {
+        const dept = invDept.value;
+        invWarehouse.innerHTML = '<option value="">-- Tất cả Kho --</option>';
+        if (dept && pharmacyMappings[dept] && pharmacyMappings[dept].length > 0) {
+            pharmacyMappings[dept].forEach(wh => {
+                invWarehouse.innerHTML += `<option value="${wh}">${wh}</option>`;
+            });
+        } else {
+            warehouses.forEach(wh => {
+                invWarehouse.innerHTML += `<option value="${wh}">${wh}</option>`;
+            });
+        }
+        doSearchInventory();
     });
 
-    // --- TAB 5: INVENTORY LOOKUP ---
-    btnSearchInventory.addEventListener('click', async () => {
+    invWarehouse.addEventListener('change', () => doSearchInventory());
+    invSource.addEventListener('change', () => doSearchInventory());
+    invKeyword.addEventListener('keypress', (e) => {
+        if (e.key === 'Enter') {
+            e.preventDefault();
+            doSearchInventory();
+        }
+    });
+
+    btnSearchInventory.addEventListener('click', doSearchInventory);
+
+    async function doSearchInventory() {
         const dept = invDept.value;
         const wh = invWarehouse.value;
         const src = invSource.value;
@@ -1430,10 +1453,10 @@ document.addEventListener('DOMContentLoaded', () => {
 
         try {
             const params = new URLSearchParams();
-            if (dept) params.append('khoa', dept);
-            if (wh) params.append('ma_kho', wh);
-            if (src) params.append('nguon', src);
-            if (kw) params.append('tu_khoa', kw);
+            if (dept) params.append('department', dept);
+            if (wh) params.append('warehouse', wh);
+            if (src) params.append('source', src);
+            if (kw) params.append('query', kw);
 
             const res = await fetch(`/api/inventory/search?${params.toString()}`);
             if (!res.ok) throw new Error("Lỗi khi tra cứu tồn kho.");
@@ -1446,22 +1469,22 @@ document.addEventListener('DOMContentLoaded', () => {
             }
 
             inventoryResultsBody.innerHTML = '';
-            items.slice(0, 100).forEach(item => {
+            items.slice(0, 200).forEach(item => {
                 const tr = document.createElement('tr');
                 tr.innerHTML = `
                     <td><code>${item.MaDuoc}</code></td>
                     <td><strong>${item.TenDuoc}</strong></td>
-                    <td>${item.DVTTinh}</td>
-                    <td>${item.TenKho || item.MaKho}</td>
+                    <td>${item.DVTTinh || '-'}</td>
+                    <td>${item.TenKho || item.MaKho || '-'}</td>
                     <td><span class="badge ${item.Nguon === 'BH' ? 'badge-success' : 'badge-info'}">${item.Nguon}</span></td>
-                    <td class="inventory-stock">${item.SoLuongTon.toLocaleString()}</td>
+                    <td class="inventory-stock">${(item.SoLuongTon || 0).toLocaleString()}</td>
                 `;
                 inventoryResultsBody.appendChild(tr);
             });
         } catch (err) {
             inventoryResultsBody.innerHTML = `<tr><td colspan="6" style="text-align: center; color: var(--danger-color); padding: 2rem;">${err.message}</td></tr>`;
         }
-    });
+    }
 
     function bindEvents() {
         // Optional global shortcut handlers

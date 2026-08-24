@@ -303,7 +303,7 @@ def _render_admission_block(
     card_number = str(patient.get("SoBHYT") or "").strip()
     card_from = None
     card_to = None
-    hospital_code = str(patient.get("DKKCB") or "").strip()
+    hospital_code = str(patient.get("DKKCB") or "").strip() or "66232"
 
     if record_type == "BHYT":
         if len(card_number) != 15 or " " in card_number or "-" in card_number:

@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Hệ thống Sinh đề thi và Nạp dữ liệu HIS - Bệnh viện Thiện Hạnh</title>
-    <link rel="stylesheet" href="style.css?v=20260823-2">
+    <link rel="stylesheet" href="style.css?v=20260824-1">
 </head>
 <body>
     <div class="container">
@@ -305,6 +305,18 @@
                                 <div id="selectedPharmaciesTags" class="selected-tags-container">
                                     <!-- Dynamic Selected Tags with (x) remove -->
                                 </div>
+                            </div>
+
+                            <!-- Bottom Save Action Bar for Active Department -->
+                            <div style="display: flex; justify-content: flex-end; gap: 0.75rem; margin-top: 1.5rem; padding-top: 1rem; border-top: 1px solid rgba(255,255,255,0.08);">
+                                <button id="btnSaveCurrentDeptMappingBottom" class="btn-primary" style="padding: 0.75rem 1.5rem; font-size: 0.95rem; font-weight: 600;">
+                                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align: middle; margin-right: 6px;">
+                                        <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"></path>
+                                        <polyline points="17 21 17 13 7 13 7 21"></polyline>
+                                        <polyline points="7 3 7 8 15 8"></polyline>
+                                    </svg>
+                                    Lưu cấu hình Dịch vụ & Kho Dược
+                                </button>
                             </div>
                         </div>
                     </div>
@@ -683,6 +695,6 @@
     <!-- Notification Toast -->
     <div id="toast" class="toast" style="display: none;"></div>
 
-    <script src="app.js?v=20260823-2"></script>
+    <script src="app.js?v=20260824-1"></script>
 </body>
 </html>

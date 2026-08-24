@@ -225,19 +225,19 @@ class CatalogManagerPatientUsageTests(unittest.TestCase):
         self.assertEqual(standard_card["BHYTTuNgay"], "01/01/2026")
         self.assertEqual(standard_card["BHYTDenNgay"], "31/12/2026")
         self.assertEqual(child_card["BHYTTuNgay"], "01/01/2026")
-        self.assertEqual(child_card["BHYTDenNgay"], "31/12/2030")
+        self.assertEqual(child_card["BHYTDenNgay"], "31/12/2026")
 
         selected = self.manager.get_patients(
-            2, must_have_bhyt=True, valid_on="15/07/2027"
+            2, must_have_bhyt=True, valid_on="15/07/2026"
         )
         selected_by_code = {
             patient["MaYTe"]: patient for patient in selected
         }
         self.assertEqual(
-            selected_by_code["BH001"]["BHYTDenNgay"], "31/12/2027"
+            selected_by_code["BH001"]["BHYTDenNgay"], "31/12/2026"
         )
         self.assertEqual(
-            selected_by_code["BH002"]["BHYTDenNgay"], "31/12/2031"
+            selected_by_code["BH002"]["BHYTDenNgay"], "31/12/2026"
         )
 
     def test_inventory_can_be_filtered_by_department_and_text(self):

@@ -67,11 +67,12 @@ def render_docx_nhan_benh_khoa(doc, data, score, q_index):
     bn_bhyt = data["bn_bhyt"]
     birth_bhyt = bn_bhyt.get("NgaySinh") or bn_bhyt.get("NamSinh") or ""
     doi_tuong_bhyt = bn_bhyt.get("DoiTuong", "BHYT")
+    dkkcb_bhyt = bn_bhyt.get("DKKCB") or "66232"
     p1 = doc.add_paragraph()
     p1.paragraph_format.space_after = Pt(2)
     p1.paragraph_format.left_indent = Inches(0.2)
     p1.add_run("- Bệnh nhân BHYT: ").bold = True
-    p1.add_run(f"Họ tên: {bn_bhyt['TenBenhNhan']} - {birth_bhyt} - {bn_bhyt.get('GioiTinh', 'Nam')} - Số BHYT: {bn_bhyt.get('SoBHYT', '')} - Đối tượng: {doi_tuong_bhyt}")
+    p1.add_run(f"Họ tên: {bn_bhyt['TenBenhNhan']} - {birth_bhyt} - {bn_bhyt.get('GioiTinh', 'Nam')} - Số BHYT: {bn_bhyt.get('SoBHYT', '')} (Nơi ĐKKCB: {dkkcb_bhyt}) - Đối tượng: {doi_tuong_bhyt}")
     
     bn_vp = data["bn_vp"]
     birth_vp = bn_vp.get("NgaySinh") or bn_vp.get("NamSinh") or ""
@@ -113,13 +114,14 @@ def render_docx_tiep_nhan(doc, data, score, q_index):
     birth_bhyt = bn_bhyt.get("NgaySinh") or bn_bhyt.get("NamSinh") or ""
     addr_bhyt = bn_bhyt.get("DiaChiLienHe") or bn_bhyt.get("DiaChi") or "Buôn Ma Thuột, Đắk Lắk"
     han_bhyt = f"{bn_bhyt.get('BHYTTuNgay', '')} - {bn_bhyt.get('BHYTDenNgay', '')}".strip(" -")
+    dkkcb_bhyt = bn_bhyt.get("DKKCB") or "66232"
     
     p1 = doc.add_paragraph()
     p1.paragraph_format.space_after = Pt(2)
     p1.paragraph_format.left_indent = Inches(0.2)
     p1.add_run("a. Bệnh nhân BHYT:\n").bold = True
     p1.add_run(f"- Họ và tên: {bn_bhyt['TenBenhNhan']}        - Ngày/Năm sinh: {birth_bhyt} ({bn_bhyt.get('GioiTinh', 'Nam')})\n")
-    p1.add_run(f"- Số thẻ BHYT: {bn_bhyt.get('SoBHYT', '')} (Hạn thẻ: {han_bhyt})\n")
+    p1.add_run(f"- Số thẻ BHYT: {bn_bhyt.get('SoBHYT', '')} (Hạn thẻ: {han_bhyt} - Nơi ĐKKCB: {dkkcb_bhyt})\n")
     p1.add_run(f"- Địa chỉ: {addr_bhyt}\n")
     p1.add_run(f"- Lý do vào viện/Chẩn đoán: {bn_bhyt.get('LyDoKham', 'Đau bụng cấp / Theo dõi viêm ruột thừa')}")
     
@@ -224,10 +226,13 @@ def render_docx_chi_dinh_thuoc_vtyt(doc, data, score, q_index):
         p_d.paragraph_format.left_indent = Inches(0.2)
         p_d.add_run("+ Thuốc Bảo hiểm y tế:").bold = True
         for d in drugs:
+            dvt = d.get('DVTTinh') or 'Viên'
+            sl = random.randint(1, 3)
+            cachdung = f"Sáng 1 {dvt}, chiều 1 {dvt}." if sl >= 2 else f"Sáng 1 {dvt}."
             p = doc.add_paragraph()
             p.paragraph_format.space_after = Pt(2)
             p.paragraph_format.left_indent = Inches(0.4)
-            p.add_run(f"- {d['TenDuoc']} ({d['DVTTinh']}) - Số lượng: {random.randint(1, 3)} - Cách dùng: Uống sáng 1 viên, chiều 1 viên.")
+            p.add_run(f"- {d['TenDuoc']} ({dvt}) - Số lượng: {sl} - Cách dùng: {cachdung}")
             
     supplies = data.get("supplies", [])
     if supplies:
@@ -236,10 +241,12 @@ def render_docx_chi_dinh_thuoc_vtyt(doc, data, score, q_index):
         p_s.paragraph_format.left_indent = Inches(0.2)
         p_s.add_run("+ Vật tư y tế / Thuốc Viện phí:").bold = True
         for s in supplies:
+            svt = s.get('DVTTinh') or 'Cái'
+            sl = random.randint(1, 2)
             p = doc.add_paragraph()
             p.paragraph_format.space_after = Pt(2)
             p.paragraph_format.left_indent = Inches(0.4)
-            p.add_run(f"- {s['TenDuoc']} ({s['DVTTinh']}) - Số lượng: {random.randint(1, 2)}")
+            p.add_run(f"- {s['TenDuoc']} ({svt}) - Số lượng: {sl}")
 
 
 # 5. YL_TRA_THUOC: Trả thuốc thừa / Hủy y lệnh (Thực hiện trên Thuốc đã kê của Bệnh nhân BHYT)
@@ -268,10 +275,11 @@ def render_docx_tra_thuoc(doc, data, score, q_index):
     pt_name = f" cho bệnh nhân BHYT {bn_bhyt['TenBenhNhan']}" if bn_bhyt else ""
     add_paragraph_with_run(doc, f"Câu {q_index}) Thực hiện trả thuốc / Hủy y lệnh{pt_name} ({score}đ):", bold=True, size_pt=11, space_after=4)
     d = data["drug"]
+    dvt = d.get('DVTTinh') or 'Viên'
     p = doc.add_paragraph()
     p.paragraph_format.space_after = Pt(6)
     p.paragraph_format.left_indent = Inches(0.2)
-    p.add_run(f"- Hoàn trả lại tủ trực/kho: {d['TenDuoc']} ({d['DVTTinh']}) - Số lượng hoàn trả: {data['quantity']} {d['DVTTinh']} (Lý do: Bệnh nhân đỡ đau / Đổi phác đồ điều trị).")
+    p.add_run(f"- Hoàn trả lại tủ trực/kho: {d['TenDuoc']} ({dvt}) - Số lượng hoàn trả: {data['quantity']} {dvt} (Lý do: Bệnh nhân đỡ đau / Đổi phác đồ điều trị).")
 
 
 # 6. YL_DOI_THEM_DICH_VU: Đổi hoặc bổ sung dịch vụ CLS (Đổi từ dịch vụ đã chỉ định trước đó)
