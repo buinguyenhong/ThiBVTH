@@ -28,13 +28,18 @@ class TemplateManager:
                 data = json.load(f)
             
             if isinstance(data, list) and len(data) > 0:
-                existing_names = {t.get("name") for t in data}
+                # Filter out any deprecated departments (e.g. Khoa Y học cổ truyền)
+                filtered_data = [
+                    t for t in data 
+                    if "Y học cổ truyền" not in t.get("name", "") and "Y học cổ truyền" not in t.get("dept", "")
+                ]
+                existing_names = {t.get("name") for t in filtered_data}
                 defaults = self._seed_default_templates()
                 missing = [d for d in defaults if d.get("name") not in existing_names]
-                if missing:
-                    data.extend(missing)
-                    self._save_templates(data)
-                return data
+                if missing or len(filtered_data) != len(data):
+                    filtered_data.extend(missing)
+                    self._save_templates(filtered_data)
+                return filtered_data
             return self._seed_default_templates()
         except Exception as e:
             print(f"Error loading exam templates: {e}, seeding defaults.")
@@ -93,34 +98,28 @@ class TemplateManager:
                 ]
             })
 
-        # 2. Direct Reception Depts (Cấp cứu, Sản, Nhi)
-        direct_depts = ["Khoa Cấp cứu", "Khoa Phụ Sản", "Khoa Nhi"]
-        for dept in direct_depts:
+        # 2. Specialized Inpatient (Khoa Phụ Sản, Khoa Nhi, Khoa Cấp cứu, Khoa Tim mạch)
+        special_inpatient = [
+            ("Khoa Phụ Sản", "Nữ hộ sinh / Điều dưỡng Sản"),
+            ("Khoa Nhi", "Điều dưỡng Nhi khoa"),
+            ("Khoa Cấp cứu", "Điều dưỡng Cấp cứu"),
+            ("Khoa Tim mạch", "Điều dưỡng Tim mạch")
+        ]
+        for dept, pos in special_inpatient:
             templates.append({
                 "id": f"tpl_{uuid.uuid4().hex[:8]}",
-                "name": f"Đề thi Điều dưỡng Tiếp nhận Trực tiếp ({dept})",
+                "name": f"Đề thi {pos} ({dept})",
                 "dept": dept,
-                "position": "Điều dưỡng Tiếp nhận trực tiếp",
+                "position": pos,
                 "uses_his": True,
                 "actions": [
-                    {"action_code": "TN_TIEP_NHAN", "score": 2.0, "params": {}},
+                    {"action_code": "NT_NHAN_BENH_KHOA", "score": 1.0, "params": {}},
                     {"action_code": "YL_CHI_DINH_CLS", "score": 2.0, "params": {}},
-                    {"action_code": "YL_CHI_DINH_THUOC_VTYT", "score": 3.0, "params": {}},
+                    {"action_code": "YL_CHI_DINH_THUOC_VTYT", "score": 3.0, "params": {"num_drugs": 3, "num_supplies": 2}},
                     {"action_code": "YL_TRA_THUOC", "score": 1.0, "params": {}},
+                    {"action_code": "YL_DOI_THEM_DICH_VU", "score": 1.0, "params": {}},
                     {"action_code": "CK_CHUYEN_KHOA", "score": 1.0, "params": {}},
                     {"action_code": "RV_CHO_RA_VIEN", "score": 1.0, "params": {}}
-                ]
-            })
-            templates.append({
-                "id": f"tpl_{uuid.uuid4().hex[:8]}",
-                "name": f"Đề thi Lễ tân Tiếp nhận Trực tiếp ({dept})",
-                "dept": dept,
-                "position": "Lễ tân Tiếp nhận trực tiếp",
-                "uses_his": True,
-                "actions": [
-                    {"action_code": "TN_TIEP_NHAN", "score": 5.0, "params": {}},
-                    {"action_code": "YL_CHI_DINH_CLS", "score": 2.5, "params": {}},
-                    {"action_code": "TC_THU_TAM_UNG", "score": 2.5, "params": {}}
                 ]
             })
 
@@ -141,11 +140,10 @@ class TemplateManager:
                 ]
             })
 
-        # 4. Outpatient Medical Record & PTTT Depts (PHCN, Thận nhân tạo, YHCT)
+        # 4. Outpatient Medical Record & PTTT Depts (PHCN, Thận nhân tạo)
         outpatient_ban_depts = [
             ("Khoa Phục hồi chức năng", "Kỹ thuật viên Phục hồi chức năng", "Đề thi Kỹ thuật viên Phục hồi chức năng (Khoa Phục hồi chức năng)"),
-            ("Thận nhân tạo", "Điều dưỡng Thận nhân tạo", "Đề thi Điều dưỡng Thận nhân tạo (Thận nhân tạo)"),
-            ("Khoa Y học cổ truyền", "Y sĩ Y học cổ truyền", "Đề thi Y sĩ Y học cổ truyền (Khoa Y học cổ truyền)")
+            ("Thận nhân tạo", "Điều dưỡng Thận nhân tạo", "Đề thi Điều dưỡng Thận nhân tạo (Thận nhân tạo)")
         ]
         for dept, pos, tpl_name in outpatient_ban_depts:
             templates.append({

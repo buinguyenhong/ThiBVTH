@@ -36,6 +36,145 @@ def get_cutoff_date(exam_date_str, days_back=30):
     return start_dt.strftime("%d/%m/%Y"), cutoff_dt.strftime("%d/%m/%Y")
 
 
+# --- CURATED DEPARTMENT CLINICAL & PROCEDURE SERVICES ---
+DEPARTMENT_CLINICAL_SERVICES = {
+    "Khoa Phục hồi chức năng": [
+        {"MaDichVu": "PHCN_DX", "TenDichVu": "Điều trị bằng các dòng điện xung", "NhomDichVu": "Vật lý trị liệu"},
+        {"MaDichVu": "PHCN_SA", "TenDichVu": "Điều trị bằng siêu âm", "NhomDichVu": "Vật lý trị liệu"},
+        {"MaDichVu": "PHCN_HN", "TenDichVu": "Điều trị bằng tia hồng ngoại", "NhomDichVu": "Vật lý trị liệu"},
+        {"MaDichVu": "PHCN_LS", "TenDichVu": "Laser điều trị", "NhomDichVu": "Vật lý trị liệu"},
+        {"MaDichVu": "PHCN_KG", "TenDichVu": "Kéo giãn cột sống cổ / thắt lưng", "NhomDichVu": "Vật lý trị liệu"},
+        {"MaDichVu": "PHCN_TVD", "TenDichVu": "Tập vận động thụ động / có trợ giúp", "NhomDichVu": "Phục hồi chức năng"}
+    ],
+    "Thận nhân tạo": [
+        {"MaDichVu": "TNT_CK", "TenDichVu": "Thận nhân tạo thường quy (Lọc máu chu kỳ)", "NhomDichVu": "Lọc máu"},
+        {"MaDichVu": "TNT_CC", "TenDichVu": "Lọc máu cấp cứu", "NhomDichVu": "Lọc máu"},
+        {"MaDichVu": "TNT_CATH", "TenDichVu": "Đặt Catheter tĩnh mạch đùi 2 nòng", "NhomDichVu": "Thủ thuật"},
+        {"MaDichVu": "URE", "TenDichVu": "Định lượng Ure [Máu]", "NhomDichVu": "Xét nghiệm"},
+        {"MaDichVu": "CREM", "TenDichVu": "Định lượng Creatinin [Máu]", "NhomDichVu": "Xét nghiệm"},
+        {"MaDichVu": "DGD", "TenDichVu": "Điện giải đồ (Na, K, Cl) [Máu]", "NhomDichVu": "Xét nghiệm"},
+        {"MaDichVu": "DNT", "TenDichVu": "Điện tâm đồ (ECG)", "NhomDichVu": "Thăm dò chức năng"}
+    ],
+    "Khoa Mắt": [
+        {"MaDichVu": "MAT_DKX", "TenDichVu": "Đo khúc xạ máy / Khám khúc xạ", "NhomDichVu": "Thủ thuật Mắt"},
+        {"MaDichVu": "MAT_SDM", "TenDichVu": "Soi đáy mắt trực tiếp", "NhomDichVu": "Khám mắt"},
+        {"MaDichVu": "MAT_LYDV", "TenDichVu": "Lấy dị vật kết mạc / giác mạc nông", "NhomDichVu": "Thủ thuật Mắt"},
+        {"MaDichVu": "MAT_BTLD", "TenDichVu": "Bơm thông lệ đạo / Rửa mắt", "NhomDichVu": "Thủ thuật Mắt"}
+    ],
+    "Khoa Tai Mũi Họng": [
+        {"MaDichVu": "TMH_NS", "TenDichVu": "Nội soi Tai Mũi Họng chẩn đoán (Ống mềm/cứng)", "NhomDichVu": "Nội soi TMH"},
+        {"MaDichVu": "TMH_PRZ", "TenDichVu": "Hút rửa mũi xoang (Phương pháp Proetz)", "NhomDichVu": "Thủ thuật TMH"},
+        {"MaDichVu": "TMH_LYDV", "TenDichVu": "Lấy dị vật Tai / Mũi / Họng", "NhomDichVu": "Thủ thuật TMH"},
+        {"MaDichVu": "TMH_KD", "TenDichVu": "Khí dung mũi họng / Làm thuốc tai", "NhomDichVu": "Thủ thuật TMH"}
+    ],
+    "Khoa Răng Hàm Mặt": [
+        {"MaDichVu": "RHM_NR", "TenDichVu": "Nhổ răng vĩnh viễn / Răng sữa lung lay", "NhomDichVu": "Thủ thuật RHM"},
+        {"MaDichVu": "RHM_TR", "TenDichVu": "Trám răng thẩm mỹ Composite", "NhomDichVu": "Thủ thuật RHM"},
+        {"MaDichVu": "RHM_LCR", "TenDichVu": "Lấy cao răng và đánh bóng hai hàm", "NhomDichVu": "Thủ thuật RHM"},
+        {"MaDichVu": "RHM_XQ", "TenDichVu": "Chụp Xquang Răng cận chóp", "NhomDichVu": "X-quang RHM"}
+    ],
+    "Khoa Phụ Sản": [
+        {"MaDichVu": "PS_SAT", "TenDichVu": "Siêu âm thai Doppler màu / 4D", "NhomDichVu": "Siêu âm"},
+        {"MaDichVu": "PS_MON", "TenDichVu": "Đo Monitor sản khoa (Theo dõi tim thai - cơn co)", "NhomDichVu": "Monitor sản khoa"},
+        {"MaDichVu": "PS_KPK", "TenDichVu": "Khám phụ khoa / Đặt thuốc âm đạo", "NhomDichVu": "Thủ thuật"},
+        {"MaDichVu": "BLT", "TenDichVu": "Tổng phân tích tế bào máu ngoại vi", "NhomDichVu": "Xét nghiệm"}
+    ],
+    "Khoa Nhi": [
+        {"MaDichVu": "NHI_KD", "TenDichVu": "Khí dung thuốc qua mặt nạ", "NhomDichVu": "Thủ thuật"},
+        {"MaDichVu": "XQNT", "TenDichVu": "Chụp Xquang ngực thẳng [Số hóa 1 phim]", "NhomDichVu": "X-quang"},
+        {"MaDichVu": "BLT", "TenDichVu": "Tổng phân tích tế bào máu ngoại vi", "NhomDichVu": "Xét nghiệm"},
+        {"MaDichVu": "CRP", "TenDichVu": "CRP Định lượng [Máu]", "NhomDichVu": "Xét nghiệm"}
+    ],
+    "Khoa Tim mạch": [
+        {"MaDichVu": "SADT", "TenDichVu": "Siêu âm Doppler tim", "NhomDichVu": "Siêu âm"},
+        {"MaDichVu": "DNT", "TenDichVu": "Điện tâm đồ (ECG) 12 chuyển đạo", "NhomDichVu": "Điện tim"},
+        {"MaDichVu": "TIM_HOL", "TenDichVu": "Holter điện tâm đồ 24 giờ", "NhomDichVu": "Thăm dò chức năng"},
+        {"MaDichVu": "XQNT", "TenDichVu": "Chụp Xquang ngực thẳng [Số hóa 1 phim]", "NhomDichVu": "X-quang"},
+        {"MaDichVu": "BLT", "TenDichVu": "Tổng phân tích tế bào máu ngoại vi", "NhomDichVu": "Xét nghiệm"}
+    ],
+    "Khoa Chấn thương chỉnh hình": [
+        {"MaDichVu": "CTCH_BB", "TenDichVu": "Bó bột cẳng bàn tay / Cẳng chân", "NhomDichVu": "Thủ thuật"},
+        {"MaDichVu": "CTCH_NTK", "TenDichVu": "Nắn trật khớp kín", "NhomDichVu": "Thủ thuật"},
+        {"MaDichVu": "XQCS", "TenDichVu": "Chụp Xquang cột sống thắt lưng thẳng nghiêng", "NhomDichVu": "X-quang"},
+        {"MaDichVu": "XQNT", "TenDichVu": "Chụp Xquang ngực thẳng [Số hóa 1 phim]", "NhomDichVu": "X-quang"},
+        {"MaDichVu": "BLT", "TenDichVu": "Tổng phân tích tế bào máu ngoại vi", "NhomDichVu": "Xét nghiệm"}
+    ],
+    "Khoa Ngoại thần kinh": [
+        {"MaDichVu": "CTSN", "TenDichVu": "Chụp CLVT (CT Scan) sọ não không tiêm thuốc cản quang", "NhomDichVu": "CT Scan"},
+        {"MaDichVu": "NTK_MRI", "TenDichVu": "Chụp Cộng hưởng từ (MRI) sọ não / Cột sống", "NhomDichVu": "MRI"},
+        {"MaDichVu": "NTK_KVT", "TenDichVu": "Khâu vết thương da đầu / Vết thương phần mềm", "NhomDichVu": "Thủ thuật"},
+        {"MaDichVu": "BLT", "TenDichVu": "Tổng phân tích tế bào máu ngoại vi", "NhomDichVu": "Xét nghiệm"}
+    ],
+    "Khoa Hồi sức tích cực": [
+        {"MaDichVu": "HSTC_KM", "TenDichVu": "Khí máu động mạch", "NhomDichVu": "Khí máu"},
+        {"MaDichVu": "HSTC_NKQ", "TenDichVu": "Đặt nội khí quản / Hút đờm khí phế quản", "NhomDichVu": "Thủ thuật"},
+        {"MaDichVu": "HSTC_CATH", "TenDichVu": "Đặt Catheter tĩnh mạch trung tâm (CVC)", "NhomDichVu": "Thủ thuật"},
+        {"MaDichVu": "XQNT", "TenDichVu": "Chụp Xquang ngực thẳng tại giường", "NhomDichVu": "X-quang"},
+        {"MaDichVu": "BLT", "TenDichVu": "Tổng phân tích tế bào máu ngoại vi", "NhomDichVu": "Xét nghiệm"}
+    ],
+    "Khoa Cấp cứu": [
+        {"MaDichVu": "CC_KM", "TenDichVu": "Khí máu động mạch cấp cứu", "NhomDichVu": "Khí máu"},
+        {"MaDichVu": "CTSN", "TenDichVu": "Chụp CLVT (CT Scan) sọ não cấp cứu", "NhomDichVu": "CT Scan"},
+        {"MaDichVu": "DNT", "TenDichVu": "Điện tâm đồ (ECG) cấp cứu", "NhomDichVu": "Điện tim"},
+        {"MaDichVu": "SAOB", "TenDichVu": "Siêu âm bụng cấp cứu (FAST)", "NhomDichVu": "Siêu âm"},
+        {"MaDichVu": "BLT", "TenDichVu": "Tổng phân tích tế bào máu ngoại vi", "NhomDichVu": "Xét nghiệm"}
+    ],
+    "Khoa Ngoại tổng hợp": [
+        {"MaDichVu": "SAOB", "TenDichVu": "Siêu âm bụng tổng quát", "NhomDichVu": "Siêu âm"},
+        {"MaDichVu": "XQNT", "TenDichVu": "Chụp Xquang ngực thẳng [Số hóa 1 phim]", "NhomDichVu": "X-quang"},
+        {"MaDichVu": "NGOAI_KVT", "TenDichVu": "Khâu vết thương phần mềm / Cắt chỉ vết mổ", "NhomDichVu": "Thủ thuật"},
+        {"MaDichVu": "BLT", "TenDichVu": "Tổng phân tích tế bào máu ngoại vi (bằng máy đếm laser)", "NhomDichVu": "Xét nghiệm"},
+        {"MaDichVu": "CRP", "TenDichVu": "CRP Định lượng [Máu]", "NhomDichVu": "Xét nghiệm"}
+    ],
+    "Khoa Nội": [
+        {"MaDichVu": "SAOB", "TenDichVu": "Siêu âm bụng tổng quát", "NhomDichVu": "Siêu âm"},
+        {"MaDichVu": "NSDD", "TenDichVu": "Nội soi dạ dày tá tràng chẩn đoán", "NhomDichVu": "Nội soi"},
+        {"MaDichVu": "DNT", "TenDichVu": "Điện tâm đồ (ECG)", "NhomDichVu": "Điện tim"},
+        {"MaDichVu": "GLUM", "TenDichVu": "Định lượng Glucose [Máu]", "NhomDichVu": "Xét nghiệm"},
+        {"MaDichVu": "CREM", "TenDichVu": "Định lượng Creatinin [Máu]", "NhomDichVu": "Xét nghiệm"}
+    ]
+}
+
+def get_department_specific_services(cm, mm, dept_name, count=4):
+    """
+    Selects clinical services & procedures strictly corresponding to the specified department.
+    """
+    allowed_groups = mm.get_services_for_dept(dept_name)
+    candidates = []
+    
+    # 1. Search in live catalog for matching groups or executing department
+    if allowed_groups:
+        candidates = cm.get_services(count * 2, nhom=allowed_groups, khoa=dept_name)
+        if len(candidates) < count:
+            candidates = cm.get_services(count * 2, nhom=allowed_groups)
+            
+    # 2. Enrich/fallback with specialized department procedures
+    dept_curated = DEPARTMENT_CLINICAL_SERVICES.get(dept_name)
+    if not dept_curated:
+        for k, v in DEPARTMENT_CLINICAL_SERVICES.items():
+            if k.lower() in dept_name.lower() or dept_name.lower() in k.lower():
+                dept_curated = v
+                break
+                
+    if dept_curated:
+        # For specialized outpatient depts (PHCN, Thận nhân tạo, Mắt, TMH, RHM), prioritize curated specialized services
+        if dept_name in ["Khoa Phục hồi chức năng", "Thận nhân tạo", "Khoa Mắt", "Khoa Tai Mũi Họng", "Khoa Răng Hàm Mặt"]:
+            candidates = list(dept_curated)
+        else:
+            existing_codes = {s.get("MaDichVu") for s in candidates}
+            for s in dept_curated:
+                if s.get("MaDichVu") not in existing_codes:
+                    candidates.append(s)
+                    existing_codes.add(s.get("MaDichVu"))
+
+    if not candidates:
+        candidates = cm.get_services(count)
+        
+    if len(candidates) <= count:
+        return list(candidates)
+    return random.sample(candidates, count)
+
+
 # --- ACTION IMPLEMENTATIONS (WITH SHARED CANDIDATE CONTEXT) ---
 
 # 1. NT_NHAN_BENH_KHOA: Nhận bệnh nhân vào khoa điều trị (Hàng chờ HIS)
@@ -174,7 +313,6 @@ def prepare_chi_dinh_cls(cm, mm, dept_name, exam_date, params, context=None):
         if context is not None:
             context["bn_bhyt"] = bn_bhyt
 
-    allowed_groups = mm.get_services_for_dept(dept_name)
     counts_config = params.get("counts_by_group", {})
     selected_services = []
     
@@ -183,18 +321,8 @@ def prepare_chi_dinh_cls(cm, mm, dept_name, exam_date, params, context=None):
             svcs = cm.get_services(int(count), nhom=grp)
             selected_services.extend(svcs)
     else:
-        img_groups = [g for g in allowed_groups if any(k in g.lower() for k in ["siêu âm", "x-quang", "ct", "mri", "nội soi", "thủ thuật"])]
-        lab_groups = [g for g in allowed_groups if any(k in g.lower() for k in ["xét nghiệm", "huyết học", "hóa sinh", "vi sinh", "khí máu"])]
-        
-        if img_groups:
-            img_services = cm.get_services(1, nhom=img_groups)
-            selected_services.extend(img_services)
-        if lab_groups:
-            lab_services = cm.get_services(3, nhom=lab_groups)
-            selected_services.extend(lab_services)
-        
-        if not selected_services:
-            selected_services = cm.get_services(3, nhom=allowed_groups if allowed_groups else None)
+        num_services = int(params.get("num_services", 4))
+        selected_services = get_department_specific_services(cm, mm, dept_name, count=num_services)
 
     if context is not None:
         context["ordered_services"] = selected_services
@@ -722,11 +850,8 @@ def prepare_pttt_chi_dinh(cm, mm, dept_name, exam_date, params, context=None):
         if context is not None:
             context["bn_ngoai_tru"] = patient
 
-    allowed_groups = mm.get_services_for_dept(dept_name)
     num_services = int(params.get("num_services", 4))
-    services = cm.get_services(num_services, nhom=allowed_groups if allowed_groups else None, khoa=dept_name)
-    if not services or len(services) < 2:
-        services = cm.get_services(num_services)
+    services = get_department_specific_services(cm, mm, dept_name, count=num_services)
 
     if context is not None:
         context["pttt_services"] = services

@@ -66,7 +66,6 @@ class MappingManager:
             "Khoa Khám bệnh": ["Khám bệnh", "Xét nghiệm", "Siêu âm", "X-quang", "Điện tim"],
             "Thận nhân tạo": ["Xét nghiệm", "Lọc máu", "Điện tim", "Thủ thuật"],
             "Khoa Phục hồi chức năng": ["Vật lý trị liệu", "Phục hồi chức năng", "Thủ thuật", "Điện xung", "Siêu âm điều trị", "Hồng ngoại", "Laser điều trị"],
-            "Khoa Y học cổ truyền": ["Y học cổ truyền", "Châm cứu", "Xoa bóp bấm huyệt", "Thủ thuật", "Vật lý trị liệu"],
             "Khoa Xét Nghiệm": ["Xét nghiệm", "Huyết học", "Hóa sinh", "Vi sinh"],
             "Khoa Chẩn đoán hình ảnh": ["X-quang", "Siêu âm", "CT Scan", "MRI"],
             "Khoa Nội soi": ["Nội soi tiêu hóa", "Nội soi dạ dày", "Nội soi đại tràng"],
@@ -95,7 +94,6 @@ class MappingManager:
             "Khoa Khám bệnh": ["KHO_LE", "KHO_BHYT", "KHO_PK", "KHO_CHUNG", "KHO_DUOCTONG"],
             "Thận nhân tạo": ["KHO_LE_NOITRU", "KHO_TNT", "KHO_CHUNG"],
             "Khoa Phục hồi chức năng": ["KHO_LE", "KHO_PK", "KHO_CHUNG", "KHO_DUOCTONG"],
-            "Khoa Y học cổ truyền": ["KHO_YHCT", "KHO_LE", "KHO_CHUNG", "KHO_DUOCTONG"],
             "Khoa Phẫu thuật - GMHS": ["KHO_PTGM", "KHO_GMHS", "KHO_CHUNG"],
             "Khoa Dược": ["KHO_DUOCTONG", "KHO_CHUNG", "KHO_BHYT", "KHO_LE"]
         }

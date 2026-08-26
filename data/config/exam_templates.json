@@ -901,31 +901,188 @@
     ]
   },
   {
-    "id": "tpl_edf7751e",
-    "name": "Đề thi Y sĩ Y học cổ truyền (Khoa Y học cổ truyền)",
-    "dept": "Khoa Y học cổ truyền",
-    "position": "Y sĩ Y học cổ truyền",
+    "id": "tpl_12855a91",
+    "name": "Đề thi Nữ hộ sinh / Điều dưỡng Sản (Khoa Phụ Sản)",
+    "dept": "Khoa Phụ Sản",
+    "position": "Nữ hộ sinh / Điều dưỡng Sản",
     "uses_his": true,
     "actions": [
       {
-        "action_code": "BAN_NGOAI_TRU_NHAN_BENH",
-        "score": 3.0,
+        "action_code": "NT_NHAN_BENH_KHOA",
+        "score": 1.0,
         "params": {}
       },
       {
-        "action_code": "PTTT_CHI_DINH",
+        "action_code": "YL_CHI_DINH_CLS",
         "score": 2.0,
+        "params": {}
+      },
+      {
+        "action_code": "YL_CHI_DINH_THUOC_VTYT",
+        "score": 3.0,
         "params": {
-          "num_services": 4
+          "num_drugs": 3,
+          "num_supplies": 2
         }
       },
       {
-        "action_code": "PTTT_TUONG_TRINH",
-        "score": 4.0,
+        "action_code": "YL_TRA_THUOC",
+        "score": 1.0,
         "params": {}
       },
       {
-        "action_code": "TK_KIEM_TON_KHO",
+        "action_code": "YL_DOI_THEM_DICH_VU",
+        "score": 1.0,
+        "params": {}
+      },
+      {
+        "action_code": "CK_CHUYEN_KHOA",
+        "score": 1.0,
+        "params": {}
+      },
+      {
+        "action_code": "RV_CHO_RA_VIEN",
+        "score": 1.0,
+        "params": {}
+      }
+    ]
+  },
+  {
+    "id": "tpl_7037d4c4",
+    "name": "Đề thi Điều dưỡng Nhi khoa (Khoa Nhi)",
+    "dept": "Khoa Nhi",
+    "position": "Điều dưỡng Nhi khoa",
+    "uses_his": true,
+    "actions": [
+      {
+        "action_code": "NT_NHAN_BENH_KHOA",
+        "score": 1.0,
+        "params": {}
+      },
+      {
+        "action_code": "YL_CHI_DINH_CLS",
+        "score": 2.0,
+        "params": {}
+      },
+      {
+        "action_code": "YL_CHI_DINH_THUOC_VTYT",
+        "score": 3.0,
+        "params": {
+          "num_drugs": 3,
+          "num_supplies": 2
+        }
+      },
+      {
+        "action_code": "YL_TRA_THUOC",
+        "score": 1.0,
+        "params": {}
+      },
+      {
+        "action_code": "YL_DOI_THEM_DICH_VU",
+        "score": 1.0,
+        "params": {}
+      },
+      {
+        "action_code": "CK_CHUYEN_KHOA",
+        "score": 1.0,
+        "params": {}
+      },
+      {
+        "action_code": "RV_CHO_RA_VIEN",
+        "score": 1.0,
+        "params": {}
+      }
+    ]
+  },
+  {
+    "id": "tpl_12564470",
+    "name": "Đề thi Điều dưỡng Cấp cứu (Khoa Cấp cứu)",
+    "dept": "Khoa Cấp cứu",
+    "position": "Điều dưỡng Cấp cứu",
+    "uses_his": true,
+    "actions": [
+      {
+        "action_code": "NT_NHAN_BENH_KHOA",
+        "score": 1.0,
+        "params": {}
+      },
+      {
+        "action_code": "YL_CHI_DINH_CLS",
+        "score": 2.0,
+        "params": {}
+      },
+      {
+        "action_code": "YL_CHI_DINH_THUOC_VTYT",
+        "score": 3.0,
+        "params": {
+          "num_drugs": 3,
+          "num_supplies": 2
+        }
+      },
+      {
+        "action_code": "YL_TRA_THUOC",
+        "score": 1.0,
+        "params": {}
+      },
+      {
+        "action_code": "YL_DOI_THEM_DICH_VU",
+        "score": 1.0,
+        "params": {}
+      },
+      {
+        "action_code": "CK_CHUYEN_KHOA",
+        "score": 1.0,
+        "params": {}
+      },
+      {
+        "action_code": "RV_CHO_RA_VIEN",
+        "score": 1.0,
+        "params": {}
+      }
+    ]
+  },
+  {
+    "id": "tpl_b2d327b6",
+    "name": "Đề thi Điều dưỡng Tim mạch (Khoa Tim mạch)",
+    "dept": "Khoa Tim mạch",
+    "position": "Điều dưỡng Tim mạch",
+    "uses_his": true,
+    "actions": [
+      {
+        "action_code": "NT_NHAN_BENH_KHOA",
+        "score": 1.0,
+        "params": {}
+      },
+      {
+        "action_code": "YL_CHI_DINH_CLS",
+        "score": 2.0,
+        "params": {}
+      },
+      {
+        "action_code": "YL_CHI_DINH_THUOC_VTYT",
+        "score": 3.0,
+        "params": {
+          "num_drugs": 3,
+          "num_supplies": 2
+        }
+      },
+      {
+        "action_code": "YL_TRA_THUOC",
+        "score": 1.0,
+        "params": {}
+      },
+      {
+        "action_code": "YL_DOI_THEM_DICH_VU",
+        "score": 1.0,
+        "params": {}
+      },
+      {
+        "action_code": "CK_CHUYEN_KHOA",
+        "score": 1.0,
+        "params": {}
+      },
+      {
+        "action_code": "RV_CHO_RA_VIEN",
         "score": 1.0,
         "params": {}
       }

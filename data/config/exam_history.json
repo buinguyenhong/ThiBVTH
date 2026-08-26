@@ -1,5 +1,453 @@
 [
   {
+    "batch_id": "batch_20260826_140121_c57f59",
+    "created_at": "26/08/2026 14:01:21",
+    "exam_date": "26/08/2026",
+    "candidate_count": 1,
+    "departments": [
+      "Khoa Phục hồi chức năng"
+    ],
+    "zip_filename": "De_Thi_Va_SQL_20260826_140121.zip",
+    "zip_url": "/api/exams/download/file/De_Thi_Va_SQL_20260826_140121.zip",
+    "sql_filename": "Nap_Du_Lieu_Thi_26082026_140121.sql",
+    "sql_url": "/api/exams/download/file/Nap_Du_Lieu_Thi_26082026_140121.sql",
+    "candidates": [
+      {
+        "name": "Hoàng Minh Tuấn",
+        "id": "SBD202",
+        "dept": "Khoa Phục hồi chức năng",
+        "position": "Kỹ thuật viên Phục hồi chức năng",
+        "template_name": "Đề thi Kỹ thuật viên Phục hồi chức năng (Khoa Phục hồi chức năng)",
+        "total_score": 10.0,
+        "docx_filename": "Đề_thi_Kỹ_thuật_viên_Phục_hồi_chức_năng_(Khoa_Phục_hồi_chức_năng)_SBD202_Hoàng_Minh_Tuấn.docx",
+        "docx_url": "/api/exams/download/file/Đề_thi_Kỹ_thuật_viên_Phục_hồi_chức_năng_(Khoa_Phục_hồi_chức_năng)_SBD202_Hoàng_Minh_Tuấn.docx",
+        "excel_filename": null,
+        "excel_url": null
+      }
+    ],
+    "files": [
+      "Đề_thi_Kỹ_thuật_viên_Phục_hồi_chức_năng_(Khoa_Phục_hồi_chức_năng)_SBD202_Hoàng_Minh_Tuấn.docx",
+      "Nap_Du_Lieu_Thi_26082026_140121.sql",
+      "01_lookup_tiep_nhan_nhap_vien.sql"
+    ]
+  },
+  {
+    "batch_id": "batch_20260826_135929_04ab68",
+    "created_at": "26/08/2026 13:59:29",
+    "exam_date": "25/07/2026",
+    "candidate_count": 1,
+    "departments": [
+      "Khoa Ngoại tổng hợp"
+    ],
+    "zip_filename": "De_Thi_Va_SQL_20260826_135929.zip",
+    "zip_url": "/api/exams/download/file/De_Thi_Va_SQL_20260826_135929.zip",
+    "sql_filename": "Nap_Du_Lieu_Thi_26082026_135929.sql",
+    "sql_url": "/api/exams/download/file/Nap_Du_Lieu_Thi_26082026_135929.sql",
+    "candidates": [
+      {
+        "name": "Nguyễn Thị Thử Nghiệm",
+        "id": "SBD888",
+        "dept": "Khoa Ngoại tổng hợp",
+        "position": "Điều dưỡng Nội trú",
+        "template_name": "Đề thi Điều dưỡng Nội trú (Khoa Ngoại tổng hợp)",
+        "total_score": 10.0,
+        "docx_filename": "Đề_thi_Điều_dưỡng_Nội_trú_(Khoa_Ngoại_tổng_hợp)_SBD888_Nguyễn_Thị_Thử_Nghiệm.docx",
+        "docx_url": "/api/exams/download/file/Đề_thi_Điều_dưỡng_Nội_trú_(Khoa_Ngoại_tổng_hợp)_SBD888_Nguyễn_Thị_Thử_Nghiệm.docx",
+        "excel_filename": null,
+        "excel_url": null
+      }
+    ],
+    "files": [
+      "Đề_thi_Điều_dưỡng_Nội_trú_(Khoa_Ngoại_tổng_hợp)_SBD888_Nguyễn_Thị_Thử_Nghiệm.docx",
+      "Nap_Du_Lieu_Thi_26082026_135929.sql",
+      "01_lookup_tiep_nhan_nhap_vien.sql"
+    ]
+  },
+  {
+    "batch_id": "batch_20260826_135919_c45ec4",
+    "created_at": "26/08/2026 13:59:19",
+    "exam_date": "26/08/2026",
+    "candidate_count": 1,
+    "departments": [
+      "Khoa Tai Mũi Họng"
+    ],
+    "zip_filename": "De_Thi_Va_SQL_20260826_135919.zip",
+    "zip_url": "/api/exams/download/file/De_Thi_Va_SQL_20260826_135919.zip",
+    "sql_filename": "Nap_Du_Lieu_Thi_26082026_135919.sql",
+    "sql_url": "/api/exams/download/file/Nap_Du_Lieu_Thi_26082026_135919.sql",
+    "candidates": [
+      {
+        "name": "Thí sinh Khoa Tai Mũi Họng",
+        "id": "SBD100",
+        "dept": "Khoa Tai Mũi Họng",
+        "position": "Điều dưỡng Ngoại trú",
+        "template_name": "Đề thi Điều dưỡng Ngoại trú (Khoa Tai Mũi Họng)",
+        "total_score": 10.0,
+        "docx_filename": "Đề_thi_Điều_dưỡng_Ngoại_trú_(Khoa_Tai_Mũi_Họng)_SBD100_Thí_sinh_Khoa_Tai_Mũi_Họng.docx",
+        "docx_url": "/api/exams/download/file/Đề_thi_Điều_dưỡng_Ngoại_trú_(Khoa_Tai_Mũi_Họng)_SBD100_Thí_sinh_Khoa_Tai_Mũi_Họng.docx",
+        "excel_filename": null,
+        "excel_url": null
+      }
+    ],
+    "files": [
+      "Đề_thi_Điều_dưỡng_Ngoại_trú_(Khoa_Tai_Mũi_Họng)_SBD100_Thí_sinh_Khoa_Tai_Mũi_Họng.docx",
+      "Nap_Du_Lieu_Thi_26082026_135919.sql",
+      "01_lookup_tiep_nhan_nhap_vien.sql"
+    ]
+  },
+  {
+    "batch_id": "batch_20260826_135919_ca3f8a",
+    "created_at": "26/08/2026 13:59:19",
+    "exam_date": "26/08/2026",
+    "candidate_count": 1,
+    "departments": [
+      "Khoa Mắt"
+    ],
+    "zip_filename": "De_Thi_Va_SQL_20260826_135919.zip",
+    "zip_url": "/api/exams/download/file/De_Thi_Va_SQL_20260826_135919.zip",
+    "sql_filename": "Nap_Du_Lieu_Thi_26082026_135919.sql",
+    "sql_url": "/api/exams/download/file/Nap_Du_Lieu_Thi_26082026_135919.sql",
+    "candidates": [
+      {
+        "name": "Thí sinh Khoa Mắt",
+        "id": "SBD100",
+        "dept": "Khoa Mắt",
+        "position": "Điều dưỡng Ngoại trú",
+        "template_name": "Đề thi Điều dưỡng Ngoại trú (Khoa Mắt)",
+        "total_score": 10.0,
+        "docx_filename": "Đề_thi_Điều_dưỡng_Ngoại_trú_(Khoa_Mắt)_SBD100_Thí_sinh_Khoa_Mắt.docx",
+        "docx_url": "/api/exams/download/file/Đề_thi_Điều_dưỡng_Ngoại_trú_(Khoa_Mắt)_SBD100_Thí_sinh_Khoa_Mắt.docx",
+        "excel_filename": null,
+        "excel_url": null
+      }
+    ],
+    "files": [
+      "Đề_thi_Điều_dưỡng_Ngoại_trú_(Khoa_Mắt)_SBD100_Thí_sinh_Khoa_Mắt.docx",
+      "Nap_Du_Lieu_Thi_26082026_135919.sql",
+      "01_lookup_tiep_nhan_nhap_vien.sql"
+    ]
+  },
+  {
+    "batch_id": "batch_20260826_135919_02ed36",
+    "created_at": "26/08/2026 13:59:19",
+    "exam_date": "26/08/2026",
+    "candidate_count": 1,
+    "departments": [
+      "Thận nhân tạo"
+    ],
+    "zip_filename": "De_Thi_Va_SQL_20260826_135919.zip",
+    "zip_url": "/api/exams/download/file/De_Thi_Va_SQL_20260826_135919.zip",
+    "sql_filename": "Nap_Du_Lieu_Thi_26082026_135919.sql",
+    "sql_url": "/api/exams/download/file/Nap_Du_Lieu_Thi_26082026_135919.sql",
+    "candidates": [
+      {
+        "name": "Thí sinh Thận nhân tạo",
+        "id": "SBD100",
+        "dept": "Thận nhân tạo",
+        "position": "Điều dưỡng Ngoại trú",
+        "template_name": "Đề thi Điều dưỡng Ngoại trú (Thận nhân tạo)",
+        "total_score": 10.0,
+        "docx_filename": "Đề_thi_Điều_dưỡng_Ngoại_trú_(Thận_nhân_tạo)_SBD100_Thí_sinh_Thận_nhân_tạo.docx",
+        "docx_url": "/api/exams/download/file/Đề_thi_Điều_dưỡng_Ngoại_trú_(Thận_nhân_tạo)_SBD100_Thí_sinh_Thận_nhân_tạo.docx",
+        "excel_filename": null,
+        "excel_url": null
+      }
+    ],
+    "files": [
+      "Đề_thi_Điều_dưỡng_Ngoại_trú_(Thận_nhân_tạo)_SBD100_Thí_sinh_Thận_nhân_tạo.docx",
+      "Nap_Du_Lieu_Thi_26082026_135919.sql",
+      "01_lookup_tiep_nhan_nhap_vien.sql"
+    ]
+  },
+  {
+    "batch_id": "batch_20260826_135919_110b51",
+    "created_at": "26/08/2026 13:59:19",
+    "exam_date": "26/08/2026",
+    "candidate_count": 1,
+    "departments": [
+      "Khoa Phục hồi chức năng"
+    ],
+    "zip_filename": "De_Thi_Va_SQL_20260826_135919.zip",
+    "zip_url": "/api/exams/download/file/De_Thi_Va_SQL_20260826_135919.zip",
+    "sql_filename": "Nap_Du_Lieu_Thi_26082026_135919.sql",
+    "sql_url": "/api/exams/download/file/Nap_Du_Lieu_Thi_26082026_135919.sql",
+    "candidates": [
+      {
+        "name": "Thí sinh Khoa Phục hồi chức năng",
+        "id": "SBD100",
+        "dept": "Khoa Phục hồi chức năng",
+        "position": "Kỹ thuật viên Phục hồi chức năng",
+        "template_name": "Đề thi Kỹ thuật viên Phục hồi chức năng (Khoa Phục hồi chức năng)",
+        "total_score": 10.0,
+        "docx_filename": "Đề_thi_Kỹ_thuật_viên_Phục_hồi_chức_năng_(Khoa_Phục_hồi_chức_năng)_SBD100_Thí_sinh_Khoa_Phục_hồi_chức_năng.docx",
+        "docx_url": "/api/exams/download/file/Đề_thi_Kỹ_thuật_viên_Phục_hồi_chức_năng_(Khoa_Phục_hồi_chức_năng)_SBD100_Thí_sinh_Khoa_Phục_hồi_chức_năng.docx",
+        "excel_filename": null,
+        "excel_url": null
+      }
+    ],
+    "files": [
+      "Đề_thi_Kỹ_thuật_viên_Phục_hồi_chức_năng_(Khoa_Phục_hồi_chức_năng)_SBD100_Thí_sinh_Khoa_Phục_hồi_chức_năng.docx",
+      "Nap_Du_Lieu_Thi_26082026_135919.sql",
+      "01_lookup_tiep_nhan_nhap_vien.sql"
+    ]
+  },
+  {
+    "batch_id": "batch_20260826_135914_9be6a5",
+    "created_at": "26/08/2026 13:59:14",
+    "exam_date": "26/08/2026",
+    "candidate_count": 1,
+    "departments": [
+      "Khoa Ngoại tổng hợp"
+    ],
+    "zip_filename": "De_Thi_Va_SQL_20260826_135914.zip",
+    "zip_url": "/api/exams/download/file/De_Thi_Va_SQL_20260826_135914.zip",
+    "sql_filename": "Nap_Du_Lieu_Thi_26082026_135914.sql",
+    "sql_url": "/api/exams/download/file/Nap_Du_Lieu_Thi_26082026_135914.sql",
+    "candidates": [
+      {
+        "name": "Thí sinh Khoa Ngoại tổng hợp",
+        "id": "SBD100",
+        "dept": "Khoa Ngoại tổng hợp",
+        "position": "Điều dưỡng Nội trú",
+        "template_name": "Đề thi Điều dưỡng Nội trú (Khoa Ngoại tổng hợp)",
+        "total_score": 10.0,
+        "docx_filename": "Đề_thi_Điều_dưỡng_Nội_trú_(Khoa_Ngoại_tổng_hợp)_SBD100_Thí_sinh_Khoa_Ngoại_tổng_hợp.docx",
+        "docx_url": "/api/exams/download/file/Đề_thi_Điều_dưỡng_Nội_trú_(Khoa_Ngoại_tổng_hợp)_SBD100_Thí_sinh_Khoa_Ngoại_tổng_hợp.docx",
+        "excel_filename": null,
+        "excel_url": null
+      }
+    ],
+    "files": [
+      "Đề_thi_Điều_dưỡng_Nội_trú_(Khoa_Ngoại_tổng_hợp)_SBD100_Thí_sinh_Khoa_Ngoại_tổng_hợp.docx",
+      "Nap_Du_Lieu_Thi_26082026_135914.sql",
+      "01_lookup_tiep_nhan_nhap_vien.sql"
+    ]
+  },
+  {
+    "batch_id": "batch_20260826_135914_f9d00c",
+    "created_at": "26/08/2026 13:59:14",
+    "exam_date": "26/08/2026",
+    "candidate_count": 1,
+    "departments": [
+      "Khoa Phụ Sản"
+    ],
+    "zip_filename": "De_Thi_Va_SQL_20260826_135914.zip",
+    "zip_url": "/api/exams/download/file/De_Thi_Va_SQL_20260826_135914.zip",
+    "sql_filename": "Nap_Du_Lieu_Thi_26082026_135914.sql",
+    "sql_url": "/api/exams/download/file/Nap_Du_Lieu_Thi_26082026_135914.sql",
+    "candidates": [
+      {
+        "name": "Thí sinh Khoa Phụ Sản",
+        "id": "SBD100",
+        "dept": "Khoa Phụ Sản",
+        "position": "Điều dưỡng Tiếp nhận trực tiếp",
+        "template_name": "Đề thi Điều dưỡng Tiếp nhận Trực tiếp (Khoa Phụ Sản)",
+        "total_score": 10.0,
+        "docx_filename": "Đề_thi_Điều_dưỡng_Tiếp_nhận_Trực_tiếp_(Khoa_Phụ_Sản)_SBD100_Thí_sinh_Khoa_Phụ_Sản.docx",
+        "docx_url": "/api/exams/download/file/Đề_thi_Điều_dưỡng_Tiếp_nhận_Trực_tiếp_(Khoa_Phụ_Sản)_SBD100_Thí_sinh_Khoa_Phụ_Sản.docx",
+        "excel_filename": null,
+        "excel_url": null
+      }
+    ],
+    "files": [
+      "Đề_thi_Điều_dưỡng_Tiếp_nhận_Trực_tiếp_(Khoa_Phụ_Sản)_SBD100_Thí_sinh_Khoa_Phụ_Sản.docx",
+      "Nap_Du_Lieu_Thi_26082026_135914.sql",
+      "01_lookup_tiep_nhan_nhap_vien.sql"
+    ]
+  },
+  {
+    "batch_id": "batch_20260826_135914_05c8e7",
+    "created_at": "26/08/2026 13:59:14",
+    "exam_date": "26/08/2026",
+    "candidate_count": 1,
+    "departments": [
+      "Khoa Răng Hàm Mặt"
+    ],
+    "zip_filename": "De_Thi_Va_SQL_20260826_135914.zip",
+    "zip_url": "/api/exams/download/file/De_Thi_Va_SQL_20260826_135914.zip",
+    "sql_filename": "Nap_Du_Lieu_Thi_26082026_135914.sql",
+    "sql_url": "/api/exams/download/file/Nap_Du_Lieu_Thi_26082026_135914.sql",
+    "candidates": [
+      {
+        "name": "Thí sinh Khoa Răng Hàm Mặt",
+        "id": "SBD100",
+        "dept": "Khoa Răng Hàm Mặt",
+        "position": "Điều dưỡng Ngoại trú",
+        "template_name": "Đề thi Điều dưỡng Ngoại trú (Khoa Răng Hàm Mặt)",
+        "total_score": 10.0,
+        "docx_filename": "Đề_thi_Điều_dưỡng_Ngoại_trú_(Khoa_Răng_Hàm_Mặt)_SBD100_Thí_sinh_Khoa_Răng_Hàm_Mặt.docx",
+        "docx_url": "/api/exams/download/file/Đề_thi_Điều_dưỡng_Ngoại_trú_(Khoa_Răng_Hàm_Mặt)_SBD100_Thí_sinh_Khoa_Răng_Hàm_Mặt.docx",
+        "excel_filename": null,
+        "excel_url": null
+      }
+    ],
+    "files": [
+      "Đề_thi_Điều_dưỡng_Ngoại_trú_(Khoa_Răng_Hàm_Mặt)_SBD100_Thí_sinh_Khoa_Răng_Hàm_Mặt.docx",
+      "Nap_Du_Lieu_Thi_26082026_135914.sql",
+      "01_lookup_tiep_nhan_nhap_vien.sql"
+    ]
+  },
+  {
+    "batch_id": "batch_20260826_135914_e8f3ba",
+    "created_at": "26/08/2026 13:59:14",
+    "exam_date": "26/08/2026",
+    "candidate_count": 1,
+    "departments": [
+      "Khoa Tai Mũi Họng"
+    ],
+    "zip_filename": "De_Thi_Va_SQL_20260826_135914.zip",
+    "zip_url": "/api/exams/download/file/De_Thi_Va_SQL_20260826_135914.zip",
+    "sql_filename": "Nap_Du_Lieu_Thi_26082026_135914.sql",
+    "sql_url": "/api/exams/download/file/Nap_Du_Lieu_Thi_26082026_135914.sql",
+    "candidates": [
+      {
+        "name": "Thí sinh Khoa Tai Mũi Họng",
+        "id": "SBD100",
+        "dept": "Khoa Tai Mũi Họng",
+        "position": "Điều dưỡng Ngoại trú",
+        "template_name": "Đề thi Điều dưỡng Ngoại trú (Khoa Tai Mũi Họng)",
+        "total_score": 10.0,
+        "docx_filename": "Đề_thi_Điều_dưỡng_Ngoại_trú_(Khoa_Tai_Mũi_Họng)_SBD100_Thí_sinh_Khoa_Tai_Mũi_Họng.docx",
+        "docx_url": "/api/exams/download/file/Đề_thi_Điều_dưỡng_Ngoại_trú_(Khoa_Tai_Mũi_Họng)_SBD100_Thí_sinh_Khoa_Tai_Mũi_Họng.docx",
+        "excel_filename": null,
+        "excel_url": null
+      }
+    ],
+    "files": [
+      "Đề_thi_Điều_dưỡng_Ngoại_trú_(Khoa_Tai_Mũi_Họng)_SBD100_Thí_sinh_Khoa_Tai_Mũi_Họng.docx",
+      "Nap_Du_Lieu_Thi_26082026_135914.sql",
+      "01_lookup_tiep_nhan_nhap_vien.sql"
+    ]
+  },
+  {
+    "batch_id": "batch_20260826_135913_1d382c",
+    "created_at": "26/08/2026 13:59:13",
+    "exam_date": "26/08/2026",
+    "candidate_count": 1,
+    "departments": [
+      "Khoa Mắt"
+    ],
+    "zip_filename": "De_Thi_Va_SQL_20260826_135913.zip",
+    "zip_url": "/api/exams/download/file/De_Thi_Va_SQL_20260826_135913.zip",
+    "sql_filename": "Nap_Du_Lieu_Thi_26082026_135913.sql",
+    "sql_url": "/api/exams/download/file/Nap_Du_Lieu_Thi_26082026_135913.sql",
+    "candidates": [
+      {
+        "name": "Thí sinh Khoa Mắt",
+        "id": "SBD100",
+        "dept": "Khoa Mắt",
+        "position": "Điều dưỡng Ngoại trú",
+        "template_name": "Đề thi Điều dưỡng Ngoại trú (Khoa Mắt)",
+        "total_score": 10.0,
+        "docx_filename": "Đề_thi_Điều_dưỡng_Ngoại_trú_(Khoa_Mắt)_SBD100_Thí_sinh_Khoa_Mắt.docx",
+        "docx_url": "/api/exams/download/file/Đề_thi_Điều_dưỡng_Ngoại_trú_(Khoa_Mắt)_SBD100_Thí_sinh_Khoa_Mắt.docx",
+        "excel_filename": null,
+        "excel_url": null
+      }
+    ],
+    "files": [
+      "Đề_thi_Điều_dưỡng_Ngoại_trú_(Khoa_Mắt)_SBD100_Thí_sinh_Khoa_Mắt.docx",
+      "Nap_Du_Lieu_Thi_26082026_135913.sql",
+      "01_lookup_tiep_nhan_nhap_vien.sql"
+    ]
+  },
+  {
+    "batch_id": "batch_20260826_135913_6edf06",
+    "created_at": "26/08/2026 13:59:13",
+    "exam_date": "26/08/2026",
+    "candidate_count": 1,
+    "departments": [
+      "Thận nhân tạo"
+    ],
+    "zip_filename": "De_Thi_Va_SQL_20260826_135913.zip",
+    "zip_url": "/api/exams/download/file/De_Thi_Va_SQL_20260826_135913.zip",
+    "sql_filename": "Nap_Du_Lieu_Thi_26082026_135913.sql",
+    "sql_url": "/api/exams/download/file/Nap_Du_Lieu_Thi_26082026_135913.sql",
+    "candidates": [
+      {
+        "name": "Thí sinh Thận nhân tạo",
+        "id": "SBD100",
+        "dept": "Thận nhân tạo",
+        "position": "Điều dưỡng Ngoại trú",
+        "template_name": "Đề thi Điều dưỡng Ngoại trú (Thận nhân tạo)",
+        "total_score": 10.0,
+        "docx_filename": "Đề_thi_Điều_dưỡng_Ngoại_trú_(Thận_nhân_tạo)_SBD100_Thí_sinh_Thận_nhân_tạo.docx",
+        "docx_url": "/api/exams/download/file/Đề_thi_Điều_dưỡng_Ngoại_trú_(Thận_nhân_tạo)_SBD100_Thí_sinh_Thận_nhân_tạo.docx",
+        "excel_filename": null,
+        "excel_url": null
+      }
+    ],
+    "files": [
+      "Đề_thi_Điều_dưỡng_Ngoại_trú_(Thận_nhân_tạo)_SBD100_Thí_sinh_Thận_nhân_tạo.docx",
+      "Nap_Du_Lieu_Thi_26082026_135913.sql",
+      "01_lookup_tiep_nhan_nhap_vien.sql"
+    ]
+  },
+  {
+    "batch_id": "batch_20260826_135913_936147",
+    "created_at": "26/08/2026 13:59:13",
+    "exam_date": "26/08/2026",
+    "candidate_count": 1,
+    "departments": [
+      "Khoa Phục hồi chức năng"
+    ],
+    "zip_filename": "De_Thi_Va_SQL_20260826_135913.zip",
+    "zip_url": "/api/exams/download/file/De_Thi_Va_SQL_20260826_135913.zip",
+    "sql_filename": "Nap_Du_Lieu_Thi_26082026_135913.sql",
+    "sql_url": "/api/exams/download/file/Nap_Du_Lieu_Thi_26082026_135913.sql",
+    "candidates": [
+      {
+        "name": "Thí sinh Khoa Phục hồi chức năng",
+        "id": "SBD100",
+        "dept": "Khoa Phục hồi chức năng",
+        "position": "Kỹ thuật viên Phục hồi chức năng",
+        "template_name": "Đề thi Kỹ thuật viên Phục hồi chức năng (Khoa Phục hồi chức năng)",
+        "total_score": 10.0,
+        "docx_filename": "Đề_thi_Kỹ_thuật_viên_Phục_hồi_chức_năng_(Khoa_Phục_hồi_chức_năng)_SBD100_Thí_sinh_Khoa_Phục_hồi_chức_năng.docx",
+        "docx_url": "/api/exams/download/file/Đề_thi_Kỹ_thuật_viên_Phục_hồi_chức_năng_(Khoa_Phục_hồi_chức_năng)_SBD100_Thí_sinh_Khoa_Phục_hồi_chức_năng.docx",
+        "excel_filename": null,
+        "excel_url": null
+      }
+    ],
+    "files": [
+      "Đề_thi_Kỹ_thuật_viên_Phục_hồi_chức_năng_(Khoa_Phục_hồi_chức_năng)_SBD100_Thí_sinh_Khoa_Phục_hồi_chức_năng.docx",
+      "Nap_Du_Lieu_Thi_26082026_135913.sql",
+      "01_lookup_tiep_nhan_nhap_vien.sql"
+    ]
+  },
+  {
+    "batch_id": "batch_20260826_135847_0f9f17",
+    "created_at": "26/08/2026 13:58:47",
+    "exam_date": "25/07/2026",
+    "candidate_count": 1,
+    "departments": [
+      "Khoa Ngoại tổng hợp"
+    ],
+    "zip_filename": "De_Thi_Va_SQL_20260826_135847.zip",
+    "zip_url": "/api/exams/download/file/De_Thi_Va_SQL_20260826_135847.zip",
+    "sql_filename": "Nap_Du_Lieu_Thi_26082026_135847.sql",
+    "sql_url": "/api/exams/download/file/Nap_Du_Lieu_Thi_26082026_135847.sql",
+    "candidates": [
+      {
+        "name": "Nguyễn Thị Thử Nghiệm",
+        "id": "SBD888",
+        "dept": "Khoa Ngoại tổng hợp",
+        "position": "Điều dưỡng Nội trú",
+        "template_name": "Đề thi Điều dưỡng Nội trú (Khoa Ngoại tổng hợp)",
+        "total_score": 10.0,
+        "docx_filename": "Đề_thi_Điều_dưỡng_Nội_trú_(Khoa_Ngoại_tổng_hợp)_SBD888_Nguyễn_Thị_Thử_Nghiệm.docx",
+        "docx_url": "/api/exams/download/file/Đề_thi_Điều_dưỡng_Nội_trú_(Khoa_Ngoại_tổng_hợp)_SBD888_Nguyễn_Thị_Thử_Nghiệm.docx",
+        "excel_filename": null,
+        "excel_url": null
+      }
+    ],
+    "files": [
+      "Đề_thi_Điều_dưỡng_Nội_trú_(Khoa_Ngoại_tổng_hợp)_SBD888_Nguyễn_Thị_Thử_Nghiệm.docx",
+      "Nap_Du_Lieu_Thi_26082026_135847.sql",
+      "01_lookup_tiep_nhan_nhap_vien.sql"
+    ]
+  },
+  {
     "batch_id": "batch_20260826_112601_46f66d",
     "created_at": "26/08/2026 11:26:01",
     "exam_date": "25/07/2026",
