@@ -13,13 +13,17 @@ from template_manager import TemplateManager
 from exam_actions import ACTION_REGISTRY, get_all_actions
 from exam_generator import generate_docx_file
 import docx
+import app as app_module
 
 class TestModularSystem(unittest.TestCase):
     def setUp(self):
         self.test_dir = tempfile.mkdtemp()
+        self.orig_mm = app_module.mm
+        app_module.mm = MappingManager(self.test_dir)
         self.client = TestClient(app)
 
     def tearDown(self):
+        app_module.mm = self.orig_mm
         shutil.rmtree(self.test_dir, ignore_errors=True)
 
     def test_mapping_manager(self):

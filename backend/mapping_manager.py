@@ -24,14 +24,19 @@ class MappingManager:
     def _load_json(self, path, default):
         if not os.path.exists(path):
             self._save_json(path, default)
-            return default
+            return dict(default)
         try:
             with open(path, "r", encoding="utf-8") as f:
                 data = json.load(f)
-                return data if isinstance(data, dict) else default
+                if isinstance(data, dict):
+                    # Ensure all standard departments exist by merging defaults
+                    merged = dict(default)
+                    merged.update(data)
+                    return merged
+                return dict(default)
         except Exception as e:
             print(f"Error loading {path}: {e}, using default.")
-            return default
+            return dict(default)
 
     def _save_json(self, path, data):
         temp_path = path + ".tmp"
