@@ -15,10 +15,12 @@ import re
 import shutil
 import zipfile
 import hashlib
+import uuid
 from datetime import datetime
 
 from mapping_manager import MappingManager
 from template_manager import TemplateManager
+from history_manager import HistoryManager
 from exam_actions import ACTION_REGISTRY, get_all_actions
 from catalog_manager import CatalogManager
 from exam_templates import EXAM_TEMPLATES
@@ -58,6 +60,7 @@ CATALOG_SCRIPTS = {
 cm = CatalogManager(CATALOG_DIR)
 mm = MappingManager(CONFIG_DIR)
 tm = TemplateManager(CONFIG_DIR)
+hm = HistoryManager(CONFIG_DIR)
 
 class TemplateActionModel(BaseModel):
     action_code: str
@@ -291,15 +294,19 @@ def reload_catalogs():
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to reload catalogs: {str(e)}")
 
-def clean_output_dir():
+def clean_output_dir(max_age_days=7):
+    """Keeps recent generated files for history/refresh downloads, pruning files older than max_age_days."""
     os.makedirs(OUTPUT_DIR, exist_ok=True)
+    now = datetime.now().timestamp()
     for item in os.listdir(OUTPUT_DIR):
         item_path = os.path.join(OUTPUT_DIR, item)
         try:
-            if os.path.isfile(item_path) or os.path.islink(item_path):
-                os.unlink(item_path)
-            elif os.path.isdir(item_path):
-                shutil.rmtree(item_path, ignore_errors=True)
+            mtime = os.path.getmtime(item_path)
+            if now - mtime > max_age_days * 86400:
+                if os.path.isfile(item_path) or os.path.islink(item_path):
+                    os.unlink(item_path)
+                elif os.path.isdir(item_path):
+                    shutil.rmtree(item_path, ignore_errors=True)
         except Exception:
             pass
 
@@ -509,6 +516,7 @@ def generate_exams(req: GenerateRequest, background_tasks: BackgroundTasks):
             combined_sql.append(f"-- Chỉ thay @Commit = 1 sau khi kết quả chạy thử đạt yêu cầu.")
             combined_sql.append(f"-- ==========================================================================\n")
         
+        candidate_records = []
         for candidate_index, (cand, tmpl) in enumerate(resolved_candidates, start=1):
             is_modular = "actions" in tmpl and tmpl["actions"]
             
@@ -568,6 +576,7 @@ def generate_exams(req: GenerateRequest, background_tasks: BackgroundTasks):
                 is_modular and any(a["action_code"] == "VP_XU_LY_EXCEL" for a in tmpl.get("actions", []))
             ) or (not tmpl.get("uses_his", True))
             
+            excel_filename = None
             if has_excel_action:
                 excel_filename = (
                     f"Du_Lieu_Excel_{safe_id}_{safe_name}.xlsx"
@@ -593,7 +602,21 @@ def generate_exams(req: GenerateRequest, background_tasks: BackgroundTasks):
                 )
                 combined_sql.append(cand_sql)
                 combined_sql.append("\n-- --------------------------------------------------------------------------\n")
+
+            candidate_records.append({
+                "name": cand.name,
+                "id": cand.id or "",
+                "dept": tmpl.get("dept", cand.dept or ""),
+                "position": tmpl.get("position", tmpl.get("name", "Thí sinh")),
+                "template_name": tmpl.get("name", "Đề thi"),
+                "total_score": round(sum(scores_to_use), 1) if scores_to_use else 10.0,
+                "docx_filename": doc_filename,
+                "docx_url": f"/api/exams/download/file/{doc_filename}",
+                "excel_filename": excel_filename,
+                "excel_url": f"/api/exams/download/file/{excel_filename}" if excel_filename else None
+            })
             
+        sql_filename = None
         if his_candidate_count:
             sql_filename = f"Nap_Du_Lieu_Thi_{datetime.now().strftime('%d%m%Y_%H%M%S')}.sql"
             sql_path = os.path.join(OUTPUT_DIR, sql_filename)
@@ -622,11 +645,30 @@ def generate_exams(req: GenerateRequest, background_tasks: BackgroundTasks):
 
         if patient_session:
             patient_session.commit()
+
+        # Save to History
+        batch_record = {
+            "batch_id": f"batch_{datetime.now().strftime('%Y%m%d_%H%M%S')}_{uuid.uuid4().hex[:6]}",
+            "created_at": datetime.now().strftime("%d/%m/%Y %H:%M:%S"),
+            "exam_date": req.exam_date,
+            "candidate_count": len(resolved_candidates),
+            "departments": sorted(list({c["dept"] for c in candidate_records if c["dept"]})),
+            "zip_filename": zip_filename,
+            "zip_url": f"/api/exams/download/file/{zip_filename}",
+            "sql_filename": sql_filename,
+            "sql_url": f"/api/exams/download/file/{sql_filename}" if sql_filename else None,
+            "candidates": candidate_records,
+            "files": [os.path.basename(f) for f in generated_files]
+        }
+        hm.add_batch(batch_record)
                 
         return FileResponse(
             zip_path, 
             media_type="application/x-zip-compressed", 
-            filename=zip_filename
+            filename=zip_filename,
+            headers={
+                "X-Batch-Id": batch_record["batch_id"]
+            }
         )
         
     except Exception as e:
@@ -636,6 +678,67 @@ def generate_exams(req: GenerateRequest, background_tasks: BackgroundTasks):
     finally:
         if patient_session:
             patient_session.close()
+
+# --- HISTORY & FILE DOWNLOAD ENDPOINTS ---
+
+@app.get("/api/exams/history")
+def get_exam_history():
+    """Returns list of past exam generation batches."""
+    return hm.get_history()
+
+@app.get("/api/exams/latest")
+def get_latest_exam_batch():
+    """Returns the most recent generated exam batch (for UI restore on reload)."""
+    latest = hm.get_latest_batch()
+    return {"batch": latest}
+
+@app.delete("/api/exams/history/{batch_id}")
+def delete_exam_history_batch(batch_id: str):
+    """Deletes a specific exam batch from history."""
+    success = hm.delete_batch(batch_id)
+    if not success:
+        raise HTTPException(status_code=404, detail="Không tìm thấy lịch sử đề thi.")
+    return {"success": True, "message": "Đã xóa lịch sử đợt thi."}
+
+@app.delete("/api/exams/history")
+def clear_exam_history():
+    """Clears all exam history."""
+    hm.clear_all()
+    return {"success": True, "message": "Đã xóa toàn bộ lịch sử đề thi."}
+
+@app.get("/api/exams/download/file/{filename}")
+def download_output_file(filename: str):
+    """Serves any generated file (docx, xlsx, sql, zip) from the output directory."""
+    safe_filename = os.path.basename(filename)
+    file_path = os.path.join(OUTPUT_DIR, safe_filename)
+    if not os.path.exists(file_path):
+        raise HTTPException(status_code=404, detail="File không tồn tại hoặc đã bị xóa.")
+    
+    media_type = "application/octet-stream"
+    if safe_filename.endswith(".docx"):
+        media_type = "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+    elif safe_filename.endswith(".xlsx"):
+        media_type = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+    elif safe_filename.endswith(".sql"):
+        media_type = "application/sql; charset=utf-8"
+    elif safe_filename.endswith(".zip"):
+        media_type = "application/x-zip-compressed"
+        
+    return FileResponse(file_path, media_type=media_type, filename=safe_filename)
+
+@app.get("/api/exams/preview/sql/{filename}")
+def preview_sql_script(filename: str):
+    """Returns content of a generated SQL script file for modal preview."""
+    safe_filename = os.path.basename(filename)
+    file_path = os.path.join(OUTPUT_DIR, safe_filename)
+    if not os.path.exists(file_path):
+        raise HTTPException(status_code=404, detail="File SQL không tồn tại.")
+    try:
+        with open(file_path, "r", encoding="utf-8") as f:
+            content = f.read()
+        return {"filename": safe_filename, "content": content}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Không thể đọc file SQL: {str(e)}")
 
 @app.get("/api/catalogs/download/{filename}")
 def download_catalog(filename: str):

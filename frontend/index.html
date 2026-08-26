@@ -63,6 +63,13 @@
                 </svg>
                 Tra cứu tồn kho
             </button>
+            <button class="tab-btn" data-tab="history-tab">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align: middle; margin-right: 6px;">
+                    <circle cx="12" cy="12" r="10"></circle>
+                    <polyline points="12 6 12 12 16 14"></polyline>
+                </svg>
+                Lịch sử Sinh đề
+            </button>
         </div>
 
         <!-- Tab Panels -->
@@ -156,6 +163,52 @@
                             </svg>
                             Sinh cả đợt thi (.zip)
                         </button>
+                    </div>
+
+                    <!-- Persistent Recent Generation Results Box -->
+                    <div id="recentGenerationBox" style="display: none; margin-top: 2rem; border-top: 2px dashed var(--border-color); padding-top: 1.5rem;">
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem; flex-wrap: wrap; gap: 0.75rem;">
+                            <div>
+                                <h3 style="margin: 0; display: inline-flex; align-items: center; gap: 8px; font-size: 1.15rem; color: var(--text-primary);">
+                                    <span>🎉 Đề thi vừa tạo gần nhất</span>
+                                    <span id="recentGenTimeBadge" class="badge badge-success" style="font-size: 0.8rem;"></span>
+                                </h3>
+                                <p style="margin: 4px 0 0 0; font-size: 0.85rem; color: var(--text-secondary);">
+                                    Dữ liệu đề thi đã tạo được tự động lưu giữ khi tải lại trang. Bạn có thể tải lẻ từng file hoặc tải trọn bộ bất cứ lúc nào.
+                                </p>
+                            </div>
+                            <div style="display: flex; gap: 0.5rem; flex-wrap: wrap; align-items: center;">
+                                <a id="btnDownloadRecentZip" class="btn-primary" href="#" target="_blank" style="text-decoration: none; display: inline-flex; align-items: center; gap: 6px; padding: 0.5rem 1rem; font-size: 0.9rem;">
+                                    ⬇️ Tải trọn bộ (ZIP)
+                                </a>
+                                <button id="btnViewRecentSql" class="btn-card" type="button" style="display: inline-flex; align-items: center; gap: 6px; padding: 0.5rem 0.85rem; font-size: 0.9rem;">
+                                    👁️ Xem Script SQL
+                                </button>
+                                <button id="btnDismissRecentBox" class="btn-card" type="button" title="Đóng bảng kết quả này" style="color: var(--text-secondary); padding: 0.5rem 0.75rem;">
+                                    ✕
+                                </button>
+                            </div>
+                        </div>
+                        
+                        <div class="matrix-table-container" style="margin-top: 0.5rem;">
+                            <table class="matrix-table">
+                                <thead>
+                                    <tr>
+                                        <th style="width: 50px; text-align: center;">STT</th>
+                                        <th>Họ và tên thí sinh</th>
+                                        <th style="text-align: center;">SBD</th>
+                                        <th>Khoa / Phòng</th>
+                                        <th>Vị trí / Mẫu đề</th>
+                                        <th style="text-align: center;">Tổng điểm</th>
+                                        <th style="text-align: center;">Đề Word (.docx)</th>
+                                        <th style="text-align: center;">Dữ liệu Excel (.xlsx)</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="recentCandidatesBody">
+                                    <!-- Dynamic rows of generated candidate files -->
+                                </tbody>
+                            </table>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -568,6 +621,33 @@
                                 </tr>
                             </tbody>
                         </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 6. HISTORY LOG PANEL -->
+            <div id="history-tab" class="tab-panel">
+                <div class="glass-panel">
+                    <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 1rem; margin-bottom: 1.5rem;">
+                        <div>
+                            <h2>Lịch sử Sinh đề thi (Exam History & Logs)</h2>
+                            <p style="color: var(--text-secondary); font-size: 0.95rem; margin-top: 4px;">
+                                Toàn bộ các đợt sinh đề thi được lưu lại đầy đủ. Bạn có thể tra cứu, xem lại script SQL hoặc tải lại đề của bất kỳ thí sinh nào.
+                            </p>
+                        </div>
+                        <div style="display: flex; gap: 0.75rem; align-items: center; flex-wrap: wrap;">
+                            <input type="text" id="historySearchInput" placeholder="Tìm theo tên thí sinh, khoa, SBD..." style="min-width: 260px;">
+                            <button id="btnReloadHistory" class="btn-card" title="Tải lại lịch sử">
+                                🔄 Làm mới
+                            </button>
+                            <button id="btnClearAllHistory" class="btn-card" style="color: var(--danger-color);" title="Xóa toàn bộ lịch sử">
+                                🗑️ Xóa tất cả
+                            </button>
+                        </div>
+                    </div>
+
+                    <div id="historyBatchesList" style="display: flex; flex-direction: column; gap: 1.25rem;">
+                        <div class="empty-state">Đang tải lịch sử sinh đề...</div>
                     </div>
                 </div>
             </div>

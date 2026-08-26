@@ -82,12 +82,27 @@ document.addEventListener('DOMContentLoaded', () => {
     const btnSearchInventory = document.getElementById('btnSearchInventory');
     const inventoryResultsBody = document.getElementById('inventoryResultsBody');
 
+    // Recent Generation Box Elements
+    const recentGenerationBox = document.getElementById('recentGenerationBox');
+    const recentGenTimeBadge = document.getElementById('recentGenTimeBadge');
+    const recentCandidatesBody = document.getElementById('recentCandidatesBody');
+    const btnDownloadRecentZip = document.getElementById('btnDownloadRecentZip');
+    const btnViewRecentSql = document.getElementById('btnViewRecentSql');
+    const btnDismissRecentBox = document.getElementById('btnDismissRecentBox');
+
+    // History Tab Elements
+    const historySearchInput = document.getElementById('historySearchInput');
+    const btnReloadHistory = document.getElementById('btnReloadHistory');
+    const btnClearAllHistory = document.getElementById('btnClearAllHistory');
+    const historyBatchesList = document.getElementById('historyBatchesList');
+
     // --- INITIALIZATION ---
     function init() {
         initTheme();
         initTabs();
         setDefaultExamDate();
         loadAllInitialData();
+        loadRecentGeneration();
         bindEvents();
     }
 
@@ -118,6 +133,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 if (targetTab === 'templates-tab') renderTemplates();
                 if (targetTab === 'mappings-tab') renderMappings();
                 if (targetTab === 'settings-tab') loadCatalogsStatus();
+                if (targetTab === 'history-tab') loadHistory();
             });
         });
     }
@@ -539,6 +555,7 @@ document.addEventListener('DOMContentLoaded', () => {
             window.URL.revokeObjectURL(url);
 
             showToast("Sinh đề thi và tải file ZIP thành công!", "success");
+            await loadRecentGeneration();
         } catch (err) {
             console.error(err);
             showToast(err.message, "error");
@@ -1546,8 +1563,312 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
+    // --- RECENT GENERATION & PERSISTENCE ---
+    async function loadRecentGeneration() {
+        try {
+            const res = await fetch('/api/exams/latest');
+            if (res.ok) {
+                const data = await res.json();
+                if (data && data.batch) {
+                    renderRecentGeneration(data.batch);
+                    return;
+                }
+            }
+        } catch (e) {
+            console.error("Error fetching latest exam batch:", e);
+        }
+
+        // Fallback to localStorage
+        try {
+            const saved = localStorage.getItem('latest_exam_generation');
+            if (saved) {
+                const batch = JSON.parse(saved);
+                if (batch) renderRecentGeneration(batch);
+            }
+        } catch (e) {
+            console.error("Error reading localStorage:", e);
+        }
+    }
+
+    function renderRecentGeneration(batch) {
+        if (!batch || !batch.candidates || batch.candidates.length === 0) {
+            if (recentGenerationBox) recentGenerationBox.style.display = 'none';
+            return;
+        }
+        if (!recentGenerationBox) return;
+
+        recentGenerationBox.style.display = 'block';
+        if (recentGenTimeBadge) recentGenTimeBadge.textContent = batch.created_at || 'Vừa tạo';
+        if (btnDownloadRecentZip) {
+            btnDownloadRecentZip.href = batch.zip_url || '#';
+            btnDownloadRecentZip.download = batch.zip_filename || 'De_Thi.zip';
+        }
+        
+        if (btnViewRecentSql) {
+            if (batch.sql_filename) {
+                btnViewRecentSql.style.display = 'inline-flex';
+                btnViewRecentSql.onclick = () => openSqlPreviewModal(batch.sql_filename);
+            } else {
+                btnViewRecentSql.style.display = 'none';
+            }
+        }
+
+        if (recentCandidatesBody) {
+            recentCandidatesBody.innerHTML = '';
+            batch.candidates.forEach((cand, idx) => {
+                const tr = document.createElement('tr');
+                const excelCell = cand.excel_url 
+                    ? `<a href="${cand.excel_url}" download="${cand.excel_filename}" class="btn-link-action" style="color: var(--success-color); font-weight: 500;">📊 Tải Excel</a>` 
+                    : '<span style="color: var(--text-secondary);">-</span>';
+                    
+                tr.innerHTML = `
+                    <td style="text-align: center; font-weight: bold;">${idx + 1}</td>
+                    <td><strong>${cand.name}</strong></td>
+                    <td style="text-align: center;"><span class="badge badge-info">${cand.id || '-'}</span></td>
+                    <td>${cand.dept || '-'}</td>
+                    <td>${cand.template_name || cand.position || '-'}</td>
+                    <td style="text-align: center; font-weight: bold; color: var(--accent-color);">${cand.total_score !== undefined ? cand.total_score.toFixed(1) : '10.0'} đ</td>
+                    <td style="text-align: center;">
+                        <a href="${cand.docx_url}" download="${cand.docx_filename}" class="btn-link-action" style="color: var(--primary-color); font-weight: 500;">
+                            📄 Tải Word (.docx)
+                        </a>
+                    </td>
+                    <td style="text-align: center;">${excelCell}</td>
+                `;
+                recentCandidatesBody.appendChild(tr);
+            });
+        }
+
+        localStorage.setItem('latest_exam_generation', JSON.stringify(batch));
+    }
+
+    if (btnDismissRecentBox) {
+        btnDismissRecentBox.addEventListener('click', () => {
+            if (recentGenerationBox) recentGenerationBox.style.display = 'none';
+            localStorage.removeItem('latest_exam_generation');
+            showToast("Đã ẩn bảng kết quả sinh đề gần nhất.", "info");
+        });
+    }
+
+    async function openSqlPreviewModal(filename) {
+        showToast("Đang tải nội dung script SQL...", "info");
+        try {
+            const res = await fetch(`/api/exams/preview/sql/${filename}`);
+            if (!res.ok) throw new Error("Không thể đọc script SQL.");
+            const data = await res.json();
+            scriptContentArea.value = data.content || "";
+            scriptModal.style.display = 'flex';
+        } catch (e) {
+            showToast(e.message, "error");
+        }
+    }
+
+    // --- TAB 6: EXAM LOGS & HISTORY ---
+    let cachedHistory = [];
+
+    async function loadHistory() {
+        if (!historyBatchesList) return;
+        historyBatchesList.innerHTML = '<div class="empty-state">Đang tải lịch sử sinh đề...</div>';
+        try {
+            const res = await fetch('/api/exams/history');
+            if (!res.ok) throw new Error("Không thể tải danh sách lịch sử.");
+            cachedHistory = await res.json();
+            renderHistory(cachedHistory);
+        } catch (e) {
+            historyBatchesList.innerHTML = `<div class="empty-state" style="color: var(--danger-color);">${e.message}</div>`;
+        }
+    }
+
+    function renderHistory(historyList) {
+        if (!historyBatchesList) return;
+        const kw = historySearchInput ? historySearchInput.value.trim().toLowerCase() : '';
+        
+        let filtered = historyList || [];
+        if (kw) {
+            filtered = filtered.filter(b => {
+                const matchBatch = (b.created_at && b.created_at.toLowerCase().includes(kw)) ||
+                                   (b.exam_date && b.exam_date.toLowerCase().includes(kw)) ||
+                                   (b.batch_id && b.batch_id.toLowerCase().includes(kw)) ||
+                                   (b.departments && b.departments.some(d => d.toLowerCase().includes(kw)));
+                const matchCand = b.candidates && b.candidates.some(c => 
+                    (c.name && c.name.toLowerCase().includes(kw)) ||
+                    (c.id && c.id.toLowerCase().includes(kw)) ||
+                    (c.dept && c.dept.toLowerCase().includes(kw)) ||
+                    (c.template_name && c.template_name.toLowerCase().includes(kw))
+                );
+                return matchBatch || matchCand;
+            });
+        }
+
+        if (filtered.length === 0) {
+            historyBatchesList.innerHTML = '<div class="empty-state">Không tìm thấy đợt sinh đề thi nào phù hợp.</div>';
+            return;
+        }
+
+        historyBatchesList.innerHTML = '';
+        filtered.forEach(batch => {
+            const card = document.createElement('div');
+            card.className = 'glass-panel';
+            card.style.padding = '1.25rem';
+            card.style.border = '1px solid var(--border-color)';
+            card.style.borderRadius = '12px';
+
+            const deptsBadge = (batch.departments && batch.departments.length > 0)
+                ? batch.departments.map(d => `<span class="badge badge-info" style="font-size: 0.75rem;">${d}</span>`).join(' ')
+                : '<span class="badge" style="font-size: 0.75rem;">Toàn viện</span>';
+
+            const sqlBtnHtml = batch.sql_filename
+                ? `<button class="btn-card btn-view-batch-sql" data-sql="${batch.sql_filename}" style="font-size: 0.8rem; padding: 0.35rem 0.65rem;">👁️ Xem SQL</button>`
+                : '';
+
+            let candidateRows = '';
+            (batch.candidates || []).forEach((c, idx) => {
+                const excelLink = c.excel_url
+                    ? `<a href="${c.excel_url}" download="${c.excel_filename}" class="btn-link-action" style="color: var(--success-color); font-size: 0.8rem;">📊 Excel</a>`
+                    : '<span style="color: var(--text-secondary); font-size: 0.8rem;">-</span>';
+                candidateRows += `
+                    <tr>
+                        <td style="text-align: center; font-size: 0.85rem;">${idx + 1}</td>
+                        <td style="font-size: 0.85rem;"><strong>${c.name}</strong></td>
+                        <td style="text-align: center; font-size: 0.85rem;"><span class="badge badge-info">${c.id || '-'}</span></td>
+                        <td style="font-size: 0.85rem;">${c.dept || '-'}</td>
+                        <td style="font-size: 0.85rem;">${c.template_name || c.position || '-'}</td>
+                        <td style="text-align: center; font-size: 0.85rem; font-weight: bold; color: var(--accent-color);">${c.total_score !== undefined ? c.total_score.toFixed(1) : '10.0'} đ</td>
+                        <td style="text-align: center;">
+                            <a href="${c.docx_url}" download="${c.docx_filename}" class="btn-link-action" style="color: var(--primary-color); font-size: 0.8rem;">
+                                📄 Tải Word
+                            </a>
+                        </td>
+                        <td style="text-align: center;">${excelLink}</td>
+                    </tr>
+                `;
+            });
+
+            card.innerHTML = `
+                <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 0.75rem; margin-bottom: 0.75rem;">
+                    <div>
+                        <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
+                            <h3 style="margin: 0; font-size: 1.05rem;">Đợt sinh: ${batch.created_at || 'Không rõ'}</h3>
+                            <span class="badge badge-success" style="font-size: 0.75rem;">Ngày thi: ${batch.exam_date || '-'}</span>
+                            <span class="badge badge-primary" style="font-size: 0.75rem;">${batch.candidate_count || (batch.candidates ? batch.candidates.length : 0)} Thí sinh</span>
+                            ${deptsBadge}
+                        </div>
+                    </div>
+                    <div style="display: flex; gap: 0.5rem; align-items: center; flex-wrap: wrap;">
+                        <a href="${batch.zip_url}" download="${batch.zip_filename || 'De_Thi.zip'}" class="btn-primary" style="text-decoration: none; font-size: 0.8rem; padding: 0.35rem 0.75rem; display: inline-flex; align-items: center; gap: 4px;">
+                            ⬇️ Tải ZIP
+                        </a>
+                        ${sqlBtnHtml}
+                        <button class="btn-card btn-delete-batch" data-id="${batch.batch_id}" style="color: var(--danger-color); font-size: 0.8rem; padding: 0.35rem 0.65rem;" title="Xóa đợt này khỏi lịch sử">
+                            🗑️ Xóa
+                        </button>
+                    </div>
+                </div>
+
+                <div class="matrix-table-container" style="margin-top: 0.5rem;">
+                    <table class="matrix-table" style="font-size: 0.85rem;">
+                        <thead>
+                            <tr>
+                                <th style="width: 40px; text-align: center;">STT</th>
+                                <th>Họ tên Thí sinh</th>
+                                <th style="text-align: center;">SBD</th>
+                                <th>Khoa / Phòng</th>
+                                <th>Mẫu đề / Vị trí</th>
+                                <th style="text-align: center;">Điểm</th>
+                                <th style="text-align: center;">Đề Word (.docx)</th>
+                                <th style="text-align: center;">Dữ liệu Excel (.xlsx)</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            ${candidateRows}
+                        </tbody>
+                    </table>
+                </div>
+            `;
+            historyBatchesList.appendChild(card);
+        });
+
+        // Attach listeners for batch action buttons
+        historyBatchesList.querySelectorAll('.btn-view-batch-sql').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                const sqlFile = e.currentTarget.getAttribute('data-sql');
+                if (sqlFile) openSqlPreviewModal(sqlFile);
+            });
+        });
+
+        historyBatchesList.querySelectorAll('.btn-delete-batch').forEach(btn => {
+            btn.addEventListener('click', async (e) => {
+                const batchId = e.currentTarget.getAttribute('data-id');
+                if (!batchId) return;
+                if (confirm("Bạn có chắc chắn muốn xóa đợt sinh đề này khỏi lịch sử?")) {
+                    try {
+                        const res = await fetch(`/api/exams/history/${batchId}`, { method: 'DELETE' });
+                        if (!res.ok) throw new Error("Không thể xóa đợt thi.");
+                        showToast("Đã xóa đợt thi khỏi lịch sử.", "success");
+                        await loadHistory();
+                    } catch (err) {
+                        showToast(err.message, "error");
+                    }
+                }
+            });
+        });
+    }
+
+    if (historySearchInput) {
+        historySearchInput.addEventListener('input', () => {
+            renderHistory(cachedHistory);
+        });
+    }
+
+    if (btnReloadHistory) {
+        btnReloadHistory.addEventListener('click', () => {
+            loadHistory();
+            showToast("Đã làm mới danh sách lịch sử.", "info");
+        });
+    }
+
+    if (btnClearAllHistory) {
+        btnClearAllHistory.addEventListener('click', async () => {
+            if (confirm("CẢNH BÁO: Bạn có chắc muốn xóa TOÀN BỘ lịch sử tất cả các đợt sinh đề thi không?")) {
+                try {
+                    const res = await fetch('/api/exams/history', { method: 'DELETE' });
+                    if (!res.ok) throw new Error("Không thể xóa lịch sử.");
+                    showToast("Đã xóa sạch toàn bộ lịch sử.", "success");
+                    await loadHistory();
+                    if (recentGenerationBox) recentGenerationBox.style.display = 'none';
+                    localStorage.removeItem('latest_exam_generation');
+                } catch (err) {
+                    showToast(err.message, "error");
+                }
+            }
+        });
+    }
+
     function bindEvents() {
-        // Optional global shortcut handlers
+        // Script Modal Close & Copy Events
+        if (btnCloseScriptModal && scriptModal) {
+            btnCloseScriptModal.addEventListener('click', () => {
+                scriptModal.style.display = 'none';
+            });
+        }
+        if (btnCloseScriptBtn && scriptModal) {
+            btnCloseScriptBtn.addEventListener('click', () => {
+                scriptModal.style.display = 'none';
+            });
+        }
+        if (btnCopyScript && scriptContentArea) {
+            btnCopyScript.addEventListener('click', () => {
+                scriptContentArea.select();
+                navigator.clipboard.writeText(scriptContentArea.value);
+                showToast("Đã sao chép nội dung script SQL vào bộ nhớ đệm!", "success");
+            });
+        }
+        // Close modal when clicking outside
+        window.addEventListener('click', (e) => {
+            if (e.target === scriptModal) {
+                scriptModal.style.display = 'none';
+            }
+        });
     }
 
     init();
