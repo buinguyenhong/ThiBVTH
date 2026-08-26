@@ -311,25 +311,60 @@ class CatalogManager:
         
         services = []
         wb = None
+        discontinued_keywords = [
+            "ngưng", "ngung", "tạm ngưng", "tam ngung", "không dùng", "khong dung",
+            "k dùng", "kdung", "[bỏ]", "[bo]", "[hủy]", "[huy]", "[ngưng]", "[ngung]",
+            "(ngưng)", "(ngung)", "(bỏ)", "(bo)", "(hủy)", "(huy)", "(không dùng)"
+        ]
+        
         try:
             wb = openpyxl.load_workbook(file_path, read_only=True)
             ws = wb.active
             rows = iter(ws.iter_rows(values_only=True))
             headers = next(rows)
             
+            # Detect column 4 intent (TrangThai vs TamNgung)
+            col4_header = str(headers[4]).strip().lower() if headers and len(headers) > 4 and headers[4] else ""
+            is_tam_ngung_header = any(k in col4_header for k in ["tamngung", "tạm ngưng", "ngưng", "tam_ngung"])
+            
             for row in rows:
                 if not row or not row[0]:
                     continue
-                status = int(row[4]) if row[4] is not None else 1
-                if status == 0:
+                    
+                code = str(row[0]).strip()
+                name = str(row[1]).strip() if len(row) > 1 and row[1] else ""
+                group = str(row[2]).strip() if len(row) > 2 and row[2] else ""
+                dept = str(row[3]).strip() if len(row) > 3 and row[3] else ""
+                raw_status = row[4] if len(row) > 4 else None
+                
+                # Check status value
+                is_active = True
+                if raw_status is not None:
+                    status_str = str(raw_status).strip().lower()
+                    if is_tam_ngung_header:
+                        # TamNgung: 1 = Stopped, 0 = Active
+                        if status_str in ["1", "true", "tạm ngưng", "ngưng"]:
+                            is_active = False
+                    else:
+                        # TrangThai: 1 = Active, 0 = Stopped
+                        if status_str in ["0", "false", "tạm ngưng", "ngưng", "đã ngưng"]:
+                            is_active = False
+                            
+                # Check text for discontinuation markers
+                name_lower = name.lower()
+                code_lower = code.lower()
+                if any(kw in name_lower or kw in code_lower for kw in discontinued_keywords):
+                    is_active = False
+                    
+                if not is_active:
                     continue
                     
                 s = {
-                    "MaDichVu": str(row[0]).strip(),
-                    "TenDichVu": str(row[1]).strip() if row[1] else "",
-                    "NhomDichVu": str(row[2]).strip() if row[2] else "",
-                    "KhoaThucHien": str(row[3]).strip() if row[3] else "",
-                    "TrangThai": status
+                    "MaDichVu": code,
+                    "TenDichVu": name,
+                    "NhomDichVu": group,
+                    "KhoaThucHien": dept,
+                    "TrangThai": 1
                 }
                 services.append(s)
         except Exception as e:

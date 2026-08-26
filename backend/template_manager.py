@@ -155,8 +155,9 @@ class TemplateManager:
                 "actions": [
                     {"action_code": "BAN_NGOAI_TRU_NHAN_BENH", "score": 3.0, "params": {}},
                     {"action_code": "PTTT_CHI_DINH", "score": 2.0, "params": {"num_services": 4}},
-                    {"action_code": "PTTT_TUONG_TRINH", "score": 4.0, "params": {}},
-                    {"action_code": "TK_KIEM_TON_KHO", "score": 1.0, "params": {}}
+                    {"action_code": "PTTT_TUONG_TRINH", "score": 3.0, "params": {}},
+                    {"action_code": "VP_KIEM_TRA_VIEN_PHI", "score": 1.0, "params": {}},
+                    {"action_code": "TC_TRA_CUU_BENH_SU", "score": 1.0, "params": {}}
                 ]
             })
 

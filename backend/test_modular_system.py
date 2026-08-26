@@ -198,5 +198,23 @@ class TestModularSystem(unittest.TestCase):
         self.assertEqual(count_p, 3)
         self.assertEqual(mgr.get_pharmacies_for_dept("Khoa Ngoại tổng hợp"), ["KHO_CHUNG", "KHO_NGOAI"])
 
+    def test_new_hospital_actions(self):
+        """Test VP_KIEM_TRA_VIEN_PHI and TC_TRA_CUU_BENH_SU actions."""
+        from exam_actions import ACTION_REGISTRY
+        self.assertIn("VP_KIEM_TRA_VIEN_PHI", ACTION_REGISTRY)
+        self.assertIn("TC_TRA_CUU_BENH_SU", ACTION_REGISTRY)
+        
+        # Test prepare_data
+        act_vp = ACTION_REGISTRY["VP_KIEM_TRA_VIEN_PHI"]
+        data_vp = act_vp["prepare_data"](cm, mm, "Khoa Ngoại tổng hợp", "26/08/2026", {})
+        self.assertIn("start_date", data_vp)
+        self.assertIn("end_date", data_vp)
+        
+        act_bs = ACTION_REGISTRY["TC_TRA_CUU_BENH_SU"]
+        data_bs = act_bs["prepare_data"](cm, mm, "Khoa Ngoại tổng hợp", "26/08/2026", {})
+        self.assertIn("ten_bn", data_bs)
+        self.assertIn("tuoi", data_bs)
+        self.assertIn("dia_chi", data_bs)
+
 if __name__ == "__main__":
     unittest.main()

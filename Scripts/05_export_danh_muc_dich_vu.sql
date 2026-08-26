@@ -40,8 +40,18 @@ LEFT JOIN dbo.DM_PhongBan AS phong WITH (NOLOCK)
   ON phong.PhongBan_Id = noiThucHien.PhongBan_Id
 WHERE ISNULL(dv.TamNgung, 0) = 0
   AND ISNULL(dv.CoGiaDichVu, 0) = 1
+  AND ISNULL(phong.TamNgung, 0) = 0
+  AND ISNULL(noiThucHien.TamNgung, 0) = 0
   AND NULLIF(LTRIM(RTRIM(dv.MaDichVu)), '') IS NOT NULL
   AND NULLIF(LTRIM(RTRIM(dv.TenDichVu)), N'') IS NOT NULL
+  AND dv.TenDichVu NOT LIKE N'%[[]NGƯNG]%'
+  AND dv.TenDichVu NOT LIKE N'%[[]KHÔNG DÙNG]%'
+  AND dv.TenDichVu NOT LIKE N'%[[]BỎ]%'
+  AND dv.TenDichVu NOT LIKE N'%[[]HỦY]%'
+  AND dv.TenDichVu NOT LIKE N'%(NGƯNG)%'
+  AND dv.TenDichVu NOT LIKE N'%(K DÙNG)%'
+  AND dv.TenDichVu NOT LIKE N'%(KHÔNG DÙNG)%'
+  AND dv.TenDichVu NOT LIKE N'%*NGƯNG*%'
 ORDER BY
     NhomDichVu,
     MaDichVu;

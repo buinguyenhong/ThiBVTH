@@ -148,19 +148,16 @@ def get_department_specific_services(cm, mm, dept_name, count=4):
         if len(candidates) < count:
             candidates = cm.get_services(count * 2, nhom=allowed_groups)
             
-    # 2. Enrich/fallback with specialized department procedures
-    dept_curated = DEPARTMENT_CLINICAL_SERVICES.get(dept_name)
-    if not dept_curated:
-        for k, v in DEPARTMENT_CLINICAL_SERVICES.items():
-            if k.lower() in dept_name.lower() or dept_name.lower() in k.lower():
-                dept_curated = v
-                break
-                
-    if dept_curated:
-        # For specialized outpatient depts (PHCN, Thận nhân tạo, Mắt, TMH, RHM), prioritize curated specialized services
-        if dept_name in ["Khoa Phục hồi chức năng", "Thận nhân tạo", "Khoa Mắt", "Khoa Tai Mũi Họng", "Khoa Răng Hàm Mặt"]:
-            candidates = list(dept_curated)
-        else:
+    # 2. Enrich/fallback with specialized department procedures only if catalog is sparse
+    if len(candidates) < count:
+        dept_curated = DEPARTMENT_CLINICAL_SERVICES.get(dept_name)
+        if not dept_curated:
+            for k, v in DEPARTMENT_CLINICAL_SERVICES.items():
+                if k.lower() in dept_name.lower() or dept_name.lower() in k.lower():
+                    dept_curated = v
+                    break
+                    
+        if dept_curated:
             existing_codes = {s.get("MaDichVu") for s in candidates}
             for s in dept_curated:
                 if s.get("MaDichVu") not in existing_codes:
@@ -882,7 +879,22 @@ def render_docx_pttt_chi_dinh(doc, data, score, q_index):
         set_font(r, font_name="Times New Roman", size_pt=11)
 
 
-# 17. PTTT_TUONG_TRINH: Nhập nội dung tường trình Phẫu thuật - Thủ thuật
+def is_pttt_procedure(svc):
+    """Checks if a service belongs to surgical/procedure/PTTT categories."""
+    name = (svc.get("TenDichVu") or "").lower()
+    grp = (svc.get("NhomDichVu") or "").lower()
+    # Exclude basic imaging/laboratory tests
+    if any(k in grp for k in ["xét nghiệm", "huyết học", "hóa sinh", "vi sinh", "x-quang", "ct scan", "mri", "siêu âm chẩn đoán"]):
+        return False
+    # Include procedures, surgeries, physical therapies, dialysis, endoscopy procedures
+    if any(k in grp for k in ["thủ thuật", "phẫu thuật", "vật lý trị liệu", "phục hồi chức năng", "lọc máu", "nội soi", "thăm dò"]):
+        return True
+    if any(k in name for k in ["điều trị", "laser", "điện xung", "kéo giãn", "tập vận động", "hồng ngoại", "nắn", "bó bột", "khâu", "thông", "rửa", "lấy dị vật", "lọc máu", "catheter", "đo monitor", "nội soi"]):
+        return True
+    return False
+
+
+# 17. PTTT_TUONG_TRINH: Nhập nội dung tường trình Phẫu thuật - Thủ thuật (Chỉ thực hiện cho các dịch vụ thuộc nhóm PT-TT)
 def prepare_pttt_tuong_trinh(cm, mm, dept_name, exam_date, params, context=None):
     patient = context.get("bn_pttt") or context.get("bn_ngoai_tru") if context else None
     if not patient:
@@ -890,14 +902,19 @@ def prepare_pttt_tuong_trinh(cm, mm, dept_name, exam_date, params, context=None)
         if context is not None:
             context["bn_ngoai_tru"] = patient
 
-    services = context.get("pttt_services", []) if context else []
-    if not services:
+    all_services = context.get("pttt_services", []) if context else []
+    if not all_services:
         allowed_groups = mm.get_services_for_dept(dept_name)
-        services = cm.get_services(3, nhom=allowed_groups if allowed_groups else None, khoa=dept_name)
+        all_services = get_department_specific_services(cm, mm, dept_name, count=4)
+
+    # Strictly filter services belonging to procedure/surgery groups
+    pttt_services = [s for s in all_services if is_pttt_procedure(s)]
+    if not pttt_services:
+        pttt_services = all_services[:2]
 
     return {
         "patient": patient,
-        "services": services,
+        "services": pttt_services,
         "dept_name": dept_name
     }
 
@@ -910,11 +927,130 @@ def render_docx_pttt_tuong_trinh(doc, data, score, q_index):
     add_paragraph_with_run(doc, f"Câu {q_index}) Nhập nội dung tường trình Phẫu thuật - Thủ thuật (PT-TT){pt_str} ({score} điểm):", bold=True, size_pt=11.5, space_after=4)
     
     p = doc.add_paragraph()
-    p.paragraph_format.space_after = Pt(4)
+    p.paragraph_format.space_after = Pt(3)
     p.paragraph_format.left_indent = Inches(0.2)
     p.paragraph_format.line_spacing = 1.15
-    r_inst = p.add_run("- Yêu cầu: Vào phân hệ Quản lý Phẫu thuật - Thủ thuật trên phần mềm HIS, tìm ca bệnh nhân và thực hiện nhập đầy đủ thông tin Tường trình PT-TT cho các dịch vụ kỹ thuật đã chỉ định ở câu trên (Bác sĩ thực hiện, Người phụ, Phương pháp xử trí, Tường trình chi tiết và Kết luận).")
-    set_font(r_inst, font_name="Times New Roman", size_pt=11)
+    r_inst = p.add_run("Yêu cầu thí sinh vào phân hệ Quản lý Phẫu thuật - Thủ thuật trên phần mềm HIS, tìm ca bệnh nhân và thực hiện nhập đầy đủ thông tin Tường trình PT-TT (Bác sĩ thực hiện, Người phụ, Phương pháp vô cảm, Cách thức xử trí, Mô tả tường trình chi tiết và Kết luận) cho các dịch vụ thuộc nhóm phẫu thuật - thủ thuật sau:")
+    set_font(r_inst, font_name="Times New Roman", italic=True, size_pt=10.5)
+
+    services = data.get("services", [])
+    for s in services:
+        p_svc = doc.add_paragraph()
+        p_svc.paragraph_format.space_after = Pt(2)
+        p_svc.paragraph_format.left_indent = Inches(0.4)
+        p_svc.paragraph_format.line_spacing = 1.15
+        nhom_str = f" ({s.get('NhomDichVu')})" if s.get('NhomDichVu') else ""
+        r_s = p_svc.add_run(f"+ {s['TenDichVu']}{nhom_str}")
+        set_font(r_s, font_name="Times New Roman", bold=True, size_pt=10.5)
+
+
+# 18. VP_KIEM_TRA_VIEN_PHI: Kiểm tra viện phí của bệnh nhân đang nằm viện thuộc khoa
+def prepare_kiem_tra_vien_phi(cm, mm, dept_name, exam_date, params, context=None):
+    start_date, end_date = get_cutoff_date(exam_date, days_back=30)
+    return {
+        "dept_name": dept_name,
+        "exam_date": exam_date,
+        "start_date": start_date,
+        "end_date": end_date
+    }
+
+def render_docx_kiem_tra_vien_phi(doc, data, score, q_index):
+    dept_name = data.get("dept_name", "Khoa")
+    start_d = data.get("start_date", "")
+    end_d = data.get("end_date", "")
+    
+    add_paragraph_with_run(doc, f"Câu {q_index}) Kiểm tra viện phí của bệnh nhân đang nằm viện ({score} điểm):", bold=True, size_pt=11.5, space_after=4)
+    
+    p_req = doc.add_paragraph()
+    p_req.paragraph_format.space_after = Pt(3)
+    p_req.paragraph_format.left_indent = Inches(0.2)
+    p_req.paragraph_format.line_spacing = 1.15
+    r_req = p_req.add_run(f"- Tìm 01 bệnh nhân bất kỳ đang nằm điều trị nội trú / ngoại trú thuộc {dept_name}, có thời gian nhập viện trong khoảng từ ngày {start_d} đến ngày {end_d}.\n- Tra cứu chi tiết viện phí và ghi lại các thông tin sau:")
+    set_font(r_req, font_name="Times New Roman", size_pt=11)
+    
+    p_fill = doc.add_paragraph()
+    p_fill.paragraph_format.space_after = Pt(4)
+    p_fill.paragraph_format.left_indent = Inches(0.4)
+    p_fill.paragraph_format.line_spacing = 1.25
+    r_f1 = p_fill.add_run("+ Họ và tên bệnh nhân                : ………………………………………………………………………………………\n")
+    r_f2 = p_fill.add_run("+ Mã y tế / Số vào viện               : ………………………………………………………………………………………\n")
+    r_f3 = p_fill.add_run("+ Tổng chi phí điều trị đến hiện tại  : ………………………………………………………………………………… đồng\n")
+    r_f4 = p_fill.add_run("+ Số tiền đã tạm ứng                  : ………………………………………………………………………………… đồng\n")
+    r_f5 = p_fill.add_run("+ Số tiền còn phải thanh toán/hoàn trả: ………………………………………………………………………………… đồng")
+    set_font(r_f1, font_name="Times New Roman", size_pt=11)
+    set_font(r_f2, font_name="Times New Roman", size_pt=11)
+    set_font(r_f3, font_name="Times New Roman", size_pt=11)
+    set_font(r_f4, font_name="Times New Roman", size_pt=11)
+    set_font(r_f5, font_name="Times New Roman", size_pt=11)
+
+
+# 19. TC_TRA_CUU_BENH_SU: Kiểm tra bệnh sử của bệnh nhân (Tên, tuổi, địa chỉ -> ghi phiếu khám gần nhất)
+def prepare_tra_cuu_benh_su(cm, mm, dept_name, exam_date, params, context=None):
+    patients = cm.get_patients(1, must_have_bhyt=False, valid_on=exam_date)
+    patient = patients[0] if patients else {
+        "TenBenhNhan": "Nguyễn Văn An",
+        "NamSinh": "1975",
+        "DiaChi": "TP. Buôn Ma Thuột, Đắk Lắk",
+        "GioiTinh": "Nam"
+    }
+    
+    exam_year = 2026
+    try:
+        exam_year = datetime.strptime(exam_date, "%d/%m/%Y").year
+    except Exception:
+        pass
+        
+    birth_year = None
+    dob_str = str(patient.get("NgaySinh") or "")
+    if "/" in dob_str:
+        try:
+            birth_year = int(dob_str.split("/")[-1])
+        except Exception:
+            pass
+    elif dob_str.isdigit() and len(dob_str) == 4:
+        birth_year = int(dob_str)
+        
+    if birth_year:
+        tuoi = f"{exam_year - birth_year} tuổi (SN: {birth_year})"
+    else:
+        tuoi = str(patient.get("Tuoi") or patient.get("NgaySinh") or "45 tuổi")
+        
+    dia_chi = patient.get("DiaChi") or "TP. Buôn Ma Thuột, Đắk Lắk"
+    
+    return {
+        "patient": patient,
+        "ten_bn": patient.get("TenBenhNhan", ""),
+        "tuoi": tuoi,
+        "dia_chi": dia_chi,
+        "dept_name": dept_name
+    }
+
+def render_docx_tra_cuu_benh_su(doc, data, score, q_index):
+    ten_bn = data.get("ten_bn", "")
+    tuoi = data.get("tuoi", "")
+    dia_chi = data.get("dia_chi", "")
+    
+    add_paragraph_with_run(doc, f"Câu {q_index}) Kiểm tra bệnh sử và lịch sử khám chữa bệnh của bệnh nhân ({score} điểm):", bold=True, size_pt=11.5, space_after=4)
+    
+    p_req = doc.add_paragraph()
+    p_req.paragraph_format.space_after = Pt(3)
+    p_req.paragraph_format.left_indent = Inches(0.2)
+    p_req.paragraph_format.line_spacing = 1.15
+    r_info = p_req.add_run(f"- Tra cứu lịch sử khám chữa bệnh của bệnh nhân:\n  * Họ và tên: {ten_bn}  -  Tuổi: {tuoi}  -  Địa chỉ: {dia_chi}\n- Yêu cầu thí sinh ghi lại thông tin đợt khám / phiếu khám được thực hiện trong khoảng thời gian gần nhất:")
+    set_font(r_info, font_name="Times New Roman", size_pt=11)
+    
+    p_fill = doc.add_paragraph()
+    p_fill.paragraph_format.space_after = Pt(4)
+    p_fill.paragraph_format.left_indent = Inches(0.4)
+    p_fill.paragraph_format.line_spacing = 1.25
+    r_f1 = p_fill.add_run("+ Ngày khám / vào viện gần nhất    : ………………………………………………………………………………………\n")
+    r_f2 = p_fill.add_run("+ Khoa / Phòng khám thực hiện        : ………………………………………………………………………………………\n")
+    r_f3 = p_fill.add_run("+ Bác sĩ khám / Bệnh án ghi nhận    : ………………………………………………………………………………………\n")
+    r_f4 = p_fill.add_run("+ Chẩn đoán bệnh chính               : ………………………………………………………………………………………")
+    set_font(r_f1, font_name="Times New Roman", size_pt=11)
+    set_font(r_f2, font_name="Times New Roman", size_pt=11)
+    set_font(r_f3, font_name="Times New Roman", size_pt=11)
+    set_font(r_f4, font_name="Times New Roman", size_pt=11)
 
 
 # --- REGISTRY DICTIONARY ---
@@ -1086,11 +1222,31 @@ ACTION_REGISTRY = {
         "code": "PTTT_TUONG_TRINH",
         "name": "Nhập tường trình Phẫu thuật - Thủ thuật",
         "category": "Phẫu thuật - Thủ thuật",
-        "description": "Nhập nội dung tường trình PT-TT (Bác sĩ, người phụ, phương pháp xử trí...) cho các dịch vụ đã chỉ định.",
+        "description": "Nhập nội dung tường trình PT-TT (Bác sĩ, người phụ, phương pháp xử trí...) cho các dịch vụ thuộc nhóm PT-TT.",
         "default_score": 4.0,
         "uses_his": True,
         "prepare_data": prepare_pttt_tuong_trinh,
         "render_docx": render_docx_pttt_tuong_trinh
+    },
+    "VP_KIEM_TRA_VIEN_PHI": {
+        "code": "VP_KIEM_TRA_VIEN_PHI",
+        "name": "Kiểm tra viện phí bệnh nhân đang nằm viện",
+        "category": "Tài chính & Viện phí",
+        "description": "Tìm 01 bệnh nhân đang nằm viện thuộc khoa có thời gian vào viện trong khoảng ngày và tra cứu chi tiết viện phí.",
+        "default_score": 1.0,
+        "uses_his": True,
+        "prepare_data": prepare_kiem_tra_vien_phi,
+        "render_docx": render_docx_kiem_tra_vien_phi
+    },
+    "TC_TRA_CUU_BENH_SU": {
+        "code": "TC_TRA_CUU_BENH_SU",
+        "name": "Kiểm tra bệnh sử / Lịch sử khám bệnh",
+        "category": "Tra cứu thông tin",
+        "description": "Tra cứu lịch sử khám bệnh của bệnh nhân (Tên, tuổi, địa chỉ) và ghi lại thông tin phiếu khám gần nhất.",
+        "default_score": 1.0,
+        "uses_his": True,
+        "prepare_data": prepare_tra_cuu_benh_su,
+        "render_docx": render_docx_tra_cuu_benh_su
     }
 }
 

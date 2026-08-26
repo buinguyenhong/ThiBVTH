@@ -859,11 +859,16 @@
       },
       {
         "action_code": "PTTT_TUONG_TRINH",
-        "score": 4.0,
+        "score": 3.0,
         "params": {}
       },
       {
-        "action_code": "TK_KIEM_TON_KHO",
+        "action_code": "VP_KIEM_TRA_VIEN_PHI",
+        "score": 1.0,
+        "params": {}
+      },
+      {
+        "action_code": "TC_TRA_CUU_BENH_SU",
         "score": 1.0,
         "params": {}
       }
@@ -890,11 +895,16 @@
       },
       {
         "action_code": "PTTT_TUONG_TRINH",
-        "score": 4.0,
+        "score": 3.0,
         "params": {}
       },
       {
-        "action_code": "TK_KIEM_TON_KHO",
+        "action_code": "VP_KIEM_TRA_VIEN_PHI",
+        "score": 1.0,
+        "params": {}
+      },
+      {
+        "action_code": "TC_TRA_CUU_BENH_SU",
         "score": 1.0,
         "params": {}
       }
@@ -1083,6 +1093,42 @@
       },
       {
         "action_code": "RV_CHO_RA_VIEN",
+        "score": 1.0,
+        "params": {}
+      }
+    ]
+  },
+  {
+    "id": "tpl_d46fe420",
+    "name": "Đề thi Test Nghiệp vụ Mới (Khoa PHCN)",
+    "dept": "Khoa Phục hồi chức năng",
+    "position": "Kỹ thuật viên Phục hồi chức năng",
+    "uses_his": true,
+    "actions": [
+      {
+        "action_code": "BAN_NGOAI_TRU_NHAN_BENH",
+        "score": 3.0,
+        "params": {}
+      },
+      {
+        "action_code": "PTTT_CHI_DINH",
+        "score": 2.0,
+        "params": {
+          "num_services": 4
+        }
+      },
+      {
+        "action_code": "PTTT_TUONG_TRINH",
+        "score": 3.0,
+        "params": {}
+      },
+      {
+        "action_code": "VP_KIEM_TRA_VIEN_PHI",
+        "score": 1.0,
+        "params": {}
+      },
+      {
+        "action_code": "TC_TRA_CUU_BENH_SU",
         "score": 1.0,
         "params": {}
       }
