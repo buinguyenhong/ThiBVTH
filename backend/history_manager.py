@@ -1,8 +1,10 @@
+from __future__ import annotations
 import os
 import json
 import uuid
 import threading
 from datetime import datetime
+from typing import Optional, Dict, List, Any
 
 class HistoryManager:
     """Manages persistent exam generation history and logs."""
@@ -18,7 +20,7 @@ class HistoryManager:
         self._lock = threading.RLock()
         self.history = self._load_history()
 
-    def _load_history(self):
+    def _load_history(self) -> list:
         if not os.path.exists(self.history_file):
             return []
         try:
@@ -62,12 +64,12 @@ class HistoryManager:
         with self._lock:
             return list(self.history[:limit])
 
-    def get_latest_batch(self) -> dict | None:
+    def get_latest_batch(self) -> Optional[dict]:
         """Returns the most recent exam generation batch, or None."""
         with self._lock:
             return self.history[0] if self.history else None
 
-    def get_batch(self, batch_id: str) -> dict | None:
+    def get_batch(self, batch_id: str) -> Optional[dict]:
         """Finds a specific batch by its batch_id."""
         with self._lock:
             for b in self.history:

@@ -1,9 +1,13 @@
 import sys
+import os
 if hasattr(sys.stdout, "reconfigure"):
     try:
         sys.stdout.reconfigure(encoding='utf-8')
     except Exception:
         pass
+
+# Ensure backend directory is in sys.path when running from workspace root
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 from fastapi import FastAPI, HTTPException, BackgroundTasks, UploadFile, File
 from fastapi.responses import FileResponse, JSONResponse, Response
