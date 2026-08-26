@@ -60,14 +60,13 @@ class TemplateManager:
                 "position": "Điều dưỡng Nội trú",
                 "uses_his": True,
                 "actions": [
-                    {"action_code": "NT_NHAN_BENH_KHOA", "score": 2.0, "params": {}},
+                    {"action_code": "NT_NHAN_BENH_KHOA", "score": 1.0, "params": {}},
                     {"action_code": "YL_CHI_DINH_CLS", "score": 2.0, "params": {}},
-                    {"action_code": "YL_CHI_DINH_THUOC_VTYT", "score": 2.0, "params": {"num_drugs": 3, "num_supplies": 2}},
+                    {"action_code": "YL_CHI_DINH_THUOC_VTYT", "score": 3.0, "params": {"num_drugs": 3, "num_supplies": 2}},
                     {"action_code": "YL_TRA_THUOC", "score": 1.0, "params": {}},
                     {"action_code": "YL_DOI_THEM_DICH_VU", "score": 1.0, "params": {}},
-                    {"action_code": "TK_KIEM_TON_KHO", "score": 1.0, "params": {}},
-                    {"action_code": "CK_CHUYEN_KHOA", "score": 0.5, "params": {}},
-                    {"action_code": "RV_CHO_RA_VIEN", "score": 0.5, "params": {}}
+                    {"action_code": "CK_CHUYEN_KHOA", "score": 1.0, "params": {}},
+                    {"action_code": "RV_CHO_RA_VIEN", "score": 1.0, "params": {}}
                 ]
             })
             
@@ -78,9 +77,10 @@ class TemplateManager:
                 "position": "Lễ tân Khoa Nội trú",
                 "uses_his": True,
                 "actions": [
-                    {"action_code": "NT_NHAN_BENH_KHOA", "score": 4.0, "params": {}},
+                    {"action_code": "NT_NHAN_BENH_KHOA", "score": 3.0, "params": {}},
                     {"action_code": "TC_THU_TAM_UNG", "score": 4.0, "params": {}},
-                    {"action_code": "TK_KIEM_TON_KHO", "score": 2.0, "params": {}}
+                    {"action_code": "TK_KIEM_TON_KHO", "score": 1.0, "params": {}},
+                    {"action_code": "RV_CHO_RA_VIEN", "score": 2.0, "params": {}}
                 ]
             })
 
@@ -94,11 +94,11 @@ class TemplateManager:
                 "position": "Điều dưỡng Tiếp nhận trực tiếp",
                 "uses_his": True,
                 "actions": [
-                    {"action_code": "TN_TIEP_NHAN", "score": 3.0, "params": {}},
+                    {"action_code": "TN_TIEP_NHAN", "score": 2.0, "params": {}},
                     {"action_code": "YL_CHI_DINH_CLS", "score": 2.0, "params": {}},
-                    {"action_code": "YL_CHI_DINH_THUOC_VTYT", "score": 2.0, "params": {}},
+                    {"action_code": "YL_CHI_DINH_THUOC_VTYT", "score": 3.0, "params": {}},
                     {"action_code": "YL_TRA_THUOC", "score": 1.0, "params": {}},
-                    {"action_code": "TK_KIEM_TON_KHO", "score": 1.0, "params": {}},
+                    {"action_code": "CK_CHUYEN_KHOA", "score": 1.0, "params": {}},
                     {"action_code": "RV_CHO_RA_VIEN", "score": 1.0, "params": {}}
                 ]
             })

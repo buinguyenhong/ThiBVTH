@@ -248,15 +248,28 @@ def prepare_chi_dinh_thuoc_vtyt(cm, mm, dept_name, exam_date, params, context=No
 def render_docx_chi_dinh_thuoc_vtyt(doc, data, score, q_index):
     bn_bhyt = data.get("bn_bhyt")
     pt_name = f" cho bệnh nhân BHYT ({bn_bhyt['TenBenhNhan']})" if bn_bhyt else ""
-    add_paragraph_with_run(doc, f"Câu {q_index}) Lên y lệnh Thuốc và Vật tư y tế{pt_name} ({score} điểm):", bold=True, size_pt=11.5, space_after=4)
+    add_paragraph_with_run(doc, f"Câu {q_index}) Lên y lệnh Thuốc & VTYT, Lập phiếu lĩnh, Nhập nội bộ và Xuất sử dụng{pt_name} ({score} điểm):", bold=True, size_pt=11.5, space_after=4)
     
+    p_inst = doc.add_paragraph()
+    p_inst.paragraph_format.space_after = Pt(4)
+    p_inst.paragraph_format.left_indent = Inches(0.2)
+    p_inst.paragraph_format.line_spacing = 1.15
+    r_inst1 = p_inst.add_run("- Thao tác 1: ").bold = True
+    r_inst1_text = p_inst.add_run("Lên y lệnh Thuốc BHYT và Vật tư y tế theo danh mục chi tiết bên dưới.\n")
+    r_inst2 = p_inst.add_run("- Thao tác 2: ").bold = True
+    r_inst2_text = p_inst.add_run("Lập phiếu lĩnh Dược / Tủ trực khoa trên phần mềm HIS.\n")
+    r_inst3 = p_inst.add_run("- Thao tác 3: ").bold = True
+    r_inst3_text = p_inst.add_run("Thực hiện Nhập nội bộ phiếu lĩnh và Xuất sử dụng cho bệnh nhân.")
+    for r in p_inst.runs:
+        set_font(r, font_name="Times New Roman", size_pt=11)
+
     drugs = data.get("drugs", [])
     if drugs:
         p_d = doc.add_paragraph()
         p_d.paragraph_format.space_after = Pt(2)
         p_d.paragraph_format.left_indent = Inches(0.2)
         p_d.paragraph_format.line_spacing = 1.15
-        r_d = p_d.add_run("+ Thuốc Bảo hiểm y tế:")
+        r_d = p_d.add_run("+ Danh mục Thuốc Bảo hiểm y tế:")
         set_font(r_d, font_name="Times New Roman", bold=True, size_pt=11)
         for d in drugs:
             dvt = d.get('DVTTinh') or 'Viên'
@@ -266,7 +279,7 @@ def render_docx_chi_dinh_thuoc_vtyt(doc, data, score, q_index):
             p.paragraph_format.space_after = Pt(2)
             p.paragraph_format.left_indent = Inches(0.4)
             p.paragraph_format.line_spacing = 1.15
-            r = p.add_run(f"- {d['TenDuoc']} ({dvt}) - Số lượng: {sl} - Cách dùng: {cachdung}")
+            r = p.add_run(f"- {d['TenDuoc']} ({dvt}) - Số lượng: {sl} {dvt} - Cách dùng: {cachdung}")
             set_font(r, font_name="Times New Roman", size_pt=11)
             
     supplies = data.get("supplies", [])
@@ -275,7 +288,7 @@ def render_docx_chi_dinh_thuoc_vtyt(doc, data, score, q_index):
         p_s.paragraph_format.space_after = Pt(2)
         p_s.paragraph_format.left_indent = Inches(0.2)
         p_s.paragraph_format.line_spacing = 1.15
-        r_s = p_s.add_run("+ Vật tư y tế / Thuốc Viện phí:")
+        r_s = p_s.add_run("+ Danh mục Vật tư y tế / Thuốc Viện phí:")
         set_font(r_s, font_name="Times New Roman", bold=True, size_pt=11)
         for s in supplies:
             svt = s.get('DVTTinh') or 'Cái'
@@ -284,7 +297,7 @@ def render_docx_chi_dinh_thuoc_vtyt(doc, data, score, q_index):
             p.paragraph_format.space_after = Pt(2)
             p.paragraph_format.left_indent = Inches(0.4)
             p.paragraph_format.line_spacing = 1.15
-            r = p.add_run(f"- {s['TenDuoc']} ({svt}) - Số lượng: {sl}")
+            r = p.add_run(f"- {s['TenDuoc']} ({svt}) - Số lượng: {sl} {svt}")
             set_font(r, font_name="Times New Roman", size_pt=11)
 
 
@@ -667,7 +680,7 @@ ACTION_REGISTRY = {
         "name": "Nhận bệnh nhân vào khoa điều trị (Hàng chờ HIS)",
         "category": "Tiếp nhận & Vào khoa",
         "description": "SQL tạo bệnh nhân BHYT/Viện phí vào hàng chờ để thí sinh bấm nhận bệnh vào khoa.",
-        "default_score": 2.0,
+        "default_score": 1.0,
         "uses_his": True,
         "needs_sql_inpatient": True,
         "prepare_data": prepare_nhan_benh_khoa,
@@ -678,7 +691,7 @@ ACTION_REGISTRY = {
         "name": "Tự tiếp nhận mới thông tin bệnh nhân",
         "category": "Tiếp nhận & Vào khoa",
         "description": "Đề in đủ thông tin 1 ca BHYT và 1 ca Viện phí để thí sinh tự nhập tay vào HIS. SQL chỉ validate.",
-        "default_score": 2.5,
+        "default_score": 2.0,
         "uses_his": True,
         "needs_sql_inpatient": False,
         "prepare_data": prepare_tiep_nhan,
@@ -696,10 +709,10 @@ ACTION_REGISTRY = {
     },
     "YL_CHI_DINH_THUOC_VTYT": {
         "code": "YL_CHI_DINH_THUOC_VTYT",
-        "name": "Lên y lệnh Thuốc và Vật tư y tế",
+        "name": "Lên y lệnh Thuốc/VTYT, Lập phiếu lĩnh, Nhập nội bộ & Xuất sử dụng",
         "category": "Y lệnh Dịch vụ & Thuốc",
-        "description": "Lên y lệnh Thuốc BHYT và VTYT Viện phí từ kho dược tương ứng với Khoa (Thực hiện trên Bệnh nhân BHYT).",
-        "default_score": 2.0,
+        "description": "Lên y lệnh Thuốc BHYT và VTYT Viện phí, lập phiếu lĩnh, nhập nội bộ và xuất sử dụng cho bệnh nhân.",
+        "default_score": 3.0,
         "uses_his": True,
         "prepare_data": prepare_chi_dinh_thuoc_vtyt,
         "render_docx": render_docx_chi_dinh_thuoc_vtyt
