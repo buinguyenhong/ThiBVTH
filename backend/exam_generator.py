@@ -636,6 +636,34 @@ def generate_docx_file(data, template_type, candidate_name, candidate_id, positi
                 action_spec["render_docx"](doc, act_data, score, q_num)
                 add_paragraph_with_run(doc, f"Điểm đạt được: …… / {score} đ", font_name="Times New Roman", size_pt=10.5, italic=True, align=WD_ALIGN_PARAGRAPH.RIGHT, space_after=14)
                 q_num += 1
+        # Render Login Credentials Notice at the bottom of the exam
+        user = data.get("user")
+        if user and user.get("TenDangNhap"):
+            add_paragraph_with_run(doc, "", space_after=4)
+            login_p = doc.add_paragraph()
+            login_p.paragraph_format.space_before = Pt(8)
+            login_p.paragraph_format.space_after = Pt(4)
+            login_p.paragraph_format.left_indent = Inches(0.2)
+            
+            r_note = login_p.add_run("Lưu ý : ")
+            set_font(r_note, font_name="Times New Roman", bold=True, size_pt=11)
+            r_user = login_p.add_run("User đăng nhập chương trình:")
+            set_font(r_user, font_name="Times New Roman", size_pt=11)
+            r_uname = login_p.add_run(f"{user['TenDangNhap']}")
+            set_font(r_uname, font_name="Times New Roman", bold=True, size_pt=11)
+            r_sep = login_p.add_run("; PassWord : ")
+            set_font(r_sep, font_name="Times New Roman", size_pt=11)
+            r_pwd = login_p.add_run(f"{user.get('MatKhau', '123')}")
+            set_font(r_pwd, font_name="Times New Roman", bold=True, size_pt=11)
+        elif not data.get("uses_his", True) or any(a.get("action_code") == "VP_XU_LY_EXCEL" for a in data.get("action_results", [])):
+            login_p = doc.add_paragraph()
+            login_p.paragraph_format.space_before = Pt(8)
+            login_p.paragraph_format.space_after = Pt(4)
+            login_p.paragraph_format.left_indent = Inches(0.2)
+            r_note = login_p.add_run("Lưu ý : ")
+            set_font(r_note, font_name="Times New Roman", bold=True, size_pt=11)
+            r_info = login_p.add_run(f"Nộp file bài làm Word và Excel vào thư mục mang tên thí sinh (BaiLam_{candidate_name}).")
+            set_font(r_info, font_name="Times New Roman", italic=True, size_pt=11)
         
         doc.save(output_path)
         try:

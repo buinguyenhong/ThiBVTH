@@ -327,10 +327,13 @@ def prepare_modular_candidate_data(
     exam_date,
     candidate,
     candidate_index,
-    used_bhyt_cards
+    used_bhyt_cards,
+    used_user_logins=None
 ):
     dept_name = template.get("dept", "Khoa Ngoại tổng hợp")
-    user = cm.get_user_for_dept(dept_name, allow_fallback=True) if template.get("uses_his", True) else None
+    user = cm.get_user_for_dept(dept_name, exclude_logins=used_user_logins, allow_fallback=True) if template.get("uses_his", True) else None
+    if user and user.get("TenDangNhap") and used_user_logins is not None:
+        used_user_logins.add(user["TenDangNhap"])
     
     # 1. Pre-allocate primary BHYT and VP patients for this candidate if HIS is used
     primary_bn_bhyt = None
@@ -414,10 +417,17 @@ def prepare_candidate_data(
     dept_name,
     candidate,
     candidate_index,
-    used_bhyt_cards
+    used_bhyt_cards,
+    used_user_logins=None
 ):
     """Generate data and replace real BHYT identifiers with unique exam cards."""
     data = generator(cm, exam_date, dept_name)
+    user = data.get("user")
+    if not user:
+        user = cm.get_user_for_dept(dept_name, exclude_logins=used_user_logins, allow_fallback=True)
+        data["user"] = user
+    if user and user.get("TenDangNhap") and used_user_logins is not None:
+        used_user_logins.add(user["TenDangNhap"])
     bhyt_patient = data.get("bn_bhyt")
     if not bhyt_patient:
         return data
@@ -521,6 +531,7 @@ def generate_exams(req: GenerateRequest, background_tasks: BackgroundTasks):
             combined_sql.append(f"-- ==========================================================================\n")
         
         candidate_records = []
+        used_user_logins = set()
         for candidate_index, (cand, tmpl) in enumerate(resolved_candidates, start=1):
             is_modular = "actions" in tmpl and tmpl["actions"]
             
@@ -531,7 +542,8 @@ def generate_exams(req: GenerateRequest, background_tasks: BackgroundTasks):
                     req.exam_date,
                     cand,
                     candidate_index,
-                    used_bhyt_cards
+                    used_bhyt_cards,
+                    used_user_logins=used_user_logins
                 )
             else:
                 # Legacy generator
@@ -541,7 +553,8 @@ def generate_exams(req: GenerateRequest, background_tasks: BackgroundTasks):
                     tmpl["dept"],
                     cand,
                     candidate_index,
-                    used_bhyt_cards
+                    used_bhyt_cards,
+                    used_user_logins=used_user_logins
                 )
             
             # Sanitise filename

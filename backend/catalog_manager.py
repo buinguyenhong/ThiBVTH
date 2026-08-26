@@ -640,16 +640,26 @@ class CatalogManager:
             return random.choices(pool, k=count) if pool else []
         return random.sample(pool, k=count)
 
-    def get_user_for_dept(self, dept_name, allow_fallback=False):
+    def get_user_for_dept(self, dept_name, exclude_logins=None, allow_fallback=False):
         """
         Finds a user account that corresponds to the given department name.
+        If exclude_logins is provided, prioritizes accounts not yet assigned in the current exam batch.
         If allow_fallback is True, falls back to any active catalog user if department is not found.
         """
         pool = self.get_users_for_dept(dept_name)
         if pool:
+            if exclude_logins:
+                available = [u for u in pool if u.get("TenDangNhap") not in exclude_logins]
+                if available:
+                    return random.choice(available)
             return random.choice(pool)
+            
         if allow_fallback:
             if self.users:
+                if exclude_logins:
+                    other_avail = [u for u in self.users if u.get("TenDangNhap") not in exclude_logins]
+                    if other_avail:
+                        return random.choice(other_avail)
                 return random.choice(self.users)
             return {
                 "TenDangNhap": "THI_SINH",
