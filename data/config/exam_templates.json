@@ -837,5 +837,98 @@
         "params": {}
       }
     ]
+  },
+  {
+    "id": "tpl_79904ce9",
+    "name": "Đề thi Kỹ thuật viên Phục hồi chức năng (Khoa Phục hồi chức năng)",
+    "dept": "Khoa Phục hồi chức năng",
+    "position": "Kỹ thuật viên Phục hồi chức năng",
+    "uses_his": true,
+    "actions": [
+      {
+        "action_code": "BAN_NGOAI_TRU_NHAN_BENH",
+        "score": 3.0,
+        "params": {}
+      },
+      {
+        "action_code": "PTTT_CHI_DINH",
+        "score": 2.0,
+        "params": {
+          "num_services": 4
+        }
+      },
+      {
+        "action_code": "PTTT_TUONG_TRINH",
+        "score": 4.0,
+        "params": {}
+      },
+      {
+        "action_code": "TK_KIEM_TON_KHO",
+        "score": 1.0,
+        "params": {}
+      }
+    ]
+  },
+  {
+    "id": "tpl_a7f78fc2",
+    "name": "Đề thi Điều dưỡng Thận nhân tạo (Thận nhân tạo)",
+    "dept": "Thận nhân tạo",
+    "position": "Điều dưỡng Thận nhân tạo",
+    "uses_his": true,
+    "actions": [
+      {
+        "action_code": "BAN_NGOAI_TRU_NHAN_BENH",
+        "score": 3.0,
+        "params": {}
+      },
+      {
+        "action_code": "PTTT_CHI_DINH",
+        "score": 2.0,
+        "params": {
+          "num_services": 4
+        }
+      },
+      {
+        "action_code": "PTTT_TUONG_TRINH",
+        "score": 4.0,
+        "params": {}
+      },
+      {
+        "action_code": "TK_KIEM_TON_KHO",
+        "score": 1.0,
+        "params": {}
+      }
+    ]
+  },
+  {
+    "id": "tpl_edf7751e",
+    "name": "Đề thi Y sĩ Y học cổ truyền (Khoa Y học cổ truyền)",
+    "dept": "Khoa Y học cổ truyền",
+    "position": "Y sĩ Y học cổ truyền",
+    "uses_his": true,
+    "actions": [
+      {
+        "action_code": "BAN_NGOAI_TRU_NHAN_BENH",
+        "score": 3.0,
+        "params": {}
+      },
+      {
+        "action_code": "PTTT_CHI_DINH",
+        "score": 2.0,
+        "params": {
+          "num_services": 4
+        }
+      },
+      {
+        "action_code": "PTTT_TUONG_TRINH",
+        "score": 4.0,
+        "params": {}
+      },
+      {
+        "action_code": "TK_KIEM_TON_KHO",
+        "score": 1.0,
+        "params": {}
+      }
+    ]
   }
 ]

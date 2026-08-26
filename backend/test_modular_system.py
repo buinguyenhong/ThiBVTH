@@ -94,7 +94,7 @@ class TestModularSystem(unittest.TestCase):
 
     def test_action_registry(self):
         actions = get_all_actions()
-        self.assertTrue(len(actions) >= 10)
+        self.assertTrue(len(actions) >= 13)
         codes = [a["code"] for a in actions]
         self.assertIn("NT_NHAN_BENH_KHOA", codes)
         self.assertIn("TN_TIEP_NHAN", codes)
@@ -102,6 +102,9 @@ class TestModularSystem(unittest.TestCase):
         self.assertIn("YL_CHI_DINH_THUOC_VTYT", codes)
         self.assertIn("TK_KIEM_TON_KHO", codes)
         self.assertIn("VP_SOAN_THAO_WORD", codes)
+        self.assertIn("BAN_NGOAI_TRU_NHAN_BENH", codes)
+        self.assertIn("PTTT_CHI_DINH", codes)
+        self.assertIn("PTTT_TUONG_TRINH", codes)
 
     def test_api_endpoints(self):
         # 1. GET /api/actions

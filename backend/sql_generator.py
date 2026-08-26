@@ -595,6 +595,18 @@ def generate_sql_script(
         ]
         return "\n\n".join(blocks)
 
+    if "BAN_NGOAI_TRU_NHAN_BENH" in action_codes:
+        patient = data.get("bn_ngoai_tru") or (data.get("modular_data", {}).get("BAN_NGOAI_TRU_NHAN_BENH", {}).get("patient"))
+        patient_name = patient.get("TenBenhNhan", "Bệnh nhân") if isinstance(patient, dict) else "Bệnh nhân"
+        return f"""-- ============================================================================
+-- ĐỀ THI NGOẠI TRÚ / PT-TT: {candidate_name} ({candidate_id or 'SBD'}) - {position}
+-- Khoa/Phòng: {department_name} | Tài khoản đăng nhập: {user_login}
+-- Nghiệp vụ: Tạo Bệnh án Ngoại trú, Chỉ định CLS/PT-TT & Nhập Tường trình PT-TT
+-- Ghi chú: Giám khảo tạo tiếp nhận ban đầu trên phần mềm HIS cho BN '{patient_name}'.
+-- ============================================================================
+PRINT N'Chuẩn bị thông tin tài khoản [{user_login}] cho thí sinh [{candidate_name}] - Khoa [{department_name}].';
+GO"""
+
     if is_direct:
         return _render_direct_reception_preflight(
             data, template_type, candidate_name, candidate_id, position

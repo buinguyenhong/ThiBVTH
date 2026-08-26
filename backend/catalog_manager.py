@@ -640,18 +640,28 @@ class CatalogManager:
             return random.choices(pool, k=count) if pool else []
         return random.sample(pool, k=count)
 
-    def get_user_for_dept(self, dept_name):
+    def get_user_for_dept(self, dept_name, allow_fallback=False):
         """
         Finds a user account that corresponds to the given department name.
+        If allow_fallback is True, falls back to any active catalog user if department is not found.
         """
         pool = self.get_users_for_dept(dept_name)
-        if not pool:
-            raise ValueError(
-                f"Không có user đang hoạt động thuộc đúng khoa/phòng "
-                f"'{dept_name}' trong users.xlsx. Hãy dùng nút Lấy script "
-                "để cập nhật danh mục user theo khoa/phòng."
-            )
-        return random.choice(pool)
+        if pool:
+            return random.choice(pool)
+        if allow_fallback:
+            if self.users:
+                return random.choice(self.users)
+            return {
+                "TenDangNhap": "THI_SINH",
+                "MatKhau": "123",
+                "TenNhanVien": "Thí sinh",
+                "KhoaPhong": dept_name or "Khoa"
+            }
+        raise ValueError(
+            f"Không có user đang hoạt động thuộc đúng khoa/phòng "
+            f"'{dept_name}' trong users.xlsx. Hãy dùng nút Lấy script "
+            "để cập nhật danh mục user theo khoa/phòng."
+        )
 
     def get_users_for_dept(self, dept_name):
         """Returns all active catalog users assigned to a department."""

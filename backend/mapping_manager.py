@@ -64,7 +64,9 @@ class MappingManager:
             "Khoa Tai Mũi Họng": ["Nội soi TMH", "Thủ thuật TMH", "Xét nghiệm", "X-quang"],
             "Khoa Răng Hàm Mặt": ["X-quang RHM", "Thủ thuật RHM", "Xét nghiệm"],
             "Khoa Khám bệnh": ["Khám bệnh", "Xét nghiệm", "Siêu âm", "X-quang", "Điện tim"],
-            "Thận nhân tạo": ["Xét nghiệm", "Lọc máu", "Điện tim"],
+            "Thận nhân tạo": ["Xét nghiệm", "Lọc máu", "Điện tim", "Thủ thuật"],
+            "Khoa Phục hồi chức năng": ["Vật lý trị liệu", "Phục hồi chức năng", "Thủ thuật", "Điện xung", "Siêu âm điều trị", "Hồng ngoại", "Laser điều trị"],
+            "Khoa Y học cổ truyền": ["Y học cổ truyền", "Châm cứu", "Xoa bóp bấm huyệt", "Thủ thuật", "Vật lý trị liệu"],
             "Khoa Xét Nghiệm": ["Xét nghiệm", "Huyết học", "Hóa sinh", "Vi sinh"],
             "Khoa Chẩn đoán hình ảnh": ["X-quang", "Siêu âm", "CT Scan", "MRI"],
             "Khoa Nội soi": ["Nội soi tiêu hóa", "Nội soi dạ dày", "Nội soi đại tràng"],
@@ -78,22 +80,24 @@ class MappingManager:
     def _default_pharmacy_mappings(self):
         # Default mapping of department to warehouse codes
         return {
-            "Khoa Ngoại tổng hợp": ["KHO_NGOAI", "KHO_CHUNG", "KHO_DUOCTONG"],
-            "Khoa Chấn thương chỉnh hình": ["KHO_CTCH", "KHO_NGOAI", "KHO_CHUNG"],
-            "Khoa Ngoại thần kinh": ["KHO_NGOAITK", "KHO_NGOAI", "KHO_CHUNG"],
-            "Khoa Hồi sức tích cực": ["KHO_HSTC", "KHO_CHUNG", "KHO_DUOCTONG"],
-            "Khoa Nội": ["KHO_NOI", "KHO_CHUNG", "KHO_DUOCTONG"],
-            "Khoa Tim mạch": ["KHO_TIMMACH", "KHO_NOI", "KHO_CHUNG"],
-            "Khoa Phụ Sản": ["KHO_SAN", "KHO_CHUNG", "KHO_DUOCTONG"],
-            "Khoa Nhi": ["KHO_NHI", "KHO_CHUNG", "KHO_DUOCTONG"],
-            "Khoa Cấp cứu": ["KHO_CAPCUU", "KHO_CHUNG", "KHO_DUOCTONG"],
-            "Khoa Mắt": ["KHO_MAT", "KHO_PK", "KHO_CHUNG"],
-            "Khoa Tai Mũi Họng": ["KHO_TMH", "KHO_PK", "KHO_CHUNG"],
-            "Khoa Răng Hàm Mặt": ["KHO_RHM", "KHO_PK", "KHO_CHUNG"],
-            "Khoa Khám bệnh": ["KHO_PK", "KHO_CHUNG", "KHO_DUOCTONG"],
-            "Thận nhân tạo": ["KHO_TNT", "KHO_CHUNG"],
-            "Khoa Phẫu thuật - GMHS": ["KHO_PTGM", "KHO_CHUNG"],
-            "Khoa Dược": ["KHO_DUOCTONG", "KHO_CHUNG"]
+            "Khoa Ngoại tổng hợp": ["KHO_LE_NOITRU", "KHO_VTYT_NOITRU", "KHO_NGOAI", "KHO_CHUNG", "KHO_DUOCTONG"],
+            "Khoa Chấn thương chỉnh hình": ["KHO_LE_NOITRU", "KHO_VTYT_NOITRU", "KHO_CTCH", "KHO_NGOAI", "KHO_CHUNG"],
+            "Khoa Ngoại thần kinh": ["KHO_LE_NOITRU", "KHO_VTYT_NOITRU", "KHO_NGOAITK", "KHO_NGOAI", "KHO_CHUNG"],
+            "Khoa Hồi sức tích cực": ["KHO_LE_NOITRU", "KHO_VTYT_NOITRU", "KHO_HSTC", "KHO_CHUNG", "KHO_DUOCTONG"],
+            "Khoa Nội": ["KHO_LE_NOITRU", "KHO_VTYT_NOITRU", "KHO_NOI", "KHO_CHUNG", "KHO_DUOCTONG"],
+            "Khoa Tim mạch": ["KHO_LE_NOITRU", "KHO_VTYT_NOITRU", "KHO_TIMMACH", "KHO_NOI", "KHO_CHUNG"],
+            "Khoa Phụ Sản": ["KHO_LE_NOITRU", "KHO_VTYT_NOITRU", "KHO_SAN", "KHO_CHUNG", "KHO_DUOCTONG"],
+            "Khoa Nhi": ["KHO_LE_NOITRU", "KHO_VTYT_NOITRU", "KHO_NHI", "KHO_CHUNG", "KHO_DUOCTONG"],
+            "Khoa Cấp cứu": ["KHO_LE", "KHO_CAPCUU", "KHO_CHUNG", "KHO_DUOCTONG"],
+            "Khoa Mắt": ["KHO_LE", "KHO_MAT", "KHO_PK", "KHO_CHUNG"],
+            "Khoa Tai Mũi Họng": ["KHO_LE", "KHO_TMH", "KHO_PK", "KHO_CHUNG"],
+            "Khoa Răng Hàm Mặt": ["KHO_LE", "KHO_RHM", "KHO_PK", "KHO_CHUNG"],
+            "Khoa Khám bệnh": ["KHO_LE", "KHO_BHYT", "KHO_PK", "KHO_CHUNG", "KHO_DUOCTONG"],
+            "Thận nhân tạo": ["KHO_LE_NOITRU", "KHO_TNT", "KHO_CHUNG"],
+            "Khoa Phục hồi chức năng": ["KHO_LE", "KHO_PK", "KHO_CHUNG", "KHO_DUOCTONG"],
+            "Khoa Y học cổ truyền": ["KHO_YHCT", "KHO_LE", "KHO_CHUNG", "KHO_DUOCTONG"],
+            "Khoa Phẫu thuật - GMHS": ["KHO_PTGM", "KHO_GMHS", "KHO_CHUNG"],
+            "Khoa Dược": ["KHO_DUOCTONG", "KHO_CHUNG", "KHO_BHYT", "KHO_LE"]
         }
 
     def _default_warehouse_names(self):

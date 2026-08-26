@@ -330,7 +330,7 @@ def prepare_modular_candidate_data(
     used_bhyt_cards
 ):
     dept_name = template.get("dept", "Khoa Ngoại tổng hợp")
-    user = cm.get_user_for_dept(dept_name) if template.get("uses_his", True) else None
+    user = cm.get_user_for_dept(dept_name, allow_fallback=True) if template.get("uses_his", True) else None
     
     # 1. Pre-allocate primary BHYT and VP patients for this candidate if HIS is used
     primary_bn_bhyt = None

@@ -672,6 +672,126 @@ def render_docx_xu_ly_excel(doc, data, score, q_index):
     set_font(r_b, font_name="Times New Roman", size_pt=11)
 
 
+# 15. BAN_NGOAI_TRU_NHAN_BENH: Nhận bệnh nhân vào khoa - Tạo Bệnh án ngoại trú, nhập nội dung bệnh án
+def prepare_ban_ngoai_tru_nhan_benh(cm, mm, dept_name, exam_date, params, context=None):
+    if context and context.get("bn_ngoai_tru"):
+        patient = context["bn_ngoai_tru"]
+    else:
+        patient = cm.get_patients(1, must_have_bhyt=True, valid_on=exam_date)[0]
+        if context is not None:
+            context["bn_ngoai_tru"] = patient
+
+    return {
+        "patient": patient,
+        "dept_name": dept_name,
+        "exam_date": exam_date
+    }
+
+def render_docx_ban_ngoai_tru_nhan_benh(doc, data, score, q_index):
+    add_paragraph_with_run(doc, f"Câu {q_index}) Nhận bệnh nhân vào khoa - Tạo Bệnh án ngoại trú, nhập nội dung bệnh án ({score} điểm):", bold=True, size_pt=11.5, space_after=4)
+    patient = data["patient"]
+    birth = patient.get("NgaySinh") or patient.get("NamSinh") or ""
+    doi_tuong = patient.get("DoiTuong", "BHYT" if patient.get("SoBHYT") else "Viện phí")
+    bhyt_str = f"  -  Số thẻ BHYT: {patient.get('SoBHYT')}" if patient.get("SoBHYT") else ""
+    
+    p = doc.add_paragraph()
+    p.paragraph_format.space_after = Pt(4)
+    p.paragraph_format.left_indent = Inches(0.2)
+    p.paragraph_format.line_spacing = 1.15
+    r_info = p.add_run(f"* Bệnh nhân: {patient['TenBenhNhan']}  -  Mã y tế: {patient.get('MaYTe', 'Do HIS cấp')}  -  Ngày sinh: {birth}  -  Giới tính: {patient.get('GioiTinh', 'Nam')}  -  Đối tượng: {doi_tuong}{bhyt_str}")
+    set_font(r_info, font_name="Times New Roman", size_pt=11)
+
+    p_req = doc.add_paragraph()
+    p_req.paragraph_format.space_after = Pt(4)
+    p_req.paragraph_format.left_indent = Inches(0.2)
+    p_req.paragraph_format.line_spacing = 1.2
+    r_req = p_req.add_run("Yêu cầu thí sinh thực hiện nhận bệnh nhân vào khoa, tạo Bệnh án ngoại trú và nhập đầy đủ nội dung bệnh án:\n")
+    set_font(r_req, font_name="Times New Roman", italic=True, size_pt=10.5)
+    r_ba = p_req.add_run("- Số bệnh án ngoại trú ghi nhận: ………………………………………………………………………………………")
+    set_font(r_ba, font_name="Times New Roman", size_pt=11)
+
+
+# 16. PTTT_CHI_DINH: Chỉ định Phẫu thuật - Thủ thuật / Dịch vụ kỹ thuật Ngoại trú
+def prepare_pttt_chi_dinh(cm, mm, dept_name, exam_date, params, context=None):
+    if context and context.get("bn_ngoai_tru"):
+        patient = context["bn_ngoai_tru"]
+    elif context and context.get("bn_bhyt"):
+        patient = context["bn_bhyt"]
+    else:
+        patient = cm.get_patients(1, must_have_bhyt=True, valid_on=exam_date)[0]
+        if context is not None:
+            context["bn_ngoai_tru"] = patient
+
+    allowed_groups = mm.get_services_for_dept(dept_name)
+    num_services = int(params.get("num_services", 4))
+    services = cm.get_services(num_services, nhom=allowed_groups if allowed_groups else None, khoa=dept_name)
+    if not services or len(services) < 2:
+        services = cm.get_services(num_services)
+
+    if context is not None:
+        context["pttt_services"] = services
+        context["bn_pttt"] = patient
+
+    return {
+        "patient": patient,
+        "services": services,
+        "dept_name": dept_name
+    }
+
+def render_docx_pttt_chi_dinh(doc, data, score, q_index):
+    patient = data["patient"]
+    pt_str = f" cho bệnh nhân {patient['TenBenhNhan']}"
+    if patient.get("MaYTe"):
+        pt_str += f" (Mã y tế: {patient['MaYTe']})"
+        
+    add_paragraph_with_run(doc, f"Câu {q_index}) Chỉ định các dịch vụ CLS, Phẫu thuật - Thủ thuật{pt_str} ({score} điểm):", bold=True, size_pt=11.5, space_after=4)
+    
+    services = data.get("services", [])
+    for s in services:
+        p = doc.add_paragraph()
+        p.paragraph_format.space_after = Pt(2)
+        p.paragraph_format.left_indent = Inches(0.2)
+        p.paragraph_format.line_spacing = 1.15
+        nhom_str = f" ({s.get('NhomDichVu')})" if s.get('NhomDichVu') else ""
+        r = p.add_run(f"- {s['TenDichVu']}{nhom_str}")
+        set_font(r, font_name="Times New Roman", size_pt=11)
+
+
+# 17. PTTT_TUONG_TRINH: Nhập nội dung tường trình Phẫu thuật - Thủ thuật
+def prepare_pttt_tuong_trinh(cm, mm, dept_name, exam_date, params, context=None):
+    patient = context.get("bn_pttt") or context.get("bn_ngoai_tru") if context else None
+    if not patient:
+        patient = cm.get_patients(1, must_have_bhyt=True, valid_on=exam_date)[0]
+        if context is not None:
+            context["bn_ngoai_tru"] = patient
+
+    services = context.get("pttt_services", []) if context else []
+    if not services:
+        allowed_groups = mm.get_services_for_dept(dept_name)
+        services = cm.get_services(3, nhom=allowed_groups if allowed_groups else None, khoa=dept_name)
+
+    return {
+        "patient": patient,
+        "services": services,
+        "dept_name": dept_name
+    }
+
+def render_docx_pttt_tuong_trinh(doc, data, score, q_index):
+    patient = data["patient"]
+    pt_str = f" cho bệnh nhân {patient['TenBenhNhan']}"
+    if patient.get("MaYTe"):
+        pt_str += f" ({patient['MaYTe']})"
+
+    add_paragraph_with_run(doc, f"Câu {q_index}) Nhập nội dung tường trình Phẫu thuật - Thủ thuật (PT-TT){pt_str} ({score} điểm):", bold=True, size_pt=11.5, space_after=4)
+    
+    p = doc.add_paragraph()
+    p.paragraph_format.space_after = Pt(4)
+    p.paragraph_format.left_indent = Inches(0.2)
+    p.paragraph_format.line_spacing = 1.15
+    r_inst = p.add_run("- Yêu cầu: Vào phân hệ Quản lý Phẫu thuật - Thủ thuật trên phần mềm HIS, tìm ca bệnh nhân và thực hiện nhập đầy đủ thông tin Tường trình PT-TT cho các dịch vụ kỹ thuật đã chỉ định ở câu trên (Bác sĩ thực hiện, Người phụ, Phương pháp xử trí, Tường trình chi tiết và Kết luận).")
+    set_font(r_inst, font_name="Times New Roman", size_pt=11)
+
+
 # --- REGISTRY DICTIONARY ---
 
 ACTION_REGISTRY = {
@@ -816,6 +936,36 @@ ACTION_REGISTRY = {
         "uses_his": False,
         "prepare_data": prepare_xu_ly_excel,
         "render_docx": render_docx_xu_ly_excel
+    },
+    "BAN_NGOAI_TRU_NHAN_BENH": {
+        "code": "BAN_NGOAI_TRU_NHAN_BENH",
+        "name": "Tạo Bệnh án ngoại trú & Nhập nội dung bệnh án",
+        "category": "Bệnh án Ngoại trú",
+        "description": "Nhận bệnh nhân vào khoa, tạo Bệnh án ngoại trú (PHCN, Thận nhân tạo, YHCT...) và nhập nội dung bệnh án.",
+        "default_score": 3.0,
+        "uses_his": True,
+        "prepare_data": prepare_ban_ngoai_tru_nhan_benh,
+        "render_docx": render_docx_ban_ngoai_tru_nhan_benh
+    },
+    "PTTT_CHI_DINH": {
+        "code": "PTTT_CHI_DINH",
+        "name": "Chỉ định Phẫu thuật - Thủ thuật Ngoại trú",
+        "category": "Phẫu thuật - Thủ thuật",
+        "description": "Chỉ định các dịch vụ kỹ thuật, thủ thuật, vật lý trị liệu cho bệnh nhân ngoại trú.",
+        "default_score": 2.0,
+        "uses_his": True,
+        "prepare_data": prepare_pttt_chi_dinh,
+        "render_docx": render_docx_pttt_chi_dinh
+    },
+    "PTTT_TUONG_TRINH": {
+        "code": "PTTT_TUONG_TRINH",
+        "name": "Nhập tường trình Phẫu thuật - Thủ thuật",
+        "category": "Phẫu thuật - Thủ thuật",
+        "description": "Nhập nội dung tường trình PT-TT (Bác sĩ, người phụ, phương pháp xử trí...) cho các dịch vụ đã chỉ định.",
+        "default_score": 4.0,
+        "uses_his": True,
+        "prepare_data": prepare_pttt_tuong_trinh,
+        "render_docx": render_docx_pttt_tuong_trinh
     }
 }
 

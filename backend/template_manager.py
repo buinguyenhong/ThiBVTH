@@ -26,7 +26,16 @@ class TemplateManager:
         try:
             with open(self.templates_file, "r", encoding="utf-8") as f:
                 data = json.load(f)
-                return data if isinstance(data, list) else self._seed_default_templates()
+            
+            if isinstance(data, list) and len(data) > 0:
+                existing_names = {t.get("name") for t in data}
+                defaults = self._seed_default_templates()
+                missing = [d for d in defaults if d.get("name") not in existing_names]
+                if missing:
+                    data.extend(missing)
+                    self._save_templates(data)
+                return data
+            return self._seed_default_templates()
         except Exception as e:
             print(f"Error loading exam templates: {e}, seeding defaults.")
             defaults = self._seed_default_templates()
@@ -132,7 +141,28 @@ class TemplateManager:
                 ]
             })
 
-        # 4. Technicians (Xét nghiệm, CĐHA, Nội soi)
+        # 4. Outpatient Medical Record & PTTT Depts (PHCN, Thận nhân tạo, YHCT)
+        outpatient_ban_depts = [
+            ("Khoa Phục hồi chức năng", "Kỹ thuật viên Phục hồi chức năng", "Đề thi Kỹ thuật viên Phục hồi chức năng (Khoa Phục hồi chức năng)"),
+            ("Thận nhân tạo", "Điều dưỡng Thận nhân tạo", "Đề thi Điều dưỡng Thận nhân tạo (Thận nhân tạo)"),
+            ("Khoa Y học cổ truyền", "Y sĩ Y học cổ truyền", "Đề thi Y sĩ Y học cổ truyền (Khoa Y học cổ truyền)")
+        ]
+        for dept, pos, tpl_name in outpatient_ban_depts:
+            templates.append({
+                "id": f"tpl_{uuid.uuid4().hex[:8]}",
+                "name": tpl_name,
+                "dept": dept,
+                "position": pos,
+                "uses_his": True,
+                "actions": [
+                    {"action_code": "BAN_NGOAI_TRU_NHAN_BENH", "score": 3.0, "params": {}},
+                    {"action_code": "PTTT_CHI_DINH", "score": 2.0, "params": {"num_services": 4}},
+                    {"action_code": "PTTT_TUONG_TRINH", "score": 4.0, "params": {}},
+                    {"action_code": "TK_KIEM_TON_KHO", "score": 1.0, "params": {}}
+                ]
+            })
+
+        # 5. Technicians (Xét nghiệm, CĐHA, Nội soi)
         tech_depts = ["Khoa Xét Nghiệm", "Khoa Chẩn đoán hình ảnh", "Khoa Nội soi"]
         for dept in tech_depts:
             templates.append({

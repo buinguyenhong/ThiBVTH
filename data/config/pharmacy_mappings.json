@@ -91,6 +91,18 @@
     "KHO_TNT",
     "KHO_CHUNG"
   ],
+  "Khoa Phục hồi chức năng": [
+    "KHO_LE",
+    "KHO_PK",
+    "KHO_CHUNG",
+    "KHO_DUOCTONG"
+  ],
+  "Khoa Y học cổ truyền": [
+    "KHO_YHCT",
+    "KHO_LE",
+    "KHO_CHUNG",
+    "KHO_DUOCTONG"
+  ],
   "Khoa Phẫu thuật - GMHS": [
     "KHO_PTGM",
     "KHO_GMHS",

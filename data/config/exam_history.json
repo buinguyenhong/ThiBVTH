@@ -1,5 +1,165 @@
 [
   {
+    "batch_id": "batch_20260826_112601_46f66d",
+    "created_at": "26/08/2026 11:26:01",
+    "exam_date": "25/07/2026",
+    "candidate_count": 1,
+    "departments": [
+      "Khoa Ngoại tổng hợp"
+    ],
+    "zip_filename": "De_Thi_Va_SQL_20260826_112601.zip",
+    "zip_url": "/api/exams/download/file/De_Thi_Va_SQL_20260826_112601.zip",
+    "sql_filename": "Nap_Du_Lieu_Thi_26082026_112601.sql",
+    "sql_url": "/api/exams/download/file/Nap_Du_Lieu_Thi_26082026_112601.sql",
+    "candidates": [
+      {
+        "name": "Nguyễn Thị Thử Nghiệm",
+        "id": "SBD888",
+        "dept": "Khoa Ngoại tổng hợp",
+        "position": "Điều dưỡng Nội trú",
+        "template_name": "Đề thi Điều dưỡng Nội trú (Khoa Ngoại tổng hợp)",
+        "total_score": 10.0,
+        "docx_filename": "Đề_thi_Điều_dưỡng_Nội_trú_(Khoa_Ngoại_tổng_hợp)_SBD888_Nguyễn_Thị_Thử_Nghiệm.docx",
+        "docx_url": "/api/exams/download/file/Đề_thi_Điều_dưỡng_Nội_trú_(Khoa_Ngoại_tổng_hợp)_SBD888_Nguyễn_Thị_Thử_Nghiệm.docx",
+        "excel_filename": null,
+        "excel_url": null
+      }
+    ],
+    "files": [
+      "Đề_thi_Điều_dưỡng_Nội_trú_(Khoa_Ngoại_tổng_hợp)_SBD888_Nguyễn_Thị_Thử_Nghiệm.docx",
+      "Nap_Du_Lieu_Thi_26082026_112601.sql",
+      "01_lookup_tiep_nhan_nhap_vien.sql"
+    ]
+  },
+  {
+    "batch_id": "batch_20260826_112538_b7c5d2",
+    "created_at": "26/08/2026 11:25:38",
+    "exam_date": "25/07/2026",
+    "candidate_count": 1,
+    "departments": [
+      "Khoa Ngoại tổng hợp"
+    ],
+    "zip_filename": "De_Thi_Va_SQL_20260826_112538.zip",
+    "zip_url": "/api/exams/download/file/De_Thi_Va_SQL_20260826_112538.zip",
+    "sql_filename": "Nap_Du_Lieu_Thi_26082026_112538.sql",
+    "sql_url": "/api/exams/download/file/Nap_Du_Lieu_Thi_26082026_112538.sql",
+    "candidates": [
+      {
+        "name": "Nguyễn Thị Thử Nghiệm",
+        "id": "SBD888",
+        "dept": "Khoa Ngoại tổng hợp",
+        "position": "Điều dưỡng Nội trú",
+        "template_name": "Đề thi Điều dưỡng Nội trú (Khoa Ngoại tổng hợp)",
+        "total_score": 10.0,
+        "docx_filename": "Đề_thi_Điều_dưỡng_Nội_trú_(Khoa_Ngoại_tổng_hợp)_SBD888_Nguyễn_Thị_Thử_Nghiệm.docx",
+        "docx_url": "/api/exams/download/file/Đề_thi_Điều_dưỡng_Nội_trú_(Khoa_Ngoại_tổng_hợp)_SBD888_Nguyễn_Thị_Thử_Nghiệm.docx",
+        "excel_filename": null,
+        "excel_url": null
+      }
+    ],
+    "files": [
+      "Đề_thi_Điều_dưỡng_Nội_trú_(Khoa_Ngoại_tổng_hợp)_SBD888_Nguyễn_Thị_Thử_Nghiệm.docx",
+      "Nap_Du_Lieu_Thi_26082026_112538.sql",
+      "01_lookup_tiep_nhan_nhap_vien.sql"
+    ]
+  },
+  {
+    "batch_id": "batch_20260826_112350_9c4d01",
+    "created_at": "26/08/2026 11:23:50",
+    "exam_date": "26/08/2026",
+    "candidate_count": 1,
+    "departments": [
+      "Khoa Phục hồi chức năng"
+    ],
+    "zip_filename": "De_Thi_Va_SQL_20260826_112350.zip",
+    "zip_url": "/api/exams/download/file/De_Thi_Va_SQL_20260826_112350.zip",
+    "sql_filename": "Nap_Du_Lieu_Thi_26082026_112350.sql",
+    "sql_url": "/api/exams/download/file/Nap_Du_Lieu_Thi_26082026_112350.sql",
+    "candidates": [
+      {
+        "name": "Nguyễn Thị Mỹ Hằng",
+        "id": "SBD999",
+        "dept": "Khoa Phục hồi chức năng",
+        "position": "Kỹ thuật viên Phục hồi chức năng",
+        "template_name": "Đề thi Kỹ thuật viên Phục hồi chức năng (Khoa Phục hồi chức năng)",
+        "total_score": 10.0,
+        "docx_filename": "Đề_thi_Kỹ_thuật_viên_Phục_hồi_chức_năng_(Khoa_Phục_hồi_chức_năng)_SBD999_Nguyễn_Thị_Mỹ_Hằng.docx",
+        "docx_url": "/api/exams/download/file/Đề_thi_Kỹ_thuật_viên_Phục_hồi_chức_năng_(Khoa_Phục_hồi_chức_năng)_SBD999_Nguyễn_Thị_Mỹ_Hằng.docx",
+        "excel_filename": null,
+        "excel_url": null
+      }
+    ],
+    "files": [
+      "Đề_thi_Kỹ_thuật_viên_Phục_hồi_chức_năng_(Khoa_Phục_hồi_chức_năng)_SBD999_Nguyễn_Thị_Mỹ_Hằng.docx",
+      "Nap_Du_Lieu_Thi_26082026_112350.sql",
+      "01_lookup_tiep_nhan_nhap_vien.sql"
+    ]
+  },
+  {
+    "batch_id": "batch_20260826_111529_00bda3",
+    "created_at": "26/08/2026 11:15:29",
+    "exam_date": "25/07/2026",
+    "candidate_count": 1,
+    "departments": [
+      "Khoa Ngoại tổng hợp"
+    ],
+    "zip_filename": "De_Thi_Va_SQL_20260826_111529.zip",
+    "zip_url": "/api/exams/download/file/De_Thi_Va_SQL_20260826_111529.zip",
+    "sql_filename": "Nap_Du_Lieu_Thi_26082026_111529.sql",
+    "sql_url": "/api/exams/download/file/Nap_Du_Lieu_Thi_26082026_111529.sql",
+    "candidates": [
+      {
+        "name": "Nguyễn Thị Thử Nghiệm",
+        "id": "SBD888",
+        "dept": "Khoa Ngoại tổng hợp",
+        "position": "Điều dưỡng Nội trú",
+        "template_name": "Đề thi Điều dưỡng Nội trú (Khoa Ngoại tổng hợp)",
+        "total_score": 10.0,
+        "docx_filename": "Đề_thi_Điều_dưỡng_Nội_trú_(Khoa_Ngoại_tổng_hợp)_SBD888_Nguyễn_Thị_Thử_Nghiệm.docx",
+        "docx_url": "/api/exams/download/file/Đề_thi_Điều_dưỡng_Nội_trú_(Khoa_Ngoại_tổng_hợp)_SBD888_Nguyễn_Thị_Thử_Nghiệm.docx",
+        "excel_filename": null,
+        "excel_url": null
+      }
+    ],
+    "files": [
+      "Đề_thi_Điều_dưỡng_Nội_trú_(Khoa_Ngoại_tổng_hợp)_SBD888_Nguyễn_Thị_Thử_Nghiệm.docx",
+      "Nap_Du_Lieu_Thi_26082026_111529.sql",
+      "01_lookup_tiep_nhan_nhap_vien.sql"
+    ]
+  },
+  {
+    "batch_id": "batch_20260826_111515_3df0d4",
+    "created_at": "26/08/2026 11:15:15",
+    "exam_date": "25/07/2026",
+    "candidate_count": 1,
+    "departments": [
+      "Khoa Ngoại tổng hợp"
+    ],
+    "zip_filename": "De_Thi_Va_SQL_20260826_111515.zip",
+    "zip_url": "/api/exams/download/file/De_Thi_Va_SQL_20260826_111515.zip",
+    "sql_filename": "Nap_Du_Lieu_Thi_26082026_111515.sql",
+    "sql_url": "/api/exams/download/file/Nap_Du_Lieu_Thi_26082026_111515.sql",
+    "candidates": [
+      {
+        "name": "Nguyễn Thị Thử Nghiệm",
+        "id": "SBD888",
+        "dept": "Khoa Ngoại tổng hợp",
+        "position": "Điều dưỡng Nội trú",
+        "template_name": "Đề thi Điều dưỡng Nội trú (Khoa Ngoại tổng hợp)",
+        "total_score": 10.0,
+        "docx_filename": "Đề_thi_Điều_dưỡng_Nội_trú_(Khoa_Ngoại_tổng_hợp)_SBD888_Nguyễn_Thị_Thử_Nghiệm.docx",
+        "docx_url": "/api/exams/download/file/Đề_thi_Điều_dưỡng_Nội_trú_(Khoa_Ngoại_tổng_hợp)_SBD888_Nguyễn_Thị_Thử_Nghiệm.docx",
+        "excel_filename": null,
+        "excel_url": null
+      }
+    ],
+    "files": [
+      "Đề_thi_Điều_dưỡng_Nội_trú_(Khoa_Ngoại_tổng_hợp)_SBD888_Nguyễn_Thị_Thử_Nghiệm.docx",
+      "Nap_Du_Lieu_Thi_26082026_111515.sql",
+      "01_lookup_tiep_nhan_nhap_vien.sql"
+    ]
+  },
+  {
     "batch_id": "batch_20260826_105135_8927ed",
     "created_at": "26/08/2026 10:51:35",
     "exam_date": "25/07/2026",
