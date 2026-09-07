@@ -28,8 +28,12 @@ public sealed class ExamScenarioAllocator
         var templates = await _database.GetTemplatesAsync(cancellationToken);
         var templateMap = templates.ToDictionary(x => x.Name, x => x, StringComparer.OrdinalIgnoreCase);
 
-        // Pre-fetch available patients
+        // Pre-fetch available patients from SQLite snapshot
         var availablePatients = (await _database.GetAvailablePatientsAsync(cancellationToken)).ToList();
+        if (availablePatients.Count == 0)
+        {
+            throw new InvalidOperationException("Chưa có hồ sơ Bệnh nhân nào trong CSDL (hoặc toàn bộ bệnh nhân đã thi). Vui lòng vào phân hệ 'Cài đặt & Danh mục HIS' và bấm 'Đồng bộ Catalog HIS'.");
+        }
         var patientIndex = 0;
 
         // Group candidates by department to allocate distinct HIS users
@@ -41,28 +45,32 @@ public sealed class ExamScenarioAllocator
             var deptName = group.Key;
             if (!configMap.TryGetValue(deptName, out var deptConfig))
             {
-                throw new InvalidOperationException($"Khoa '{deptName}' chưa được cấu hình một kho thi duy nhất.");
+                throw new InvalidOperationException($"Khoa '{deptName}' chưa được cấu hình một kho thi duy nhất tại phân hệ 'Phân quyền Dịch vụ & Kho'.");
             }
 
-            // Get available users for this department
+            // Get available users for this department from SQLite snapshot
             var deptUsers = await _database.GetDepartmentUsersAsync(deptName, cancellationToken);
+            if (deptUsers.Count == 0)
+            {
+                throw new InvalidOperationException($"Khoa '{deptName}' chưa có tài khoản User HIS nào được đồng bộ từ HIS. Vui lòng đồng bộ danh mục User trước khi sinh đề.");
+            }
             if (deptUsers.Count < group.Count())
             {
                 throw new InvalidOperationException($"Khoa '{deptName}' có {group.Count()} thí sinh nhưng chỉ có {deptUsers.Count} tài khoản HIS khả dụng. Vui lòng bổ sung User HIS vào danh mục trước khi sinh đề.");
             }
 
-            // Get warehouse drugs
+            // Get warehouse drugs from SQLite snapshot
             var warehouseDrugs = await _database.GetWarehouseDrugsAsync(deptConfig.WarehouseCode, cancellationToken);
             if (warehouseDrugs.Count == 0)
             {
-                throw new InvalidOperationException($"Kho thi '{deptConfig.WarehouseName}' của khoa '{deptName}' không có thuốc/vật tư tồn kho khả dụng.");
+                throw new InvalidOperationException($"Kho thi '{deptConfig.WarehouseName}' của khoa '{deptName}' chưa có thuốc/vật tư tồn kho khả dụng được đồng bộ từ HIS.");
             }
 
-            // Get services
+            // Get clinical services from SQLite snapshot
             var allServices = await _database.GetCatalogItemsAsync("Services", cancellationToken);
             if (allServices.Count == 0)
             {
-                allServices = new[] { ("XQ_NGUC", "Chụp X-quang tim phổi"), ("CT_MAU", "Tổng phân tích tế bào máu"), ("SH_URE", "Ure máu"), ("SH_CRE", "Creatinin máu"), ("ECG", "Điện tim thường") };
+                throw new InvalidOperationException("Chưa có danh mục Dịch vụ kỹ thuật / CLS nào được đồng bộ từ HIS. Vui lòng đồng bộ danh mục trước khi sinh đề.");
             }
 
             var userIndex = 0;
@@ -83,7 +91,7 @@ public sealed class ExamScenarioAllocator
                 var isDirectReception = tpl.ReceptionMode.Contains("DirectReception", StringComparison.OrdinalIgnoreCase);
                 var isWardAdmission = tpl.ReceptionMode.Contains("WardAdmissionPreparation", StringComparison.OrdinalIgnoreCase);
 
-                // Allocate patient
+                // Allocate patient from synced snapshot
                 ScenarioPatient patient;
                 if (patientIndex < availablePatients.Count)
                 {
@@ -114,39 +122,20 @@ public sealed class ExamScenarioAllocator
                 }
                 else
                 {
-                    // Synthetic variant patient (Rule 3.1.2)
-                    var variantId = $"{examDate.Year % 100}90{scenarios.Count + 1:D4}";
-                    var isTe1 = tpl.Department.Contains("Nhi", StringComparison.OrdinalIgnoreCase);
-                    var insurancePeriod = InsurancePeriod.ForExamYear(examDate.Year, isTe1);
-                    var birthYear = isTe1 ? examDate.Year - 4 : examDate.Year - (25 + (scenarios.Count % 40));
-                    patient = new ScenarioPatient(
-                        variantId,
-                        $"Bệnh nhân Khảo thí {scenarios.Count + 1}",
-                        new DateOnly(birthYear, ((scenarios.Count * 3) % 12) + 1, ((scenarios.Count * 7) % 27) + 1),
-                        examDate.Year - birthYear,
-                        scenarios.Count % 2 == 0 ? "Nam" : "Nữ",
-                        "Phường Tân An, TP. Buôn Ma Thuột, Đắk Lắk",
-                        isTe1 ? $"TE166232{8800000 + scenarios.Count:D7}" : $"GD466232{9900000 + scenarios.Count:D7}",
-                        insurancePeriod,
-                        "66232",
-                        isTe1 ? "Viêm phế quản co thắt ở trẻ em" : "Viêm loét dạ dày - tá tràng cấp",
-                        PatientPaymentType.Insurance
-                    );
+                    // If patient pool is exhausted
+                    throw new InvalidOperationException($"Số lượng hồ sơ Bệnh nhân trong snapshot không đủ cho đợt thi ({availablePatients.Count} bệnh nhân). Vui lòng đồng bộ thêm từ HIS.");
                 }
 
-                // Allocate Clinical Services
+                // Allocate Clinical Services from synced snapshot
                 var orderedServices = allServices.Take(3).Select(s => new ScenarioService(s.Code, s.Name, "Cận lâm sàng")).ToList();
                 ScenarioServiceChange? serviceChange = null;
-                if (orderedServices.Count > 0)
+                if (orderedServices.Count > 0 && allServices.Count > 3)
                 {
-                    var extraService = allServices.Skip(3).FirstOrDefault();
-                    if (!string.IsNullOrEmpty(extraService.Code))
-                    {
-                        serviceChange = new ScenarioServiceChange(orderedServices[0], new ScenarioService(extraService.Code, extraService.Name, "Cận lâm sàng"));
-                    }
+                    var extraService = allServices.Skip(3).First();
+                    serviceChange = new ScenarioServiceChange(orderedServices[0], new ScenarioService(extraService.Code, extraService.Name, "Cận lâm sàng"));
                 }
 
-                // Allocate Drugs from mapped warehouse
+                // Allocate Drugs from mapped warehouse snapshot
                 var orderedDrugs = new List<ScenarioDrug>();
                 for (var dIdx = 0; dIdx < Math.Min(3, warehouseDrugs.Count); dIdx++)
                 {

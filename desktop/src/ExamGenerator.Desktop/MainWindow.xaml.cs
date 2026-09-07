@@ -19,34 +19,9 @@ public partial class MainWindow : Window
 
     private readonly List<CandidateRow> _candidates = [];
     private readonly List<TemplateRow> _templates = [];
-    private readonly List<DepartmentRow> _departments =
-    [
-        new("Khoa Nội", "NOI"),
-        new("Khoa Ngoại tổng hợp", "NGOAI"),
-        new("Khoa Phụ Sản", "SAN"),
-        new("Khoa Nhi", "NHI"),
-        new("Khoa Cấp cứu", "CC"),
-        new("Khoa Khám bệnh", "KKB")
-    ];
-    private readonly List<WarehouseRow> _warehouses =
-    [
-        new("Kho trực Nội", "KHO-NOI"),
-        new("Kho trực Ngoại", "KHO-NGOAI"),
-        new("Kho trực Sản", "KHO-SAN"),
-        new("Kho trực Nhi", "KHO-NHI"),
-        new("Kho trực Cấp cứu", "KHO-CC"),
-        new("Kho dược chính", "KHO-01")
-    ];
-    private readonly List<ServiceGroupRow> _serviceGroups =
-    [
-        new("Xét nghiệm", "XN"),
-        new("Siêu âm", "SA"),
-        new("X-quang", "XQ"),
-        new("CT Scan", "CT"),
-        new("Thủ thuật", "TT"),
-        new("Phẫu thuật", "PT"),
-        new("Thăm dò chức năng", "TDCN")
-    ];
+    private readonly List<DepartmentRow> _departments = [];
+    private readonly List<WarehouseRow> _warehouses = [];
+    private readonly List<ServiceGroupRow> _serviceGroups = [];
 
     private string? _selectedMappingDepartment;
 
@@ -93,6 +68,18 @@ public partial class MainWindow : Window
 
     private async Task LoadStaticViewsAsync()
     {
+        _departments.Clear();
+        var depts = await _database.GetCatalogItemsAsync("Departments");
+        _departments.AddRange(depts.Select(d => new DepartmentRow(d.Name, d.Code)));
+
+        _warehouses.Clear();
+        var whs = await _database.GetCatalogItemsAsync("Warehouses");
+        _warehouses.AddRange(whs.Select(w => new WarehouseRow(w.Name, w.Code)));
+
+        _serviceGroups.Clear();
+        var sgs = await _database.GetCatalogItemsAsync("ServiceGroups");
+        _serviceGroups.AddRange(sgs.Select(s => new ServiceGroupRow(s.Name, s.Code)));
+
         _templates.Clear();
         var storedTemplates = await _database.GetTemplatesAsync();
         _templates.AddRange(storedTemplates.Select(x => new TemplateRow(
@@ -105,16 +92,30 @@ public partial class MainWindow : Window
             x.ReceptionMode.Contains("DirectReception") ? "Tiếp nhận trực tiếp" : "Hàng chờ nhận khoa"
         )));
 
+        CandidatesGrid.ItemsSource = null;
         CandidatesGrid.ItemsSource = _candidates;
+        TemplatesGrid.ItemsSource = null;
         TemplatesGrid.ItemsSource = _templates;
 
+        ExamDepartmentComboBox.ItemsSource = null;
         ExamDepartmentComboBox.ItemsSource = _departments.Select(x => x.Name).ToList();
-        if (_departments.Count > 0) ExamDepartmentComboBox.SelectedIndex = 0;
+        if (_departments.Count > 0)
+        {
+            ExamDepartmentComboBox.SelectedIndex = 0;
+        }
+        else
+        {
+            ExamDepartmentComboBox.Text = "(Chưa đồng bộ khoa từ HIS)";
+        }
 
+        MappingDepartmentList.ItemsSource = null;
         MappingDepartmentList.ItemsSource = _departments;
+
+        InventoryDepartmentComboBox.ItemsSource = null;
         InventoryDepartmentComboBox.ItemsSource = new[] { "Tất cả khoa" }.Concat(_departments.Select(x => x.Name)).ToList();
         InventoryDepartmentComboBox.SelectedIndex = 0;
 
+        InventoryWarehouseComboBox.ItemsSource = null;
         InventoryWarehouseComboBox.ItemsSource = new[] { new WarehouseRow("Tất cả kho", "ALL") }.Concat(_warehouses).ToList();
         InventoryWarehouseComboBox.DisplayMemberPath = "Name";
         InventoryWarehouseComboBox.SelectedIndex = 0;
@@ -122,13 +123,26 @@ public partial class MainWindow : Window
         InventorySourceComboBox.ItemsSource = new[] { "Tất cả nguồn", "BHYT", "Viện phí" };
         InventorySourceComboBox.SelectedIndex = 0;
 
+        MappingWarehouseComboBox.ItemsSource = null;
         MappingWarehouseComboBox.ItemsSource = _warehouses;
         MappingWarehouseComboBox.DisplayMemberPath = "Name";
 
+        ServiceGroupsList.ItemsSource = null;
         ServiceGroupsList.ItemsSource = _serviceGroups;
 
         await RefreshCatalogSummaryAsync();
         await SearchInventoryCoreAsync();
+
+        if (_departments.Count == 0)
+        {
+            HeaderStatusText.Text = "Chưa có danh mục từ HIS";
+            FooterStatusText.Text = "CSDL SQLite chưa có danh mục. Vui lòng vào phân hệ 'Cài đặt & Danh mục HIS' và bấm 'Đồng bộ Catalog HIS'.";
+        }
+        else
+        {
+            HeaderStatusText.Text = "Hệ thống sẵn sàng";
+            FooterStatusText.Text = $"Đã nạp {_departments.Count} khoa và {_warehouses.Count} kho từ snapshot SQLite.";
+        }
     }
 
     private void ExamDepartmentChanged(object sender, SelectionChangedEventArgs e)
@@ -409,9 +423,11 @@ public partial class MainWindow : Window
                 SqlUserTextBox.Text);
 
             var counts = await new HisCatalogSynchronizer().SynchronizeAsync(p, SqlPasswordBox.Password, _database);
-            await RefreshCatalogSummaryAsync();
+            await LoadStaticViewsAsync();
+            await LoadMappingsAsync();
             await RefreshDashboardCardsAsync();
             ConnectionStatusText.Text = "Đồng bộ thành công: " + string.Join(" | ", counts.Select(x => $"{x.Key}: {x.Value} bản ghi"));
+            MessageBox.Show("Đã đồng bộ thành công danh mục chính xác từ SQL Server HIS!\nDữ liệu đã được lưu snapshot vào SQLite và là nguồn chuẩn duy nhất cho mọi hoạt động tạo đề thi.", "Đồng bộ thành công", MessageBoxButton.OK, MessageBoxImage.Information);
         }
         catch (Exception ex)
         {
@@ -577,10 +593,10 @@ public partial class MainWindow : Window
     private async Task RefreshDashboardCardsAsync()
     {
         var summary = (await _database.GetCatalogSummaryAsync()).ToDictionary(x => x.CatalogType, x => x.Count, StringComparer.OrdinalIgnoreCase);
-        CardDeptCount.Text = (summary.GetValueOrDefault("Departments", 6)).ToString();
-        CardWhCount.Text = (summary.GetValueOrDefault("Warehouses", 6)).ToString();
-        CardDrugCount.Text = (summary.GetValueOrDefault("Drugs", 16)).ToString();
-        CardUserCount.Text = (summary.GetValueOrDefault("Users", 16)).ToString();
+        CardDeptCount.Text = summary.GetValueOrDefault("Departments", 0).ToString("N0");
+        CardWhCount.Text = summary.GetValueOrDefault("Warehouses", 0).ToString("N0");
+        CardDrugCount.Text = summary.GetValueOrDefault("Drugs", 0).ToString("N0");
+        CardUserCount.Text = summary.GetValueOrDefault("Users", 0).ToString("N0");
     }
 
     private static string Sanitize(string value) =>

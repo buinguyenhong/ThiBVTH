@@ -109,12 +109,17 @@ public sealed class SqliteDatabase
         await command.ExecuteNonQueryAsync(cancellationToken);
     }
 
+    /// <summary>
+    /// Chỉ khởi tạo khung cấu trúc mẫu đề (ExamTemplate & TemplateAction) theo họ đề chuẩn.
+    /// TUYỆT ĐỐI KHÔNG nạp dữ liệu danh mục giả/mẫu (Bệnh nhân, Thuốc, User, Dịch vụ).
+    /// Toàn bộ danh mục chỉ được tạo ra và cập nhật khi người dùng đồng bộ từ SQL Server HIS.
+    /// </summary>
     public async Task EnsureDefaultTemplatesAsync(CancellationToken cancellationToken = default)
     {
         await using var connection = new SqliteConnection($"Data Source={DatabasePath}");
         await connection.OpenAsync(cancellationToken);
 
-        // 1. Default templates
+        // 1. Standard Exam Templates structure
         var command = connection.CreateCommand();
         command.CommandText = "INSERT OR IGNORE INTO ExamTemplate (TemplateId, Name, Department, Position, QuestionCount, TotalScore, ReceptionMode, CreatedAt) VALUES " +
             "('tpl-noi','Đề Điều dưỡng nội trú chuẩn (8 câu)','Khoa Nội','Điều dưỡng',8,10,'WardAdmissionPreparation',$at), " +
@@ -126,7 +131,7 @@ public sealed class SqliteDatabase
         command.Parameters.AddWithValue("$at", DateTimeOffset.Now.ToString("O"));
         await command.ExecuteNonQueryAsync(cancellationToken);
 
-        // 2. Default actions
+        // 2. Standard template actions
         var actions = connection.CreateCommand();
         actions.CommandText = """
             INSERT OR IGNORE INTO TemplateAction (TemplateId, ActionCode, ActionName, Score) VALUES
@@ -172,99 +177,6 @@ public sealed class SqliteDatabase
             ('tpl-kkb','YL_CHI_DINH_CLS','Chỉ định CLS ban đầu',2);
             """;
         await actions.ExecuteNonQueryAsync(cancellationToken);
-
-        // 3. Default Department Configurations (1 Khoa -> 1 Kho thi duy nhất)
-        var configs = connection.CreateCommand();
-        configs.CommandText = """
-            INSERT OR IGNORE INTO DepartmentConfiguration (DepartmentCode, DepartmentName, WarehouseCode, WarehouseName, UpdatedAt) VALUES
-            ('NOI', 'Khoa Nội', 'KHO-NOI', 'Kho trực Nội', $at),
-            ('NGOAI', 'Khoa Ngoại tổng hợp', 'KHO-NGOAI', 'Kho trực Ngoại', $at),
-            ('SAN', 'Khoa Phụ Sản', 'KHO-SAN', 'Kho trực Sản', $at),
-            ('NHI', 'Khoa Nhi', 'KHO-NHI', 'Kho trực Nhi', $at),
-            ('CC', 'Khoa Cấp cứu', 'KHO-CC', 'Kho trực Cấp cứu', $at),
-            ('KKB', 'Khoa Khám bệnh', 'KHO-01', 'Kho dược chính', $at);
-            """;
-        configs.Parameters.AddWithValue("$at", DateTimeOffset.Now.ToString("O"));
-        await configs.ExecuteNonQueryAsync(cancellationToken);
-
-        // 4. Default HIS Users for testing (Rule 3.2 distinct users per dept)
-        var users = connection.CreateCommand();
-        users.CommandText = """
-            INSERT OR IGNORE INTO SnapshotUser (UserId, UserName, FullName, DepartmentCode, DepartmentName) VALUES
-            ('u_noi_1', 'thissinh_noi1', 'Nguyễn Thị Hoa (Khoa Nội)', 'NOI', 'Khoa Nội'),
-            ('u_noi_2', 'thissinh_noi2', 'Trần Văn Bình (Khoa Nội)', 'NOI', 'Khoa Nội'),
-            ('u_noi_3', 'thissinh_noi3', 'Lê Hữu Đạt (Khoa Nội)', 'NOI', 'Khoa Nội'),
-            ('u_noi_4', 'thissinh_noi4', 'Phạm Minh Châu (Khoa Nội)', 'NOI', 'Khoa Nội'),
-            ('u_ngoai_1', 'thissinh_ngoai1', 'Vũ Quốc Khánh (Khoa Ngoại)', 'NGOAI', 'Khoa Ngoại tổng hợp'),
-            ('u_ngoai_2', 'thissinh_ngoai2', 'Hoàng Gia Huy (Khoa Ngoại)', 'NGOAI', 'Khoa Ngoại tổng hợp'),
-            ('u_ngoai_3', 'thissinh_ngoai3', 'Đặng Thu Thảo (Khoa Ngoại)', 'NGOAI', 'Khoa Ngoại tổng hợp'),
-            ('u_san_1', 'thissinh_san1', 'Ngô Bảo Ngọc (Khoa Sản)', 'SAN', 'Khoa Phụ Sản'),
-            ('u_san_2', 'thissinh_san2', 'Bùi Kim Anh (Khoa Sản)', 'SAN', 'Khoa Phụ Sản'),
-            ('u_san_3', 'thissinh_san3', 'Dương Thúy Nga (Khoa Sản)', 'SAN', 'Khoa Phụ Sản'),
-            ('u_nhi_1', 'thissinh_nhi1', 'Đỗ Thanh Hà (Khoa Nhi)', 'NHI', 'Khoa Nhi'),
-            ('u_nhi_2', 'thissinh_nhi2', 'Lý Hải Đăng (Khoa Nhi)', 'NHI', 'Khoa Nhi'),
-            ('u_cc_1', 'thissinh_cc1', 'Nguyễn Hùng Dũng (Cấp cứu)', 'CC', 'Khoa Cấp cứu'),
-            ('u_cc_2', 'thissinh_cc2', 'Trần Quang Khải (Cấp cứu)', 'CC', 'Khoa Cấp cứu'),
-            ('u_kkb_1', 'thissinh_kkb1', 'Phan Bích Thủy (Lễ tân)', 'KKB', 'Khoa Khám bệnh'),
-            ('u_kkb_2', 'thissinh_kkb2', 'Võ Thị Hồng (Lễ tân)', 'KKB', 'Khoa Khám bệnh');
-            """;
-        await users.ExecuteNonQueryAsync(cancellationToken);
-
-        // 5. Default Drugs with positive stock
-        var drugs = connection.CreateCommand();
-        drugs.CommandText = """
-            INSERT OR IGNORE INTO SnapshotDrug (DrugId, DrugCode, DrugName, Unit, WarehouseCode, WarehouseName, FundingSource, QuantityOnHand) VALUES
-            ('d1', 'AMOX500', 'Amoxicillin 500mg (Viên nang)', 'Viên', 'KHO-NOI', 'Kho trực Nội', 'BHYT', 500),
-            ('d2', 'PARA500', 'Paracetamol 500mg', 'Viên', 'KHO-NOI', 'Kho trực Nội', 'BHYT', 1200),
-            ('d3', 'CEFTR1G', 'Ceftriaxone 1g (Lọ bột tiêm)', 'Lọ', 'KHO-NOI', 'Kho trực Nội', 'BHYT', 150),
-            ('d4', 'NACL09', 'Natri Clorid 0.9% 500ml', 'Chai', 'KHO-NOI', 'Kho trực Nội', 'BHYT', 300),
-            ('d5', 'OMEP20', 'Omeprazol 20mg', 'Viên', 'KHO-NOI', 'Kho trực Nội', 'BHYT', 450),
-            ('d6', 'BT5ML', 'Bơm tiêm 5ml dùng 1 lần', 'Cái', 'KHO-NOI', 'Kho trực Nội', 'BHYT', 800),
-            ('d7', 'KL20G', 'Kim luồn tĩnh mạch 20G', 'Cái', 'KHO-NOI', 'Kho trực Nội', 'BHYT', 400),
-            ('d8', 'CEFAT500', 'Cefalexin 500mg', 'Viên', 'KHO-NGOAI', 'Kho trực Ngoại', 'BHYT', 600),
-            ('d9', 'PARA_IV', 'Paracetamol 1000mg/100ml truyền TM', 'Chai', 'KHO-NGOAI', 'Kho trực Ngoại', 'BHYT', 250),
-            ('d10', 'BETADINE', 'Povidine 10% 20ml', 'Chai', 'KHO-NGOAI', 'Kho trực Ngoại', 'BHYT', 100),
-            ('d11', 'GAC', 'Gạc vô trùng 10x10cm', 'Gói', 'KHO-NGOAI', 'Kho trực Ngoại', 'BHYT', 500),
-            ('d12', 'OXYTOCIN', 'Oxytocin 5UI/ml (Ống)', 'Ống', 'KHO-SAN', 'Kho trực Sản', 'BHYT', 200),
-            ('d13', 'SPASFON', 'Spasfon 40mg', 'Viên', 'KHO-SAN', 'Kho trực Sản', 'BHYT', 350),
-            ('d14', 'SALBU', 'Salbutamol 2.5mg/2.5ml khí dung', 'Ống', 'KHO-NHI', 'Kho trực Nhi', 'BHYT', 400),
-            ('d15', 'AUGM250', 'Augmentin 250mg gói bột', 'Gói', 'KHO-NHI', 'Kho trực Nhi', 'BHYT', 300),
-            ('d16', 'ADRENALIN', 'Adrenalin 1mg/1ml', 'Ống', 'KHO-CC', 'Kho trực Cấp cứu', 'BHYT', 150);
-            """;
-        await drugs.ExecuteNonQueryAsync(cancellationToken);
-
-        // 6. Default Clinical Services
-        var services = connection.CreateCommand();
-        services.CommandText = """
-            INSERT OR IGNORE INTO CatalogItem (CatalogType, ItemId, ItemCode, ItemName, ParentId, ImportedAt) VALUES
-            ('Services', 's1', 'XQ_NGUC', 'Chụp X-quang tim phổi thẳng', 'X-quang', $at),
-            ('Services', 's2', 'SA_BUNG', 'Siêu âm ổ bụng tổng quát', 'Siêu âm', $at),
-            ('Services', 's3', 'CT_MAU', 'Tổng phân tích tế bào máu ngoại vi bằng máy đếm laser', 'Xét nghiệm', $at),
-            ('Services', 's4', 'SH_URE', 'Định lượng Ure máu', 'Xét nghiệm', $at),
-            ('Services', 's5', 'SH_CRE', 'Định lượng Creatinin máu', 'Xét nghiệm', $at),
-            ('Services', 's6', 'SH_GLU', 'Định lượng Glucose máu', 'Xét nghiệm', $at),
-            ('Services', 's7', 'ECG', 'Điện tim thường (ECG 12 đạo trình)', 'Thăm dò chức năng', $at),
-            ('Services', 's8', 'SA_THAI', 'Siêu âm thai Doppler màu', 'Siêu âm', $at),
-            ('Services', 's9', 'NS_TMH', 'Nội soi tai mũi họng', 'Nội soi', $at),
-            ('Services', 's10', 'BO_BOT', 'Bó bột cẳng bàn tay', 'Thủ thuật', $at);
-            """;
-        services.Parameters.AddWithValue("$at", DateTimeOffset.Now.ToString("O"));
-        await services.ExecuteNonQueryAsync(cancellationToken);
-
-        // 7. Default Patients
-        var patients = connection.CreateCommand();
-        patients.CommandText = """
-            INSERT OR IGNORE INTO SnapshotPatient (PatientId, MedicalCode, FullName, DateOfBirth, Gender, Address, InsuranceNumber, Diagnosis, PaymentType) VALUES
-            ('p1', '26001234', 'Nguyễn Thị Mai', '1988-04-12', 'Nữ', '142 Lê Duẩn, P. Tân Thành, TP. Buôn Ma Thuột', 'GD4662329876541', 'Viêm dạ dày - ruột cấp', 'BHYT'),
-            ('p2', '26001235', 'Trần Văn Hoàng', '1975-08-23', 'Nam', '45 Phan Bội Châu, P. Thắng Lợi, TP. Buôn Ma Thuột', 'HT2662328765432', 'Viêm phế quản mạn đợt cấp', 'BHYT'),
-            ('p3', '26001236', 'Lê Thị Thu Thủy', '1995-11-05', 'Nữ', '78 Y Jut, P. Thống Nhất, TP. Buôn Ma Thuột', 'DN4662327654321', 'Thai 38 tuần chuyển dạ', 'BHYT'),
-            ('p4', '26001237', 'Bùi Gia Huy', '2021-03-15', 'Nam', '23 Đinh Tiên Hoàng, P. Tự An, TP. Buôn Ma Thuột', 'TE1662326543210', 'Viêm phổi thùy ở trẻ em', 'BHYT'),
-            ('p5', '26001238', 'Phạm Quốc Cường', '1962-09-30', 'Nam', '92 Hùng Vương, P. Tự An, TP. Buôn Ma Thuột', 'GD4662325432109', 'Tăng huyết áp vô căn / Đái tháo đường type 2', 'BHYT'),
-            ('p6', '26001239', 'Hoàng Minh Châu', '2001-06-18', 'Nữ', '15 Mai Hắc Đế, P. Tân Thành, TP. Buôn Ma Thuột', 'SV4662324321098', 'Viêm ruột thừa cấp', 'BHYT'),
-            ('p7', '26001240', 'Vũ Đình Trọng', '1982-12-10', 'Nam', '64 Y Moan, P. Tân Lợi, TP. Buôn Ma Thuột', 'GD4662323210987', 'Chấn thương phần mềm đùi trái', 'BHYT'),
-            ('p8', '26001241', 'Đặng Ngọc Ánh', '1998-02-28', 'Nữ', '31 Nơ Trang Gưh, P. Tân Lập, TP. Buôn Ma Thuột', 'DN4662322109876', 'Viêm Amidan mủ cấp', 'BHYT');
-            """;
-        await patients.ExecuteNonQueryAsync(cancellationToken);
     }
 
     public async Task<IReadOnlyList<(string Name, double Score)>> GetTemplateActionsAsync(string templateId, CancellationToken cancellationToken = default)
@@ -437,6 +349,88 @@ public sealed class SqliteDatabase
         await transaction.CommitAsync(cancellationToken);
     }
 
+    public async Task ReplaceSnapshotUsersAsync(IReadOnlyList<SnapshotUserRow> users, CancellationToken cancellationToken = default)
+    {
+        await using var connection = new SqliteConnection($"Data Source={DatabasePath}");
+        await connection.OpenAsync(cancellationToken);
+        await using var transaction = connection.BeginTransaction();
+        var clear = connection.CreateCommand();
+        clear.Transaction = transaction;
+        clear.CommandText = "DELETE FROM SnapshotUser";
+        await clear.ExecuteNonQueryAsync(cancellationToken);
+
+        foreach (var u in users)
+        {
+            var insert = connection.CreateCommand();
+            insert.Transaction = transaction;
+            insert.CommandText = "INSERT INTO SnapshotUser (UserId, UserName, FullName, DepartmentCode, DepartmentName) VALUES ($id, $userName, $fullName, $deptCode, $deptName)";
+            insert.Parameters.AddWithValue("$id", u.UserId);
+            insert.Parameters.AddWithValue("$userName", u.UserName);
+            insert.Parameters.AddWithValue("$fullName", u.FullName);
+            insert.Parameters.AddWithValue("$deptCode", u.DepartmentCode);
+            insert.Parameters.AddWithValue("$deptName", u.DepartmentName);
+            await insert.ExecuteNonQueryAsync(cancellationToken);
+        }
+        await transaction.CommitAsync(cancellationToken);
+    }
+
+    public async Task ReplaceSnapshotDrugsAsync(IReadOnlyList<SnapshotDrugRow> drugs, CancellationToken cancellationToken = default)
+    {
+        await using var connection = new SqliteConnection($"Data Source={DatabasePath}");
+        await connection.OpenAsync(cancellationToken);
+        await using var transaction = connection.BeginTransaction();
+        var clear = connection.CreateCommand();
+        clear.Transaction = transaction;
+        clear.CommandText = "DELETE FROM SnapshotDrug";
+        await clear.ExecuteNonQueryAsync(cancellationToken);
+
+        foreach (var d in drugs)
+        {
+            var insert = connection.CreateCommand();
+            insert.Transaction = transaction;
+            insert.CommandText = "INSERT INTO SnapshotDrug (DrugId, DrugCode, DrugName, Unit, WarehouseCode, WarehouseName, FundingSource, QuantityOnHand) VALUES ($id, $code, $name, $unit, $whCode, $whName, $src, $qty)";
+            insert.Parameters.AddWithValue("$id", d.DrugId);
+            insert.Parameters.AddWithValue("$code", d.DrugCode);
+            insert.Parameters.AddWithValue("$name", d.DrugName);
+            insert.Parameters.AddWithValue("$unit", d.Unit);
+            insert.Parameters.AddWithValue("$whCode", d.WarehouseCode);
+            insert.Parameters.AddWithValue("$whName", d.WarehouseName);
+            insert.Parameters.AddWithValue("$src", d.FundingSource);
+            insert.Parameters.AddWithValue("$qty", d.QuantityOnHand);
+            await insert.ExecuteNonQueryAsync(cancellationToken);
+        }
+        await transaction.CommitAsync(cancellationToken);
+    }
+
+    public async Task ReplaceSnapshotPatientsAsync(IReadOnlyList<SnapshotPatientRow> patients, CancellationToken cancellationToken = default)
+    {
+        await using var connection = new SqliteConnection($"Data Source={DatabasePath}");
+        await connection.OpenAsync(cancellationToken);
+        await using var transaction = connection.BeginTransaction();
+        var clear = connection.CreateCommand();
+        clear.Transaction = transaction;
+        clear.CommandText = "DELETE FROM SnapshotPatient";
+        await clear.ExecuteNonQueryAsync(cancellationToken);
+
+        foreach (var p in patients)
+        {
+            var insert = connection.CreateCommand();
+            insert.Transaction = transaction;
+            insert.CommandText = "INSERT INTO SnapshotPatient (PatientId, MedicalCode, FullName, DateOfBirth, Gender, Address, InsuranceNumber, Diagnosis, PaymentType) VALUES ($id, $med, $name, $dob, $gender, $addr, $ins, $diag, $pay)";
+            insert.Parameters.AddWithValue("$id", p.PatientId);
+            insert.Parameters.AddWithValue("$med", p.MedicalCode);
+            insert.Parameters.AddWithValue("$name", p.FullName);
+            insert.Parameters.AddWithValue("$dob", p.DateOfBirth);
+            insert.Parameters.AddWithValue("$gender", p.Gender);
+            insert.Parameters.AddWithValue("$addr", p.Address);
+            insert.Parameters.AddWithValue("$ins", (object?)p.InsuranceNumber ?? DBNull.Value);
+            insert.Parameters.AddWithValue("$diag", p.Diagnosis);
+            insert.Parameters.AddWithValue("$pay", p.PaymentType);
+            await insert.ExecuteNonQueryAsync(cancellationToken);
+        }
+        await transaction.CommitAsync(cancellationToken);
+    }
+
     public async Task<IReadOnlyList<(string Code, string Name)>> GetCatalogItemsAsync(string catalogType, CancellationToken cancellationToken = default)
     {
         var items = new List<(string, string)>();
@@ -460,10 +454,21 @@ public sealed class SqliteDatabase
         // CatalogItem
         var command = connection.CreateCommand();
         command.CommandText = "SELECT CatalogType, COUNT(*) FROM CatalogItem GROUP BY CatalogType ORDER BY CatalogType";
+        var existingTypes = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         await using (var reader = await command.ExecuteReaderAsync(cancellationToken))
         {
             while (await reader.ReadAsync(cancellationToken))
-                result.Add((reader.GetString(0), reader.GetInt32(1)));
+            {
+                var type = reader.GetString(0);
+                existingTypes.Add(type);
+                result.Add((type, reader.GetInt32(1)));
+            }
+        }
+
+        foreach (var standard in new[] { "Departments", "Warehouses", "ServiceGroups", "Services" })
+        {
+            if (!existingTypes.Contains(standard))
+                result.Add((standard, 0));
         }
 
         // Snapshot counts
@@ -558,7 +563,7 @@ public sealed class SqliteDatabase
         var command = connection.CreateCommand();
 
         var query = "SELECT DrugId, DrugCode, DrugName, Unit, WarehouseCode, WarehouseName, FundingSource, QuantityOnHand FROM SnapshotDrug WHERE 1=1";
-        if (!string.IsNullOrWhiteSpace(warehouseCode) && warehouseCode != "Tất cả kho")
+        if (!string.IsNullOrWhiteSpace(warehouseCode) && warehouseCode != "Tất cả kho" && warehouseCode != "ALL")
         {
             query += " AND WarehouseCode = $wh";
             command.Parameters.AddWithValue("$wh", warehouseCode);
