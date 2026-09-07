@@ -2,6 +2,30 @@
 
 Nhật ký ghi lại các thay đổi, quyết định thiết kế và tiến trình thực thi của Antigravity Coding Assistant trong suốt phiên làm việc.
 
+## [2026-09-07] Chuẩn hóa Dữ liệu Đồng bộ HIS: Loại bỏ hoàn toàn Dữ liệu Mẫu Offline, Snapshot SQLite là Duy nhất & Bất biến
+
+### 1. Quyết định nghiệp vụ & Thiết kế:
+*   **Loại bỏ 100% Mock / Sample Data Offline:**
+    - Không nạp bất kỳ bệnh nhân, thuốc, dịch vụ, hay user HIS giả định/mẫu vào SQLite khi khởi tạo database.
+    - Cơ chế snapshot SQLite hoàn toàn sạch (`0` records khi khởi tạo).
+    - Ngăn chặn triệt để tình trạng lệch danh mục, sai mã phòng ban, sai mã dịch vụ hoặc tồn kho ảo giữa dữ liệu mẫu và môi trường bệnh viện thực tế.
+*   **Chỉ Đồng bộ từ SQL Server HIS mới là Danh mục Chính xác:**
+    - Khi người dùng bấm **"Đồng bộ Catalog HIS"** tại Tab Cài đặt, hệ thống thực hiện `SELECT` danh mục chính thức từ SQL Server HIS (`eHospital_ThienHanh`):
+      1. Danh mục Khoa/Phòng (`DM_PhongBan`)
+      2. Danh mục Kho Dược (`DM_Kho`)
+      3. Danh mục Nhóm dịch vụ (`DM_NhomDichVu`)
+      4. Danh mục Dịch vụ CLS (`DM_DichVu` gắn theo `DM_PhongBan_DichVu`)
+      5. Danh mục User HIS (`Sys_Users` kèm mapping nhân viên và phòng ban)
+      6. Danh mục Thuốc/VTYT còn tồn (`DM_Duoc` inner join `DuocTonKho` có `SoLuongTon > 0`, `TamNgung = 0`)
+      7. Danh mục Bệnh nhân nguồn (`DM_BenhNhan` inner join `DM_BenhNhan_BHYT` còn hạn)
+    - Dữ liệu được ghi đè nguyên tử (atomic transaction) vào các bảng snapshot SQLite (`snapshot_departments`, `snapshot_warehouses`, `snapshot_services`, `snapshot_users`, `snapshot_drugs`, `snapshot_patients`).
+    - Dữ liệu snapshot trong SQLite **chỉ thay đổi khi người vận hành bấm đồng bộ lại lần nữa**.
+*   **Kiểm soát Chặt chẽ Luồng Sinh Đề (Fail-Fast Preflight):**
+    - Nếu cơ sở dữ liệu SQLite chưa có dữ liệu đồng bộ (số lượng snapshot = 0), hệ thống **chặn hoàn toàn** việc tạo kịch bản đề thi và thông báo rõ ràng cho người dùng phải cấu hình kết nối và bấm "Đồng bộ Catalog HIS" trước.
+    - Giao diện Dashboard và Cài đặt hiển thị số lượng thực tế từ SQLite (nếu chưa đồng bộ sẽ hiển thị `0` kèm cảnh báo trực quan màu cam).
+
+---
+
 ## [2026-09-07] Hiện thực hóa Core Engine Exam Operations Desktop, Khắc phục Rule 3.2 và Nâng cấp Giao diện Modern Healthcare UI
 
 ### 1. Quyết định nghiệp vụ & Thiết kế:
