@@ -2,6 +2,65 @@
 
 Nhật ký ghi lại các thay đổi, quyết định thiết kế và tiến trình thực thi của Antigravity Coding Assistant trong suốt phiên làm việc.
 
+## [2026-09-07] Hiện thực hóa Core Engine Exam Operations Desktop, Khắc phục Rule 3.2 và Nâng cấp Giao diện Modern Healthcare UI
+
+### 1. Quyết định nghiệp vụ & Thiết kế:
+*   **Khắc phục triệt để lỗ hổng Rule 3.2 (User HIS):**
+    - Loại bỏ hoàn toàn cơ chế chọn 1 User combobox chung cho cả đợt thi.
+    - Xây dựng `ExamScenarioAllocator`: tự động truy vấn danh sách User HIS của khoa và phân bổ mỗi thí sinh 1 User HIS riêng biệt không trùng lặp trong đợt thi.
+    - Cơ chế Preflight Fail-Fast: Chặn ngay từ đầu nếu số lượng thí sinh trong một khoa vượt quá số lượng User HIS khả dụng của khoa đó.
+*   **Chuyển giao Bộ sinh T-SQL (`SqlScriptGenerator`) sang C# .NET 8:**
+    - Porting logic nạp tham số từ template `Scripts/02_tao_benh_nhan_tiep_nhan_chi_dinh_vao_khoa.sql` sang C#.
+    - Hỗ trợ phân định chính xác: Đề Tiếp nhận trực tiếp không sinh SQL; Đề Nhận bệnh vào khoa sinh script an toàn có cảnh báo chỉ chạy trên server thi.
+*   **Nâng cấp Bộ sinh Tài liệu Word (`WordExamWriter`):**
+    - Thiết kế tài liệu Word chuẩn A4 OpenXML chuyên nghiệp: Bảng thông tin thí sinh, Bảng thông tin hành chính bệnh nhân (PID, BHYT, DKKCB 66232), Bảng dịch vụ CLS, Bảng y lệnh thuốc & VTYT (liều dùng, đường dùng theo ĐVT), liên kết logic đổi dịch vụ / trả thuốc và khung chữ ký giám khảo.
+*   **Thiết kế lại Giao diện (UI/UX Redesign):**
+    - Xây dựng `Resources/ModernTheme.xaml` theo chuẩn Modern Fluent Healthcare Dashboard: Bảng màu Deep Navy (`#0F172A`), Slate (`#1E293B`), Medical Teal (`#0D9488`), Cyan (`#0284C7`), nền sáng `#F8FAFC`, thẻ Card bo góc mềm mại (`CornerRadius="8"`), viền mỏng `#E2E8F0`.
+    - Thiết kế lại toàn bộ 6 phân hệ giao diện: Dashboard thống kê 4 chỉ số, form cấu hình gọn gàng, DataGrid hiện đại, badges trạng thái trực quan.
+*   **Mở rộng SQLite Database:**
+    - Hỗ trợ lưu trữ `UsedPatient` chống trùng bệnh nhân giữa các đợt thi, lưu snapshot và nạp dữ liệu bệnh viện mặc định phục vụ khảo thí offline hoàn chỉnh.
+
+### 2. Công việc đã thực hiện:
+*   Tạo `desktop/src/ExamGenerator.Domain/ExamScenario.cs`.
+*   Tạo `desktop/src/ExamGenerator.Infrastructure/SqlScriptGenerator.cs`.
+*   Nâng cấp `desktop/src/ExamGenerator.Infrastructure/WordExamWriter.cs`.
+*   Nâng cấp `desktop/src/ExamGenerator.Infrastructure/SqliteDatabase.cs`.
+*   Tạo `desktop/src/ExamGenerator.Infrastructure/ExamScenarioAllocator.cs`.
+*   Tạo `desktop/src/ExamGenerator.Desktop/Resources/ModernTheme.xaml` và nhúng vào `App.xaml`.
+*   Viết lại toàn diện `desktop/src/ExamGenerator.Desktop/MainWindow.xaml` và `MainWindow.xaml.cs`.
+*   Tạo bộ kiểm thử đơn vị `desktop/tests/ExamGenerator.Tests/ExamScenarioAllocatorTests.cs`.
+*   Chạy `dotnet test` đạt 14/14 tests Passed (100% OK).
+*   Chạy `dotnet publish` Release build thành công vào `desktop/publish/ExamOperationsDesktop/`.
+
+---
+
+## [2026-08-31] Chốt định hướng Exam Operations Desktop và quy tắc nghiệp vụ
+
+### Quyết định nghiệp vụ và kiến trúc:
+* Dự án được định hướng lại thành ứng dụng Windows mới: C# / .NET 8 LTS / WPF / MVVM; không bị ràng buộc phải giữ mã Python/FastAPI hiện tại.
+* SQLite cục bộ là dữ liệu vận hành và snapshot; Excel chỉ là import dự phòng, import thí sinh hoặc export đối chiếu.
+* Ứng dụng chỉ đọc danh mục HIS bằng `SELECT`; không tự thực hiện thao tác thay đổi dữ liệu HIS.
+* Danh mục và mapping được đồng bộ trực tiếp từ SQL Server, gồm khoa/phòng, kho, tồn, thuốc/VTYT, dịch vụ, quyền dịch vụ, user HIS và bệnh nhân nguồn.
+* Mỗi khoa khảo thí được cấu hình đúng một kho thi; dịch vụ phải theo `DM_PhongBan_DichVu`, không suy diễn bằng `CROSS JOIN`.
+* Mỗi thí sinh dùng một user HIS không trùng trong cùng đợt; user phải đúng khoa. Mật khẩu server thi `123` là cấu hình môi trường, không lấy từ danh mục HIS.
+* Bệnh nhân không được tái sử dụng; có thể tạo bệnh nhân khảo thí biến thể có kiểm soát từ dữ liệu nguồn.
+* Thẻ BHYT `TE1` có hiệu lực từ `01/01/<năm thi>` đến `31/12/<năm thi + 4>`; ví dụ năm 2026 là `01/01/2026` đến `31/12/2030`.
+* Đề tiếp nhận trực tiếp không sinh SQL. Sản, Nhi, Cấp cứu và Khám bệnh bắt buộc tiếp nhận trực tiếp cho cả điều dưỡng và lễ tân khi dùng template tương ứng.
+* SQL chỉ được sinh cho đề bắt đầu từ nhận bệnh vào khoa mà không kiểm tra tiếp nhận trực tiếp. SQL do người vận hành chạy thủ công trên server thi; ứng dụng không tự chạy SQL.
+* Nhi chỉ là biến thể nội trú có bệnh nhân trẻ em và nhóm dịch vụ đã map; không mặc định có nghiệp vụ mẹ-con hoặc tạo thẻ trẻ.
+* Word dùng DOCX template theo họ đề, ưu tiên đầu ra chuẩn, đẹp, rõ ràng; không nằm trong phạm vi PDF, ký số hoặc mã hóa.
+
+### Công việc đã thực hiện:
+* Khảo sát kho đề `D:\CÔNG VIỆC\Thi\Thi_2021` và schema HIS `D:\CÔNG VIỆC\CAUTRUCHIS\schema_output_markdown`.
+* Viết lại `project.md` thành đặc tả dự án và quy tắc nghiệp vụ hiện hành trước khi thực thi.
+* Chốt SQLite đặt cạnh thư mục cài phần mềm, mặc định `exam-generator.sqlite`.
+* Bổ sung model và service Settings cho connection profile SQL Server; người dùng sẽ cấu hình khi đưa phần mềm vào sử dụng.
+* Settings chỉ là cấu hình kết nối đọc catalog; không cho phép ứng dụng tự ghi HIS.
+* Tách hoàn toàn source code ứng dụng mới vào `desktop/`; solution là `desktop/ExamGenerator.Desktop.sln`. Hệ thống Python/web cũ tại root được giữ nguyên để tham khảo, không dùng chung mã thực thi.
+* Triển khai MVP WPF: SQLite tự khởi tạo cạnh phần mềm, Settings lưu profile SQL Server, kiểm tra kết nối `SELECT 1`, mapping một khoa-một kho và sinh DOCX/ZIP 8 câu thử nghiệm.
+* Publish bản thử nghiệm framework-dependent tại `desktop/publish/ExamOperationsDesktop/`; chưa có đồng bộ catalog HIS hoặc phân bổ dữ liệu đề thực tế.
+* Khảo sát đầy đủ webapp cũ gồm sáu tab, state frontend, API, manager backend và workflow sinh đề. Bổ sung đặc tả UX desktop kế thừa vào `project.md`; tạm dừng mở rộng các tab MVP rời rạc cho đến khi thiết kế sáu phân hệ được triển khai có hệ thống.
+
 ## [2026-08-24] Chuẩn hóa DKKCB 66232, Đơn vị tính Dược, Sửa Lọc Tồn kho & Không theo dõi Data trên Git
 
 ### 1. Quyết định nghiệp vụ & Thiết kế:

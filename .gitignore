@@ -26,3 +26,15 @@ Thumbs.db
 .vscode/
 .idea/
 *.swp
+
+# .NET build artifacts for the desktop application
+desktop/**/bin/
+desktop/**/obj/
+src/**/bin/
+src/**/obj/
+tests/**/bin/
+tests/**/obj/
+desktop/publish/
+desktop/appsettings.local.json
+desktop/exam-generator.sqlite
+desktop/output/

@@ -1,10 +1,18 @@
-# Hướng dẫn Khởi chạy & Sử dụng - Exam Generator & HIS Data Populator
+# Hệ Thống Khảo Thí HIS - Bệnh Viện Đa Khoa Thiện Hạnh
+## Exam Generator & HIS Data Populator
 
-Hệ thống hỗ trợ Hội đồng tuyển dụng Bệnh viện Đa khoa Thiện Hạnh tự động hóa việc tạo đề thi và sinh script nạp dữ liệu SQL Server.
+Hệ thống hỗ trợ Hội đồng tuyển dụng Bệnh viện Đa khoa Thiện Hạnh tự động hóa việc tạo đề thi thực hành Word và sinh script nạp dữ liệu SQL Server trên HIS eHospital.
+
+> [!TIP]
+> **Ứng dụng Windows Desktop Mới (`desktop/`):**
+> Dự án hiện đã phát triển phiên bản máy trạm Windows độc lập bằng **C# / .NET 8 LTS / WPF / SQLite cục bộ** với giao diện Modern Healthcare UI, tự động phân bổ User HIS riêng biệt từng thí sinh (Rule 3.2), sinh đề Word OpenXML chuẩn A4 và script T-SQL.
+> * **Khởi chạy trực tiếp:** `dotnet run --project desktop\src\ExamGenerator.Desktop\ExamGenerator.Desktop.csproj`
+> * **File thực thi đã đóng gói:** `desktop\publish\ExamOperationsDesktop\ExamGenerator.Desktop.exe`
+> * Xem chi tiết tại [desktop/README.md](file:///d:/Project/ThiBVTH/ExamGenerator/desktop/README.md).
 
 ---
 
-## 1. Chuẩn bị Môi trường
+## 1. Hệ Thống Cũ (Python / Local WebApp Tham Chiếu)
 
 Hệ thống yêu cầu cài đặt Python 3.8+ (đã được cài đặt sẵn Python 3.14.0 trên máy tính khảo thí).
 
