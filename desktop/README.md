@@ -45,29 +45,41 @@ desktop/
      5. *Tra cứu tồn kho:* Bộ lọc tìm kiếm thuốc theo kho, nguồn, tên/mã thuốc.
      6. *Lịch sử sinh đề:* Danh sách đợt thi đã sinh, nút mở nhanh tệp ZIP.
 
-5. **Lưu trữ & Khảo thí Offline:**
-   * CSDL SQLite cục bộ `exam-generator.sqlite` cạnh phần mềm.
-   * Quản lý bảng `UsedPatient` chống trùng bệnh nhân giữa các đợt thi.
-   * Bộ dữ liệu mẫu mặc định đa khoa phòng để trải nghiệm ngay lập tức mà không cần kết nối mạng SQL Server.
+5. **Lưu trữ & Chuẩn hóa Danh mục HIS (Pure HIS Sync):**
+   * CSDL SQLite cục bộ `exam-generator.sqlite` đặt cạnh phần mềm.
+   * **Nguyên tắc Danh mục Chính xác:** Loại bỏ hoàn toàn dữ liệu mẫu (mock data) offline. Chỉ khi người vận hành bấm "Đồng bộ Catalog HIS" từ SQL Server HIS thì dữ liệu đó mới là danh mục chính thức.
+   * Dữ liệu snapshot trong SQLite là bất biến và chỉ cập nhật khi người dùng đồng bộ lại lần nữa.
+   * Chặn sinh đề (Fail-Fast) nếu cơ sở dữ liệu chưa có danh mục đồng bộ từ HIS.
+   * Quản lý bảng `UsedPatient` chống trùng lặp bệnh nhân giữa các đợt thi.
 
 ---
 
 ## 3. Hướng dẫn Build & Chạy thử
 
-### A. Kiểm thử Đơn vị (Unit Tests)
+### A. Đóng gói Bản Chạy Tự Động (Khuyến nghị)
+Hệ thống cung cấp script PowerShell tự động kiểm thử, làm sạch và đóng gói:
+```powershell
+.\build_release.ps1 -Note "Ghi chú nội dung thay đổi phiên bản"
+```
+Script sẽ tự động:
+1. Chạy 15/15 unit tests đảm bảo chất lượng.
+2. Build & Publish cấu hình `Release` ra thư mục `desktop/publish/ExamOperationsDesktop/`.
+3. Dọn dẹp CSDL cũ trong thư mục publish để bảo đảm khởi động sạch cho đồng bộ HIS.
+4. Tự động ghi vết lịch sử build vào `BUILD_HISTORY.md`.
+
+### B. Kiểm thử Đơn vị Thủ công (Unit Tests)
 Chạy từ thư mục gốc của repository:
 ```powershell
 dotnet test desktop\tests\ExamGenerator.Tests\ExamGenerator.Tests.csproj
 ```
-*(Toàn bộ 14/14 tests Passed 100% OK)*
+*(Toàn bộ 15/15 tests Passed 100% OK)*
 
-### B. Chạy Trực tiếp từ Source Code
+### C. Chạy Trực tiếp từ Source Code (Dev Mode)
 ```powershell
 dotnet run --project desktop\src\ExamGenerator.Desktop\ExamGenerator.Desktop.csproj
 ```
 
-### C. Đóng gói Bản Chạy Thử (Publish Release)
-```powershell
-dotnet publish desktop\src\ExamGenerator.Desktop\ExamGenerator.Desktop.csproj -c Release -o desktop\publish\ExamOperationsDesktop
-```
-Chạy file thực thi: `desktop\publish\ExamOperationsDesktop\ExamGenerator.Desktop.exe`.
+### D. File Thực thi Đã Đóng Gói (Executable)
+* File thực thi: `desktop/publish/ExamOperationsDesktop/ExamGenerator.Desktop.exe`
+* Lịch sử các phiên bản build và thông số chi tiết: Xem tại `BUILD_HISTORY.md`.
+

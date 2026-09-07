@@ -7,7 +7,9 @@ Hệ thống hỗ trợ Hội đồng tuyển dụng Bệnh viện Đa khoa Thi�
 > **Ứng dụng Windows Desktop Mới (`desktop/`):**
 > Dự án hiện đã phát triển phiên bản máy trạm Windows độc lập bằng **C# / .NET 8 LTS / WPF / SQLite cục bộ** với giao diện Modern Healthcare UI, tự động phân bổ User HIS riêng biệt từng thí sinh (Rule 3.2), sinh đề Word OpenXML chuẩn A4 và script T-SQL.
 > * **Khởi chạy trực tiếp:** `dotnet run --project desktop\src\ExamGenerator.Desktop\ExamGenerator.Desktop.csproj`
+> * **Đóng gói bản chạy mới:** `.\build_release.ps1 -Note "Nội dung thay đổi"`
 > * **File thực thi đã đóng gói:** `desktop\publish\ExamOperationsDesktop\ExamGenerator.Desktop.exe`
+> * **Lịch sử các bản build:** Xem tại [BUILD_HISTORY.md](file:///d:/Project/ThiBVTH/ExamGenerator/BUILD_HISTORY.md).
 > * Xem chi tiết tại [desktop/README.md](file:///d:/Project/ThiBVTH/ExamGenerator/desktop/README.md).
 
 ---
