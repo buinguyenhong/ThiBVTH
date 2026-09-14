@@ -17,7 +17,8 @@ public sealed record ScenarioDrug(
 
 public sealed record ScenarioServiceChange(
     ScenarioService CanceledService,
-    ScenarioService NewService);
+    ScenarioService NewService,
+    ScenarioService? AddedService = null);
 
 public sealed record ScenarioDrugReturn(
     ScenarioDrug ReturnedDrug,
@@ -64,7 +65,12 @@ public sealed record ExamScenario(
     ScenarioServiceChange? ServiceChange,
     ScenarioDrugReturn? DrugReturn,
     bool RequiresDirectReception,
-    bool RequiresExamSetupSql)
+    bool RequiresExamSetupSql,
+    int ExamDurationMinutes = 30,
+    ScenarioPatient? SecondPatient = null,
+    DateOnly? CutoffDate = null,
+    ScenarioDrug? InventoryCheckDrug = null,
+    string? TargetTransferDepartment = null)
 {
     public double TotalScore => Questions.Sum(q => q.Score);
 }

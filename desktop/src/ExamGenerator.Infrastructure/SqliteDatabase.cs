@@ -92,7 +92,9 @@ public sealed class SqliteDatabase
                 WarehouseCode TEXT NOT NULL,
                 WarehouseName TEXT NOT NULL,
                 FundingSource TEXT NOT NULL,
-                QuantityOnHand REAL NOT NULL
+                QuantityOnHand REAL NOT NULL,
+                DepartmentCode TEXT NULL,
+                DepartmentName TEXT NULL
             );
             CREATE TABLE IF NOT EXISTS SnapshotPatient (
                 PatientId TEXT PRIMARY KEY NOT NULL,
@@ -107,6 +109,23 @@ public sealed class SqliteDatabase
             );
             """;
         await command.ExecuteNonQueryAsync(cancellationToken);
+
+        // Safe migrations for newly added columns
+        try
+        {
+            var alter1 = connection.CreateCommand();
+            alter1.CommandText = "ALTER TABLE SnapshotDrug ADD COLUMN DepartmentCode TEXT NULL";
+            await alter1.ExecuteNonQueryAsync(cancellationToken);
+        }
+        catch { /* column may already exist */ }
+
+        try
+        {
+            var alter2 = connection.CreateCommand();
+            alter2.CommandText = "ALTER TABLE SnapshotDrug ADD COLUMN DepartmentName TEXT NULL";
+            await alter2.ExecuteNonQueryAsync(cancellationToken);
+        }
+        catch { /* column may already exist */ }
     }
 
     /// <summary>
@@ -124,10 +143,16 @@ public sealed class SqliteDatabase
         command.CommandText = "INSERT OR IGNORE INTO ExamTemplate (TemplateId, Name, Department, Position, QuestionCount, TotalScore, ReceptionMode, CreatedAt) VALUES " +
             "('tpl-noi','Đề Điều dưỡng nội trú chuẩn (8 câu)','Khoa Nội','Điều dưỡng',8,10,'WardAdmissionPreparation',$at), " +
             "('tpl-ngoai','Đề Điều dưỡng Ngoại tổng hợp','Khoa Ngoại tổng hợp','Điều dưỡng',8,10,'WardAdmissionPreparation',$at), " +
-            "('tpl-san','Đề Nữ hộ sinh / Điều dưỡng Sản','Khoa Phụ Sản','Điều dưỡng',8,10,'DirectReception',$at), " +
-            "('tpl-nhi','Đề Điều dưỡng Nhi (Tiếp nhận trực tiếp)','Khoa Nhi','Điều dưỡng',8,10,'DirectReception',$at), " +
-            "('tpl-cc','Đề Điều dưỡng Cấp cứu','Khoa Cấp cứu','Điều dưỡng',8,10,'DirectReception',$at), " +
-            "('tpl-kkb','Đề Lễ tân phòng khám / Tiếp đón','Khoa Khám bệnh','Lễ tân',5,10,'DirectReception',$at)";
+            "('tpl-ctch','Đề Điều dưỡng Chấn thương chỉnh hình','Khoa Chấn thương chỉnh hình','Điều dưỡng',8,10,'WardAdmissionPreparation',$at), " +
+            "('tpl-hs-tc','Đề Điều dưỡng Hồi sức tích cực','Khoa Hồi sức tích cực','Điều dưỡng',8,10,'WardAdmissionPreparation',$at), " +
+            "('tpl-san','Đề Nữ hộ sinh / Điều dưỡng Sản','Khoa Phụ Sản','Điều dưỡng',7,10,'DirectReception',$at), " +
+            "('tpl-nhi','Đề Điều dưỡng Nhi (Tiếp nhận trực tiếp)','Khoa Nhi','Điều dưỡng',7,10,'DirectReception',$at), " +
+            "('tpl-cc','Đề Điều dưỡng Cấp cứu','Khoa Cấp cứu','Điều dưỡng',6,10,'DirectReception',$at), " +
+            "('tpl-lt-noitru','Đề Lễ tân Khoa Nội trú','Khoa Ngoại tổng hợp','Lễ tân',4,10,'WardAdmissionPreparation',$at), " +
+            "('tpl-kkb','Đề Lễ tân phòng khám / Tiếp đón','Khoa Khám bệnh','Lễ tân',5,10,'DirectReception',$at), " +
+            "('tpl-ktv-xn','Đề Kỹ thuật viên Xét nghiệm','Khoa Xét Nghiệm','Kỹ thuật viên',2,10,'WardAdmissionPreparation',$at), " +
+            "('tpl-ktv-cdha','Đề Kỹ thuật viên Chẩn đoán hình ảnh','Khoa Chẩn đoán hình ảnh','Kỹ thuật viên',2,10,'WardAdmissionPreparation',$at), " +
+            "('tpl-thu-ngan','Đề Thu ngân Quầy viện phí','Phòng Tài chính kế toán','Thu ngân',3,10,'DirectReception',$at)";
         command.Parameters.AddWithValue("$at", DateTimeOffset.Now.ToString("O"));
         await command.ExecuteNonQueryAsync(cancellationToken);
 
@@ -151,6 +176,22 @@ public sealed class SqliteDatabase
             ('tpl-ngoai','TK_KIEM_TON_KHO','Kiểm tra tồn kho',1),
             ('tpl-ngoai','CK_CHUYEN_KHOA','Chuyển khoa điều trị',1),
             ('tpl-ngoai','RV_CHO_RA_VIEN','Cho ra viện',1),
+            ('tpl-ctch','NT_NHAN_BENH_KHOA','Nhận bệnh vào khoa',1),
+            ('tpl-ctch','YL_CHI_DINH_CLS','Chỉ định CLS',1),
+            ('tpl-ctch','YL_CHI_DINH_THUOC_VTYT','Y lệnh thuốc & VTYT',3),
+            ('tpl-ctch','YL_TRA_THUOC','Trả thuốc thừa',1),
+            ('tpl-ctch','YL_DOI_THEM_DICH_VU','Đổi/thêm dịch vụ',1),
+            ('tpl-ctch','TK_KIEM_TON_KHO','Kiểm tra tồn kho',1),
+            ('tpl-ctch','CK_CHUYEN_KHOA','Chuyển khoa điều trị',1),
+            ('tpl-ctch','RV_CHO_RA_VIEN','Cho ra viện',1),
+            ('tpl-hs-tc','NT_NHAN_BENH_KHOA','Nhận bệnh vào khoa',1),
+            ('tpl-hs-tc','YL_CHI_DINH_CLS','Chỉ định CLS',1),
+            ('tpl-hs-tc','YL_CHI_DINH_THUOC_VTYT','Y lệnh thuốc & VTYT',3),
+            ('tpl-hs-tc','YL_TRA_THUOC','Trả thuốc thừa',1),
+            ('tpl-hs-tc','YL_DOI_THEM_DICH_VU','Đổi/thêm dịch vụ',1),
+            ('tpl-hs-tc','TK_KIEM_TON_KHO','Kiểm tra tồn kho',1),
+            ('tpl-hs-tc','CK_CHUYEN_KHOA','Chuyển khoa điều trị',1),
+            ('tpl-hs-tc','RV_CHO_RA_VIEN','Cho ra viện',1),
             ('tpl-san','TN_TIEP_NHAN','Tiếp nhận trực tiếp',2),
             ('tpl-san','YL_CHI_DINH_CLS','Chỉ định CLS',1),
             ('tpl-san','YL_CHI_DINH_THUOC_VTYT','Y lệnh thuốc & VTYT',3),
@@ -170,11 +211,22 @@ public sealed class SqliteDatabase
             ('tpl-cc','YL_CHI_DINH_THUOC_VTYT','Y lệnh thuốc cấp cứu & VTYT',3),
             ('tpl-cc','TK_KIEM_TON_KHO','Kiểm tra cơ số tủ trực',1),
             ('tpl-cc','CK_CHUYEN_KHOA','Chuyển khoa điều trị',2),
+            ('tpl-lt-noitru','NT_NHAN_BENH_KHOA','Nhận bệnh vào khoa',3),
+            ('tpl-lt-noitru','TC_THU_TAM_UNG','Thu tạm ứng',4),
+            ('tpl-lt-noitru','TK_KIEM_TON_KHO','Kiểm tra tồn kho',1),
+            ('tpl-lt-noitru','RV_CHO_RA_VIEN','Cho ra viện',2),
             ('tpl-kkb','TN_TIEP_NHAN','Tiếp nhận trực tiếp',2),
             ('tpl-kkb','TC_THU_TAM_UNG','Thu tạm ứng',2),
             ('tpl-kkb','TC_THANH_TOAN_RA_VIEN','Thanh toán viện phí',2),
             ('tpl-kkb','TC_TRA_CUU_BENH_SU','Tra cứu lịch sử KCB',2),
-            ('tpl-kkb','YL_CHI_DINH_CLS','Chỉ định CLS ban đầu',2);
+            ('tpl-kkb','YL_CHI_DINH_CLS','Chỉ định CLS ban đầu',2),
+            ('tpl-ktv-xn','KQ_TRA_KET_QUA_CLS','Trả kết quả xét nghiệm huyết học/sinh hóa',7),
+            ('tpl-ktv-xn','TK_KIEM_TON_KHO','Kiểm tra tồn hóa chất/vật tư',3),
+            ('tpl-ktv-cdha','KQ_TRA_KET_QUA_CLS','Trả kết quả chẩn đoán hình ảnh',7),
+            ('tpl-ktv-cdha','TK_KIEM_TON_KHO','Kiểm tra tồn phim/vật tư',3),
+            ('tpl-thu-ngan','TC_THU_TAM_UNG','Thu tạm ứng viện phí',4),
+            ('tpl-thu-ngan','TC_THANH_TOAN_RA_VIEN','Thanh toán ra viện',4),
+            ('tpl-thu-ngan','TK_KIEM_TON_KHO','Kiểm tra biên lai/ấn chỉ',2);
             """;
         await actions.ExecuteNonQueryAsync(cancellationToken);
     }
@@ -337,7 +389,7 @@ public sealed class SqliteDatabase
         {
             var insert = connection.CreateCommand();
             insert.Transaction = transaction;
-            insert.CommandText = "INSERT INTO CatalogItem (CatalogType, ItemId, ItemCode, ItemName, ParentId, ImportedAt) VALUES ($type, $id, $code, $name, $parent, $at)";
+            insert.CommandText = "INSERT OR REPLACE INTO CatalogItem (CatalogType, ItemId, ItemCode, ItemName, ParentId, ImportedAt) VALUES ($type, $id, $code, $name, $parent, $at)";
             insert.Parameters.AddWithValue("$type", catalogType);
             insert.Parameters.AddWithValue("$id", item.Id);
             insert.Parameters.AddWithValue("$code", item.Code);
@@ -363,7 +415,7 @@ public sealed class SqliteDatabase
         {
             var insert = connection.CreateCommand();
             insert.Transaction = transaction;
-            insert.CommandText = "INSERT INTO SnapshotUser (UserId, UserName, FullName, DepartmentCode, DepartmentName) VALUES ($id, $userName, $fullName, $deptCode, $deptName)";
+            insert.CommandText = "INSERT OR REPLACE INTO SnapshotUser (UserId, UserName, FullName, DepartmentCode, DepartmentName) VALUES ($id, $userName, $fullName, $deptCode, $deptName)";
             insert.Parameters.AddWithValue("$id", u.UserId);
             insert.Parameters.AddWithValue("$userName", u.UserName);
             insert.Parameters.AddWithValue("$fullName", u.FullName);
@@ -388,7 +440,7 @@ public sealed class SqliteDatabase
         {
             var insert = connection.CreateCommand();
             insert.Transaction = transaction;
-            insert.CommandText = "INSERT INTO SnapshotDrug (DrugId, DrugCode, DrugName, Unit, WarehouseCode, WarehouseName, FundingSource, QuantityOnHand) VALUES ($id, $code, $name, $unit, $whCode, $whName, $src, $qty)";
+            insert.CommandText = "INSERT OR REPLACE INTO SnapshotDrug (DrugId, DrugCode, DrugName, Unit, WarehouseCode, WarehouseName, FundingSource, QuantityOnHand, DepartmentCode, DepartmentName) VALUES ($id, $code, $name, $unit, $whCode, $whName, $src, $qty, $deptCode, $deptName)";
             insert.Parameters.AddWithValue("$id", d.DrugId);
             insert.Parameters.AddWithValue("$code", d.DrugCode);
             insert.Parameters.AddWithValue("$name", d.DrugName);
@@ -397,6 +449,8 @@ public sealed class SqliteDatabase
             insert.Parameters.AddWithValue("$whName", d.WarehouseName);
             insert.Parameters.AddWithValue("$src", d.FundingSource);
             insert.Parameters.AddWithValue("$qty", d.QuantityOnHand);
+            insert.Parameters.AddWithValue("$deptCode", (object?)d.DepartmentCode ?? DBNull.Value);
+            insert.Parameters.AddWithValue("$deptName", (object?)d.DepartmentName ?? DBNull.Value);
             await insert.ExecuteNonQueryAsync(cancellationToken);
         }
         await transaction.CommitAsync(cancellationToken);
@@ -416,7 +470,7 @@ public sealed class SqliteDatabase
         {
             var insert = connection.CreateCommand();
             insert.Transaction = transaction;
-            insert.CommandText = "INSERT INTO SnapshotPatient (PatientId, MedicalCode, FullName, DateOfBirth, Gender, Address, InsuranceNumber, Diagnosis, PaymentType) VALUES ($id, $med, $name, $dob, $gender, $addr, $ins, $diag, $pay)";
+            insert.CommandText = "INSERT OR REPLACE INTO SnapshotPatient (PatientId, MedicalCode, FullName, DateOfBirth, Gender, Address, InsuranceNumber, Diagnosis, PaymentType) VALUES ($id, $med, $name, $dob, $gender, $addr, $ins, $diag, $pay)";
             insert.Parameters.AddWithValue("$id", p.PatientId);
             insert.Parameters.AddWithValue("$med", p.MedicalCode);
             insert.Parameters.AddWithValue("$name", p.FullName);
@@ -442,6 +496,25 @@ public sealed class SqliteDatabase
         await using var reader = await command.ExecuteReaderAsync(cancellationToken);
         while (await reader.ReadAsync(cancellationToken))
             items.Add((reader.GetString(0), reader.GetString(1)));
+        return items;
+    }
+
+    public async Task<IReadOnlyList<(string Code, string Name, string GroupName)>> GetCatalogServicesWithGroupAsync(CancellationToken cancellationToken = default)
+    {
+        var items = new List<(string, string, string)>();
+        await using var connection = new SqliteConnection($"Data Source={DatabasePath}");
+        await connection.OpenAsync(cancellationToken);
+        var command = connection.CreateCommand();
+        command.CommandText = """
+            SELECT s.ItemCode, s.ItemName, COALESCE(g.ItemName, 'Cận lâm sàng') AS GroupName
+            FROM CatalogItem s
+            LEFT JOIN CatalogItem g ON g.CatalogType = 'ServiceGroups' AND (g.ItemId = s.ParentId OR g.ItemCode = s.ParentId)
+            WHERE s.CatalogType = 'Services'
+            ORDER BY s.ItemName
+            """;
+        await using var reader = await command.ExecuteReaderAsync(cancellationToken);
+        while (await reader.ReadAsync(cancellationToken))
+            items.Add((reader.GetString(0), reader.GetString(1), reader.GetString(2)));
         return items;
     }
 
@@ -547,12 +620,36 @@ public sealed class SqliteDatabase
         await using var connection = new SqliteConnection($"Data Source={DatabasePath}");
         await connection.OpenAsync(cancellationToken);
         var command = connection.CreateCommand();
-        command.CommandText = "SELECT DrugId, DrugCode, DrugName, Unit, WarehouseCode, WarehouseName, FundingSource, QuantityOnHand FROM SnapshotDrug WHERE WarehouseCode = $code AND QuantityOnHand > 0 ORDER BY DrugName";
+        command.CommandText = "SELECT DrugId, DrugCode, DrugName, Unit, WarehouseCode, WarehouseName, FundingSource, QuantityOnHand, DepartmentCode, DepartmentName FROM SnapshotDrug WHERE WarehouseCode = $code AND QuantityOnHand > 0 ORDER BY DrugName";
         command.Parameters.AddWithValue("$code", warehouseCode);
         await using var reader = await command.ExecuteReaderAsync(cancellationToken);
         while (await reader.ReadAsync(cancellationToken))
-            rows.Add(new SnapshotDrugRow(reader.GetString(0), reader.GetString(1), reader.GetString(2), reader.GetString(3), reader.GetString(4), reader.GetString(5), reader.GetString(6), reader.GetDouble(7)));
+            rows.Add(new SnapshotDrugRow(
+                reader.GetString(0),
+                reader.GetString(1),
+                reader.GetString(2),
+                reader.GetString(3),
+                reader.GetString(4),
+                reader.GetString(5),
+                reader.GetString(6),
+                reader.GetDouble(7),
+                reader.IsDBNull(8) ? null : reader.GetString(8),
+                reader.IsDBNull(9) ? null : reader.GetString(9)
+            ));
         return rows;
+    }
+
+    public async Task<IReadOnlyList<(string Code, string Name, string? DepartmentId)>> GetWarehousesWithDepartmentAsync(CancellationToken cancellationToken = default)
+    {
+        var items = new List<(string, string, string?)>();
+        await using var connection = new SqliteConnection($"Data Source={DatabasePath}");
+        await connection.OpenAsync(cancellationToken);
+        var command = connection.CreateCommand();
+        command.CommandText = "SELECT ItemCode, ItemName, ParentId FROM CatalogItem WHERE CatalogType = 'Warehouses' ORDER BY ItemName";
+        await using var reader = await command.ExecuteReaderAsync(cancellationToken);
+        while (await reader.ReadAsync(cancellationToken))
+            items.Add((reader.GetString(0), reader.GetString(1), reader.IsDBNull(2) ? null : reader.GetString(2)));
+        return items;
     }
 
     public async Task<IReadOnlyList<SnapshotDrugRow>> SearchInventoryAsync(string? deptName, string? warehouseCode, string? source, string? keyword, CancellationToken cancellationToken = default)
@@ -562,28 +659,56 @@ public sealed class SqliteDatabase
         await connection.OpenAsync(cancellationToken);
         var command = connection.CreateCommand();
 
-        var query = "SELECT DrugId, DrugCode, DrugName, Unit, WarehouseCode, WarehouseName, FundingSource, QuantityOnHand FROM SnapshotDrug WHERE 1=1";
-        if (!string.IsNullOrWhiteSpace(warehouseCode) && warehouseCode != "Tất cả kho" && warehouseCode != "ALL")
+        var query = """
+            SELECT 
+                d.DrugId, d.DrugCode, d.DrugName, d.Unit, d.WarehouseCode, d.WarehouseName, d.FundingSource, d.QuantityOnHand,
+                COALESCE(NULLIF(d.DepartmentCode, ''), cDept.ItemCode, '') AS DepartmentCode,
+                COALESCE(NULLIF(d.DepartmentName, ''), cDept.ItemName, '') AS DepartmentName
+            FROM SnapshotDrug d
+            LEFT JOIN CatalogItem cWh ON cWh.CatalogType = 'Warehouses' AND (cWh.ItemCode = d.WarehouseCode OR cWh.ItemId = d.WarehouseCode)
+            LEFT JOIN CatalogItem cDept ON cDept.CatalogType = 'Departments' AND cDept.ItemId = cWh.ParentId
+            WHERE 1=1
+            """;
+
+        if (!string.IsNullOrWhiteSpace(deptName) && deptName != "Tất cả khoa" && deptName != "ALL")
         {
-            query += " AND WarehouseCode = $wh";
-            command.Parameters.AddWithValue("$wh", warehouseCode);
+            query += " AND (d.DepartmentName = $dept OR d.DepartmentCode = $dept OR cDept.ItemName = $dept OR cDept.ItemCode = $dept)";
+            command.Parameters.AddWithValue("$dept", deptName.Trim());
+        }
+        if (!string.IsNullOrWhiteSpace(warehouseCode) && warehouseCode != "Tất cả kho" && warehouseCode != "ALL" && warehouseCode != "ALL_DEPT")
+        {
+            query += " AND d.WarehouseCode = $wh";
+            command.Parameters.AddWithValue("$wh", warehouseCode.Trim());
         }
         if (!string.IsNullOrWhiteSpace(source) && source != "Tất cả nguồn")
         {
-            query += " AND FundingSource = $source";
-            command.Parameters.AddWithValue("$source", source);
+            query += " AND d.FundingSource = $source";
+            command.Parameters.AddWithValue("$source", source.Trim());
         }
         if (!string.IsNullOrWhiteSpace(keyword))
         {
-            query += " AND (DrugName LIKE $kw OR DrugCode LIKE $kw)";
+            query += " AND (d.DrugName LIKE $kw OR d.DrugCode LIKE $kw)";
             command.Parameters.AddWithValue("$kw", $"%{keyword.Trim()}%");
         }
-        query += " ORDER BY WarehouseName, DrugName LIMIT 100";
+        query += " ORDER BY DepartmentName, WarehouseName, DrugName LIMIT 250";
 
         command.CommandText = query;
         await using var reader = await command.ExecuteReaderAsync(cancellationToken);
         while (await reader.ReadAsync(cancellationToken))
-            rows.Add(new SnapshotDrugRow(reader.GetString(0), reader.GetString(1), reader.GetString(2), reader.GetString(3), reader.GetString(4), reader.GetString(5), reader.GetString(6), reader.GetDouble(7)));
+        {
+            rows.Add(new SnapshotDrugRow(
+                reader.GetString(0),
+                reader.GetString(1),
+                reader.GetString(2),
+                reader.GetString(3),
+                reader.GetString(4),
+                reader.GetString(5),
+                reader.GetString(6),
+                reader.GetDouble(7),
+                reader.IsDBNull(8) ? null : reader.GetString(8),
+                reader.IsDBNull(9) ? null : reader.GetString(9)
+            ));
+        }
         return rows;
     }
 
@@ -638,5 +763,5 @@ public sealed class SqliteDatabase
 }
 
 public sealed record SnapshotUserRow(string UserId, string UserName, string FullName, string DepartmentCode, string DepartmentName);
-public sealed record SnapshotDrugRow(string DrugId, string DrugCode, string DrugName, string Unit, string WarehouseCode, string WarehouseName, string FundingSource, double QuantityOnHand);
+public sealed record SnapshotDrugRow(string DrugId, string DrugCode, string DrugName, string Unit, string WarehouseCode, string WarehouseName, string FundingSource, double QuantityOnHand, string? DepartmentCode = null, string? DepartmentName = null);
 public sealed record SnapshotPatientRow(string PatientId, string MedicalCode, string FullName, string DateOfBirth, string Gender, string Address, string? InsuranceNumber, string Diagnosis, string PaymentType);

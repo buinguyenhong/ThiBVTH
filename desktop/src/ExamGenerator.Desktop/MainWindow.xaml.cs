@@ -21,7 +21,8 @@ public partial class MainWindow : Window
     private readonly List<TemplateRow> _templates = [];
     private readonly List<DepartmentRow> _departments = [];
     private readonly List<WarehouseRow> _warehouses = [];
-    private readonly List<ServiceGroupRow> _serviceGroups = [];
+    private readonly List<ServiceGroupItemViewModel> _allServiceGroups = [];
+    private List<(string Code, string Name, string? DepartmentId)> _allWarehousesWithDept = [];
 
     private string? _selectedMappingDepartment;
 
@@ -73,12 +74,13 @@ public partial class MainWindow : Window
         _departments.AddRange(depts.Select(d => new DepartmentRow(d.Name, d.Code)));
 
         _warehouses.Clear();
-        var whs = await _database.GetCatalogItemsAsync("Warehouses");
+        var whs = await _database.GetWarehousesWithDepartmentAsync();
+        _allWarehousesWithDept = whs.ToList();
         _warehouses.AddRange(whs.Select(w => new WarehouseRow(w.Name, w.Code)));
 
-        _serviceGroups.Clear();
+        _allServiceGroups.Clear();
         var sgs = await _database.GetCatalogItemsAsync("ServiceGroups");
-        _serviceGroups.AddRange(sgs.Select(s => new ServiceGroupRow(s.Name, s.Code)));
+        _allServiceGroups.AddRange(sgs.Select(s => new ServiceGroupItemViewModel(s.Name, s.Code)));
 
         _templates.Clear();
         var storedTemplates = await _database.GetTemplatesAsync();
@@ -115,10 +117,7 @@ public partial class MainWindow : Window
         InventoryDepartmentComboBox.ItemsSource = new[] { "Tất cả khoa" }.Concat(_departments.Select(x => x.Name)).ToList();
         InventoryDepartmentComboBox.SelectedIndex = 0;
 
-        InventoryWarehouseComboBox.ItemsSource = null;
-        InventoryWarehouseComboBox.ItemsSource = new[] { new WarehouseRow("Tất cả kho", "ALL") }.Concat(_warehouses).ToList();
-        InventoryWarehouseComboBox.DisplayMemberPath = "Name";
-        InventoryWarehouseComboBox.SelectedIndex = 0;
+        UpdateInventoryWarehousesForDepartment("Tất cả khoa");
 
         InventorySourceComboBox.ItemsSource = new[] { "Tất cả nguồn", "BHYT", "Viện phí" };
         InventorySourceComboBox.SelectedIndex = 0;
@@ -127,8 +126,7 @@ public partial class MainWindow : Window
         MappingWarehouseComboBox.ItemsSource = _warehouses;
         MappingWarehouseComboBox.DisplayMemberPath = "Name";
 
-        ServiceGroupsList.ItemsSource = null;
-        ServiceGroupsList.ItemsSource = _serviceGroups;
+        RefreshServiceGroupsList();
 
         await RefreshCatalogSummaryAsync();
         await SearchInventoryCoreAsync();
@@ -143,6 +141,43 @@ public partial class MainWindow : Window
             HeaderStatusText.Text = "Hệ thống sẵn sàng";
             FooterStatusText.Text = $"Đã nạp {_departments.Count} khoa và {_warehouses.Count} kho từ snapshot SQLite.";
         }
+    }
+
+    private void RefreshServiceGroupsList()
+    {
+        var kw = ServiceSearchTextBox.Text?.Trim() ?? string.Empty;
+        ServiceGroupsList.ItemsSource = null;
+        ServiceGroupsList.ItemsSource = _allServiceGroups
+            .Where(x => string.IsNullOrWhiteSpace(kw) || x.Name.Contains(kw, StringComparison.OrdinalIgnoreCase))
+            .ToList();
+    }
+
+    private void UpdateInventoryWarehousesForDepartment(string? deptName)
+    {
+        if (string.IsNullOrWhiteSpace(deptName) || deptName == "Tất cả khoa")
+        {
+            InventoryWarehouseComboBox.ItemsSource = new[] { new WarehouseRow("Tất cả kho", "ALL") }.Concat(_warehouses).ToList();
+            InventoryWarehouseComboBox.DisplayMemberPath = "Name";
+            InventoryWarehouseComboBox.SelectedIndex = 0;
+            return;
+        }
+
+        var matchDept = _departments.FirstOrDefault(d => d.Name.Equals(deptName, StringComparison.OrdinalIgnoreCase));
+        var deptCode = matchDept?.Code;
+
+        var deptWhs = _allWarehousesWithDept
+            .Where(w => !string.IsNullOrEmpty(deptCode) && string.Equals(w.DepartmentId, deptCode, StringComparison.OrdinalIgnoreCase))
+            .Select(w => new WarehouseRow(w.Name, w.Code))
+            .ToList();
+
+        if (deptWhs.Count == 0)
+        {
+            deptWhs = _warehouses.ToList();
+        }
+
+        InventoryWarehouseComboBox.ItemsSource = new[] { new WarehouseRow("Tất cả kho của khoa này", "ALL_DEPT") }.Concat(deptWhs).ToList();
+        InventoryWarehouseComboBox.DisplayMemberPath = "Name";
+        InventoryWarehouseComboBox.SelectedIndex = 0;
     }
 
     private void ExamDepartmentChanged(object sender, SelectionChangedEventArgs e)
@@ -166,6 +201,18 @@ public partial class MainWindow : Window
         if (ExamTemplateComboBox.SelectedItem is TemplateRow template)
         {
             ScoreSummaryText.Text = $"{template.Name} · {template.QuestionCount} câu · Tổng {template.TotalScore:0.0} điểm · Chế độ: {template.Status}";
+            if (template.Position.Contains("Lễ tân", StringComparison.OrdinalIgnoreCase) ||
+                template.Name.Contains("Lễ tân", StringComparison.OrdinalIgnoreCase) ||
+                template.Name.Contains("KKB", StringComparison.OrdinalIgnoreCase) ||
+                template.Department.Contains("Khám bệnh", StringComparison.OrdinalIgnoreCase) ||
+                template.Department.Contains("Xét Nghiệm", StringComparison.OrdinalIgnoreCase))
+            {
+                ExamDurationTextBox.Text = "15";
+            }
+            else
+            {
+                ExamDurationTextBox.Text = "30";
+            }
         }
     }
 
@@ -187,12 +234,15 @@ public partial class MainWindow : Window
             return;
         }
 
-        _candidates.Add(new CandidateRow(true, name, id, dept, template.Name, "Tự động cấp User riêng không trùng"));
+        int.TryParse(ExamDurationTextBox.Text?.Trim(), out var duration);
+        if (duration <= 0) duration = 30;
+
+        _candidates.Add(new CandidateRow(true, name, id, dept, template.Name, "Tự động cấp User riêng không trùng", duration));
         CandidatesGrid.Items.Refresh();
         UpdateCandidatesCount();
         CandidateNameTextBox.Clear();
         CandidateIdTextBox.Clear();
-        FooterStatusText.Text = $"Đã thêm thí sinh {name} vào danh sách.";
+        FooterStatusText.Text = $"Đã thêm thí sinh {name} ({duration} phút) vào danh sách.";
     }
 
     private void SelectAllCandidates_Click(object sender, RoutedEventArgs e)
@@ -239,7 +289,7 @@ public partial class MainWindow : Window
 
             // Run Scenario Allocation (Rule 3.2 distinct user per candidate, drug stock, patient)
             var allocator = new ExamScenarioAllocator(_database);
-            var candidateInputs = candidates.Select(c => new CandidateInput(c.Name, c.Id, c.Department, c.Template)).ToList();
+            var candidateInputs = candidates.Select(c => new CandidateInput(c.Name, c.Id, c.Department, c.Template, c.DurationMinutes)).ToList();
             var scenarios = await allocator.AllocateBatchScenariosAsync(batchName, examDate, candidateInputs);
 
             var outputDir = Path.Combine(_storage.ApplicationDirectory, "output");
@@ -269,17 +319,30 @@ public partial class MainWindow : Window
                     {
                         await _database.MarkPatientUsedAsync(scenario.Patient.MedicalCode, scenario.Patient.FullName, batchName);
                     }
+                    if (scenario.SecondPatient is not null && !string.IsNullOrWhiteSpace(scenario.SecondPatient.MedicalCode))
+                    {
+                        await _database.MarkPatientUsedAsync(scenario.SecondPatient.MedicalCode, scenario.SecondPatient.FullName, batchName);
+                    }
+                }
+
+                // 3. Generate Merged Word Document (.docx) for one-click printing of all candidates
+                if (scenarios.Count >= 1)
+                {
+                    var mergedDocxName = $"_InGop_TatCaDeThi_{batchName}_{examDate:yyyyMMdd}.docx";
+                    var mergedDocxPath = Path.Combine(outputDir, mergedDocxName);
+                    _wordWriter.CreateMerged(mergedDocxPath, scenarios);
+                    archive.CreateEntryFromFile(mergedDocxPath, mergedDocxName);
                 }
             }
 
             await _database.SaveGeneratedFileAsync(Guid.NewGuid().ToString("N"), batchName, examDate, zipPath);
-            GenerationStatusText.Text = $"Sinh thành công {scenarios.Count} bộ đề thi và script SQL! File ZIP: {zipPath}";
-            FooterStatusText.Text = $"Đã xuất {scenarios.Count} đề thi vào tệp tin: {Path.GetFileName(zipPath)}";
+            GenerationStatusText.Text = $"Sinh thành công {scenarios.Count} bộ đề thi, tệp in gộp và script SQL! File ZIP: {zipPath}";
+            FooterStatusText.Text = $"Đã xuất {scenarios.Count} đề thi (kèm tệp in gộp) vào tệp tin: {Path.GetFileName(zipPath)}";
 
             await ReloadHistoryDataAsync();
             await RefreshDashboardCardsAsync();
 
-            var res = MessageBox.Show($"Sinh hoàn tất {scenarios.Count} bộ đề thi và script SQL!\nBạn có muốn mở thư mục chứa tệp tin ZIP ngay không?", "Thành công", MessageBoxButton.YesNo, MessageBoxImage.Information);
+            var res = MessageBox.Show($"Sinh hoàn tất {scenarios.Count} bộ đề thi và script SQL!\n\nĐã tạo sẵn tệp in gộp: _InGop_TatCaDeThi_{batchName}_{examDate:yyyyMMdd}.docx (in 1 lần ra toàn bộ đề).\n\nBạn có muốn mở thư mục chứa tệp tin ZIP ngay không?", "Thành công", MessageBoxButton.YesNo, MessageBoxImage.Information);
             if (res == MessageBoxResult.Yes)
             {
                 System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo("explorer.exe", $"/select,\"{zipPath}\"") { UseShellExecute = true });
@@ -294,19 +357,32 @@ public partial class MainWindow : Window
 
     private async void SaveMapping_Click(object sender, RoutedEventArgs e)
     {
-        if (MappingDepartmentList.SelectedItem is not DepartmentRow department ||
-            MappingWarehouseComboBox.SelectedItem is not WarehouseRow warehouse)
+        if (MappingDepartmentList.SelectedItem is not DepartmentRow department)
         {
-            MappingStatusText.Text = "Vui lòng chọn Khoa và chọn một Kho thi duy nhất.";
+            MappingStatusText.Text = "Vui lòng chọn Khoa khảo thí từ danh sách bên trái.";
+            return;
+        }
+
+        var warehouse = MappingWarehouseComboBox.SelectedItem as WarehouseRow;
+        if (warehouse is null)
+        {
+            var whText = MappingWarehouseComboBox.Text?.Trim();
+            warehouse = _warehouses.FirstOrDefault(w => w.Name.Equals(whText, StringComparison.OrdinalIgnoreCase));
+        }
+
+        if (warehouse is null)
+        {
+            MappingStatusText.Text = "Vui lòng chọn một Kho thi duy nhất cho khoa này.";
             return;
         }
 
         await _database.SaveDepartmentConfigurationAsync(department.Code, department.Name, warehouse.Code, warehouse.Name);
-        var selectedGroups = ServiceGroupsList.SelectedItems.OfType<ServiceGroupRow>().Select(x => (x.Code, x.Name)).ToList();
+        var selectedGroups = _allServiceGroups.Where(x => x.IsSelected).Select(x => (x.Code, x.Name)).ToList();
         await _database.ReplaceDepartmentServiceGroupsAsync(department.Code, selectedGroups);
         MappingStatusText.Text = $"Đã lưu cấu hình: {department.Name} -> {warehouse.Name} ({selectedGroups.Count} nhóm dịch vụ).";
         await LoadMappingsAsync();
         await RefreshDashboardCardsAsync();
+        MessageBox.Show($"Đã lưu thành công cấu hình cho {department.Name}:\n• Kho thi: {warehouse.Name}\n• Số nhóm dịch vụ CLS được phép: {selectedGroups.Count}", "Lưu Thành Công", MessageBoxButton.OK, MessageBoxImage.Information);
     }
 
     private async void MappingDepartmentChanged(object sender, SelectionChangedEventArgs e)
@@ -322,13 +398,18 @@ public partial class MainWindow : Window
             var matchWh = _warehouses.FirstOrDefault(w => w.Code == current.WarehouseCode);
             if (matchWh is not null) MappingWarehouseComboBox.SelectedItem = matchWh;
         }
+        else
+        {
+            MappingWarehouseComboBox.SelectedIndex = -1;
+        }
 
         var codes = await _database.GetDepartmentServiceGroupCodesAsync(d.Code);
-        ServiceGroupsList.SelectedItems.Clear();
-        foreach (var group in _serviceGroups.Where(x => codes.Contains(x.Code)))
+        var codeSet = codes.ToHashSet(StringComparer.OrdinalIgnoreCase);
+        foreach (var group in _allServiceGroups)
         {
-            ServiceGroupsList.SelectedItems.Add(group);
+            group.IsSelected = codeSet.Contains(group.Code);
         }
+        RefreshServiceGroupsList();
     }
 
     private void MappingSearchChanged(object sender, TextChangedEventArgs e)
@@ -341,10 +422,29 @@ public partial class MainWindow : Window
 
     private void ServiceSearchChanged(object sender, TextChangedEventArgs e)
     {
-        var kw = ServiceSearchTextBox.Text.Trim();
-        ServiceGroupsList.ItemsSource = _serviceGroups
-            .Where(x => x.Name.Contains(kw, StringComparison.OrdinalIgnoreCase))
-            .ToList();
+        RefreshServiceGroupsList();
+    }
+
+    private void SelectAllServices_Click(object sender, RoutedEventArgs e)
+    {
+        var kw = ServiceSearchTextBox.Text?.Trim() ?? string.Empty;
+        var targetList = _allServiceGroups
+            .Where(x => string.IsNullOrWhiteSpace(kw) || x.Name.Contains(kw, StringComparison.OrdinalIgnoreCase));
+        foreach (var sg in targetList)
+        {
+            sg.IsSelected = true;
+        }
+    }
+
+    private void ClearAllServices_Click(object sender, RoutedEventArgs e)
+    {
+        var kw = ServiceSearchTextBox.Text?.Trim() ?? string.Empty;
+        var targetList = _allServiceGroups
+            .Where(x => string.IsNullOrWhiteSpace(kw) || x.Name.Contains(kw, StringComparison.OrdinalIgnoreCase));
+        foreach (var sg in targetList)
+        {
+            sg.IsSelected = false;
+        }
     }
 
     private async void CopyMapping_Click(object sender, RoutedEventArgs e)
@@ -359,8 +459,13 @@ public partial class MainWindow : Window
         if (source is null) return;
 
         var groups = await _database.GetDepartmentServiceGroupCodesAsync(source.Code);
-        await _database.ReplaceDepartmentServiceGroupsAsync(target.Code, _serviceGroups.Where(x => groups.Contains(x.Code)).Select(x => (x.Code, x.Name)).ToList());
-        MappingStatusText.Text = $"Đã sao chép nhóm dịch vụ từ {source.Name}; hãy lưu kho thi cho {target.Name}.";
+        var groupSet = groups.ToHashSet(StringComparer.OrdinalIgnoreCase);
+        foreach (var sg in _allServiceGroups)
+        {
+            sg.IsSelected = groupSet.Contains(sg.Code);
+        }
+        RefreshServiceGroupsList();
+        MappingStatusText.Text = $"Đã sao chép {groups.Count} nhóm dịch vụ từ {source.Name}; hãy lưu kho thi cho {target.Name}.";
     }
 
     private async Task LoadMappingsAsync()
@@ -414,24 +519,63 @@ public partial class MainWindow : Window
     {
         try
         {
-            ConnectionStatusText.Text = "Đang đồng bộ dữ liệu danh mục từ HIS...";
+            ConnectionStatusText.Text = "Đang kết nối và đồng bộ dữ liệu danh mục từ SQL Server HIS...";
+            FooterStatusText.Text = "Đang thực hiện đồng bộ snapshot danh mục HIS...";
             var p = new SqlServerConnectionProfile(
-                ProfileNameTextBox.Text,
-                ServerTextBox.Text,
-                DatabaseTextBox.Text,
+                ProfileNameTextBox.Text.Trim(),
+                ServerTextBox.Text.Trim(),
+                DatabaseTextBox.Text.Trim(),
                 WindowsAuthenticationCheckBox.IsChecked == true,
-                SqlUserTextBox.Text);
+                SqlUserTextBox.Text.Trim());
 
-            var counts = await new HisCatalogSynchronizer().SynchronizeAsync(p, SqlPasswordBox.Password, _database);
+            var counts = await new HisCatalogSynchronizer().SynchronizeAsync(
+                p,
+                SqlPasswordBox.Password,
+                _database,
+                progress =>
+                {
+                    Dispatcher.Invoke(() =>
+                    {
+                        ConnectionStatusText.Text = progress;
+                        FooterStatusText.Text = progress;
+                    });
+                });
             await LoadStaticViewsAsync();
             await LoadMappingsAsync();
             await RefreshDashboardCardsAsync();
-            ConnectionStatusText.Text = "Đồng bộ thành công: " + string.Join(" | ", counts.Select(x => $"{x.Key}: {x.Value} bản ghi"));
-            MessageBox.Show("Đã đồng bộ thành công danh mục chính xác từ SQL Server HIS!\nDữ liệu đã được lưu snapshot vào SQLite và là nguồn chuẩn duy nhất cho mọi hoạt động tạo đề thi.", "Đồng bộ thành công", MessageBoxButton.OK, MessageBoxImage.Information);
+
+            var summaryText =
+                $"• Khoa / Phòng (Cấp 1): {counts.GetValueOrDefault("Departments", 0):N0} bản ghi\n" +
+                $"• Kho Dược / Tủ trực: {counts.GetValueOrDefault("Warehouses", 0):N0} bản ghi\n" +
+                $"• Nhóm Dịch vụ CLS: {counts.GetValueOrDefault("ServiceGroups", 0):N0} bản ghi\n" +
+                $"• Dịch vụ Kỹ thuật / CLS: {counts.GetValueOrDefault("Services", 0):N0} bản ghi\n" +
+                $"• Tài khoản User HIS: {counts.GetValueOrDefault("Users", 0):N0} tài khoản\n" +
+                $"• Thuốc / VTYT có tồn dương: {counts.GetValueOrDefault("Drugs", 0):N0} mặt hàng\n" +
+                $"• Hồ sơ Bệnh nhân nguồn: {counts.GetValueOrDefault("Patients", 0):N0} hồ sơ";
+
+            ConnectionStatusText.Text = "Đồng bộ THÀNH CÔNG toàn bộ danh mục từ HIS!";
+            FooterStatusText.Text = "Đồng bộ snapshot HIS thành công.";
+
+            MessageBox.Show(
+                "ĐỒNG BỘ DANH MỤC TỪ SQL SERVER HIS THÀNH CÔNG!\n\n" +
+                "Chi tiết số lượng dữ liệu snapshot đã nạp vào SQLite:\n" +
+                summaryText + "\n\n" +
+                "Dữ liệu này là nguồn chuẩn duy nhất phục vụ phân bổ kịch bản và sinh đề thi.",
+                "Đồng Bộ Thành Công",
+                MessageBoxButton.OK,
+                MessageBoxImage.Information);
         }
         catch (Exception ex)
         {
-            ConnectionStatusText.Text = "Đồng bộ không thành công: " + ex.Message;
+            ConnectionStatusText.Text = "Đồng bộ THẤT BẠI: " + ex.Message;
+            FooterStatusText.Text = "Lỗi đồng bộ danh mục HIS: " + ex.Message;
+            MessageBox.Show(
+                "ĐỒNG BỘ DANH MỤC THẤT BẠI!\n\n" +
+                $"Chi tiết lỗi:\n{ex.Message}\n\n" +
+                "Vui lòng kiểm tra lại thông tin kết nối SQL Server (Địa chỉ máy chủ, Tên database, Tài khoản/Mật khẩu hoặc quyền truy cập) rồi thử lại.",
+                "Lỗi Đồng Bộ Catalog HIS",
+                MessageBoxButton.OK,
+                MessageBoxImage.Error);
         }
     }
 
@@ -533,6 +677,21 @@ public partial class MainWindow : Window
         TemplatesGrid.ItemsSource = _templates;
     }
 
+    private void InventoryDepartmentChanged(object sender, SelectionChangedEventArgs e)
+    {
+        var deptName = InventoryDepartmentComboBox.SelectedItem as string ?? InventoryDepartmentComboBox.Text;
+        UpdateInventoryWarehousesForDepartment(deptName);
+        _ = SearchInventoryCoreAsync();
+    }
+
+    private async void InventorySearch_KeyDown(object sender, System.Windows.Input.KeyEventArgs e)
+    {
+        if (e.Key == System.Windows.Input.Key.Enter)
+        {
+            await SearchInventoryCoreAsync();
+        }
+    }
+
     private async void SearchInventory_Click(object sender, RoutedEventArgs e) => await SearchInventoryCoreAsync();
 
     private async Task SearchInventoryCoreAsync()
@@ -602,7 +761,7 @@ public partial class MainWindow : Window
     private static string Sanitize(string value) =>
         string.Concat((value ?? "").Select(c => Path.GetInvalidFileNameChars().Contains(c) ? '_' : c)).Trim();
 
-    private sealed class CandidateRow(bool selected, string name, string id, string department, string template, string userStatus)
+    private sealed class CandidateRow(bool selected, string name, string id, string department, string template, string userStatus, int durationMinutes = 30)
     {
         public bool Selected { get; set; } = selected;
         public string Name { get; } = name;
@@ -610,12 +769,42 @@ public partial class MainWindow : Window
         public string Department { get; } = department;
         public string Template { get; } = template;
         public string UserStatus { get; } = userStatus;
+        public int DurationMinutes { get; } = durationMinutes;
+        public string DurationText => $"{DurationMinutes}p";
     }
 
     private sealed record TemplateRow(string Id, string Name, string Department, string Position, int QuestionCount, double TotalScore, string Status);
     private sealed record DepartmentRow(string Name, string Code);
     private sealed record WarehouseRow(string Name, string Code);
-    private sealed record ServiceGroupRow(string Name, string Code);
     private sealed record CatalogRow(string Catalog, string Status, string Count);
     private sealed record HistoryRow(string Batch, string ExamDate, string FilePath, string CreatedAt);
+}
+
+public sealed class ServiceGroupItemViewModel : System.ComponentModel.INotifyPropertyChanged
+{
+    private bool _isSelected;
+    public string Name { get; }
+    public string Code { get; }
+
+    public bool IsSelected
+    {
+        get => _isSelected;
+        set
+        {
+            if (_isSelected != value)
+            {
+                _isSelected = value;
+                PropertyChanged?.Invoke(this, new System.ComponentModel.PropertyChangedEventArgs(nameof(IsSelected)));
+            }
+        }
+    }
+
+    public ServiceGroupItemViewModel(string name, string code, bool isSelected = false)
+    {
+        Name = name;
+        Code = code;
+        _isSelected = isSelected;
+    }
+
+    public event System.ComponentModel.PropertyChangedEventHandler? PropertyChanged;
 }

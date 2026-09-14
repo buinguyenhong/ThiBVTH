@@ -7,6 +7,8 @@ namespace ExamGenerator.Infrastructure;
 
 public sealed class WordExamWriter
 {
+    private const string FontFamily = "Times New Roman";
+
     public void Create(string filePath, ExamScenario scenario)
     {
         ArgumentNullException.ThrowIfNull(scenario);
@@ -16,164 +18,114 @@ public sealed class WordExamWriter
         mainPart.Document = new Document(new Body());
         var body = mainPart.Document.Body!;
 
-        // Page setup: Standard A4, 2cm margins
-        var sectionProps = new SectionProperties();
-        var pageSize = new PageSize { Width = 11906, Height = 16838 }; // A4 in dxa
-        var pageMargin = new PageMargin { Top = 1134, Right = 1134, Bottom = 1134, Left = 1134 }; // 20mm
-        sectionProps.Append(pageSize, pageMargin);
+        AppendScenarioToBody(body, scenario);
 
-        // Header: Hospital & Examination Council
-        AddParagraph(body, "BỆNH VIỆN ĐA KHOA THIỆN HẠNH", true, JustificationValues.Center, 13);
-        AddParagraph(body, "HỘI ĐỒNG THI TUYỂN DỤNG", true, JustificationValues.Center, 12);
-        AddParagraph(body, "BÀI THI THỰC HÀNH TRÊN PHẦN MỀM HIS", true, JustificationValues.Center, 16);
-        AddParagraph(body, "", false, size: 6);
-
-        // Candidate Info Table
-        var candidateTable = CreateStyledTable();
-        AddTableRow(candidateTable, "Đợt thi:", scenario.BatchName, "Ngày thi:", $"{scenario.ExamDate:dd/MM/yyyy}");
-        AddTableRow(candidateTable, "Họ tên thí sinh:", scenario.CandidateName, "Số báo danh (SBD):", string.IsNullOrWhiteSpace(scenario.CandidateId) ? "(Tự do)" : scenario.CandidateId);
-        AddTableRow(candidateTable, "Khoa / Phòng:", scenario.DepartmentName, "Mẫu đề thi:", scenario.TemplateName);
-        AddTableRow(candidateTable, "Tài khoản HIS:", $"{scenario.HisUserCode}  (Mật khẩu máy chủ: 123)", "Thang điểm:", $"{scenario.TotalScore:0.0} điểm");
-        body.Append(candidateTable);
-        AddParagraph(body, "", false, size: 6);
-
-        // Patient Admin Box
-        AddParagraph(body, "I. THÔNG TIN NGƯỜI BỆNH KHẢO THÍ", true, JustificationValues.Left, 12);
-        var p = scenario.Patient;
-        var patTable = CreateStyledTable();
-        var birthStr = p.DateOfBirth.HasValue ? p.DateOfBirth.Value.ToString("dd/MM/yyyy") : (p.Age > 0 ? $"{p.Age} tuổi" : "1990");
-        var bhytStr = !string.IsNullOrWhiteSpace(p.InsuranceNumber) 
-            ? $"{p.InsuranceNumber} (Hạn: {p.InsurancePeriod?.From:dd/MM/yyyy} - {p.InsurancePeriod?.To:dd/MM/yyyy})" 
-            : "Viện phí (Không BHYT)";
-
-        AddTableRow(patTable, "Mã Y tế (PID):", p.MedicalCode, "Họ và tên:", p.FullName.ToUpperInvariant());
-        AddTableRow(patTable, "Ngày sinh / Tuổi:", $"{birthStr} ({p.Gender})", "Đối tượng KCB:", bhytStr);
-        AddTableRow(patTable, "Nơi ĐKKCB ban đầu:", $"{p.InitialRegistrationCode} - BVĐK Thiện Hạnh", "Địa chỉ liên hệ:", p.Address);
-        AddTableRow(patTable, "Chẩn đoán ban đầu:", p.Diagnosis, "Hình thức tiếp nhận:", scenario.RequiresDirectReception ? "Thí sinh tự tiếp nhận" : "Hàng chờ nhận vào khoa");
-        body.Append(patTable);
-        AddParagraph(body, "", false, size: 8);
-
-        // Exam Questions
-        AddParagraph(body, "II. NỘI DUNG YÊU CẦU BÀI THI", true, JustificationValues.Left, 12);
-
-        foreach (var q in scenario.Questions)
-        {
-            AddQuestionHeader(body, q.OrderIndex, q.Title, q.Score);
-            AddParagraph(body, q.Instruction, false, JustificationValues.Left, 11);
-
-            // If action is ordering CLS services -> render services table
-            if (q.ActionCode.Contains("CLS", StringComparison.OrdinalIgnoreCase) && scenario.OrderedServices.Count > 0)
-            {
-                var svcTable = CreateSubTable(["STT", "Mã Dịch vụ", "Tên Dịch vụ Kỹ thuật / CLS", "Nhóm Dịch vụ"]);
-                for (var i = 0; i < scenario.OrderedServices.Count; i++)
-                {
-                    var s = scenario.OrderedServices[i];
-                    AddSubTableRow(svcTable, [(i + 1).ToString(), s.Code, s.Name, s.GroupName]);
-                }
-                body.Append(svcTable);
-            }
-
-            // If action is ordering drugs -> render drugs table
-            if (q.ActionCode.Contains("THUOC", StringComparison.OrdinalIgnoreCase) && scenario.OrderedDrugs.Count > 0)
-            {
-                var drugTable = CreateSubTable(["STT", "Tên Thuốc / Hàm lượng", "ĐVT", "Số lượng", "Cách dùng / Đường dùng"]);
-                for (var i = 0; i < scenario.OrderedDrugs.Count; i++)
-                {
-                    var d = scenario.OrderedDrugs[i];
-                    AddSubTableRow(drugTable, [(i + 1).ToString(), d.Name, d.Unit, d.Quantity.ToString(), d.UsageInstructions]);
-                }
-                body.Append(drugTable);
-            }
-
-            // If action is changing service
-            if (q.ActionCode.Contains("DOI", StringComparison.OrdinalIgnoreCase) && scenario.ServiceChange is not null)
-            {
-                AddParagraph(body, $"- Dịch vụ cần hủy/đổi: [{scenario.ServiceChange.CanceledService.Code}] {scenario.ServiceChange.CanceledService.Name}", true, size: 10);
-                AddParagraph(body, $"- Dịch vụ mới bổ sung: [{scenario.ServiceChange.NewService.Code}] {scenario.ServiceChange.NewService.Name}", true, size: 10);
-            }
-
-            // If action is returning drug
-            if (q.ActionCode.Contains("TRA_THUOC", StringComparison.OrdinalIgnoreCase) && scenario.DrugReturn is not null)
-            {
-                AddParagraph(body, $"- Mặt hàng hoàn trả: {scenario.DrugReturn.ReturnedDrug.Name} (Số lượng trả: {scenario.DrugReturn.ReturnQuantity} {scenario.DrugReturn.ReturnedDrug.Unit})", true, size: 10);
-                AddParagraph(body, $"- Lý do hoàn trả: {scenario.DrugReturn.Reason}", false, size: 10);
-            }
-
-            AddParagraph(body, "Điểm đạt được: ................................................................................................................", false, size: 10);
-            AddParagraph(body, "", false, size: 4);
-        }
-
-        // Summary & Signature
-        AddParagraph(body, "", false, size: 6);
-        AddParagraph(body, $"TỔNG ĐIỂM BÀI THI: {scenario.TotalScore:0.0} ĐIỂM", true, JustificationValues.Right, 12);
-        AddParagraph(body, "", false, size: 10);
-
-        var sigTable = CreateBorderLessTable();
-        var row = new TableRow();
-        var cell1 = new TableCell();
-        AddParagraphToCell(cell1, "CÁN BỘ CHẤM THI 1\n(Ký và ghi rõ họ tên)", true, JustificationValues.Center, 11);
-        var cell2 = new TableCell();
-        AddParagraphToCell(cell2, "CÁN BỘ CHẤM THI 2\n(Ký và ghi rõ họ tên)", true, JustificationValues.Center, 11);
-        var cell3 = new TableCell();
-        AddParagraphToCell(cell3, "THÍ SINH XÁC NHẬN\n(Ký và ghi rõ họ tên)", true, JustificationValues.Center, 11);
-        row.Append(cell1, cell2, cell3);
-        sigTable.Append(row);
-        body.Append(sigTable);
-
-        body.Append(sectionProps);
+        body.Append(CreateSectionProperties());
         mainPart.Document.Save();
     }
 
-    private static Table CreateStyledTable()
+    public void CreateMerged(string filePath, IReadOnlyList<ExamScenario> scenarios)
+    {
+        ArgumentNullException.ThrowIfNull(scenarios);
+        if (scenarios.Count == 0) return;
+
+        using var document = WordprocessingDocument.Create(filePath, WordprocessingDocumentType.Document);
+        var mainPart = document.AddMainDocumentPart();
+        mainPart.Document = new Document(new Body());
+        var body = mainPart.Document.Body!;
+
+        for (var i = 0; i < scenarios.Count; i++)
+        {
+            var scenario = scenarios[i];
+            AppendScenarioToBody(body, scenario);
+
+            if (i < scenarios.Count - 1)
+            {
+                // Page break between candidates to ensure clean 2-page print per candidate
+                var breakP = new Paragraph(
+                    new ParagraphProperties(new SpacingBetweenLines { Before = "0", After = "0" }),
+                    new Run(new Break { Type = BreakValues.Page })
+                );
+                body.Append(breakP);
+            }
+        }
+
+        body.Append(CreateSectionProperties());
+        mainPart.Document.Save();
+    }
+
+    private static SectionProperties CreateSectionProperties()
+    {
+        var sectionProps = new SectionProperties();
+        var pageSize = new PageSize { Width = 11906, Height = 16838 }; // A4 in dxa
+        var pageMargin = new PageMargin { Top = 567, Right = 567, Bottom = 567, Left = 1134 }; // 10mm top/bottom/right, 20mm left
+        sectionProps.Append(pageSize, pageMargin);
+        return sectionProps;
+    }
+
+    private static void AppendScenarioToBody(Body body, ExamScenario scenario)
+    {
+        // 1. Header: Left (Hospital + Candidate info) & Right (Examination Council)
+        var headerTable = CreateBorderlessHeaderTable(scenario);
+        body.Append(headerTable);
+        AddEmptyParagraph(body, 60);
+
+        // 2. Table 1: Score & Proctor/Marker Signatures
+        var scoreSignTable = CreateScoreSignTable();
+        body.Append(scoreSignTable);
+        AddEmptyParagraph(body, 80);
+
+        // 3. Title: BÀI THI VI TÍNH
+        AddCenteredTitle(body, "BÀI THI VI TÍNH", 15);
+
+        // 4. Questions
+        foreach (var q in scenario.Questions)
+        {
+            var titleText = q.Title.Trim();
+            if (titleText.EndsWith(".")) titleText = titleText.Substring(0, titleText.Length - 1).Trim();
+            var qHeader = $"câu {q.OrderIndex}) {titleText} ({q.Score:0.#}đ):";
+            AddQuestionHeader(body, qHeader);
+
+            var lines = (q.Instruction ?? "").Split('\n', StringSplitOptions.RemoveEmptyEntries);
+            foreach (var line in lines)
+            {
+                var trimmed = line.Trim();
+                if (trimmed.StartsWith("Số điểm đạt được:", StringComparison.OrdinalIgnoreCase))
+                {
+                    AddScoreParagraph(body, trimmed);
+                }
+                else if (trimmed.StartsWith("+") || trimmed.StartsWith("-") || trimmed.StartsWith("*"))
+                {
+                    AddBulletParagraph(body, trimmed);
+                }
+                else
+                {
+                    AddBodyParagraph(body, line);
+                }
+            }
+            AddEmptyParagraph(body, 30);
+        }
+
+        // 5. Table of Drugs & Medical Supplies (if ordered drugs exist)
+        if (scenario.OrderedDrugs.Count > 0)
+        {
+            AddSectionTitle(body, "Danh sách thuốc, VTYT cần lên y lệnh cho bệnh nhân:");
+            var drugTable = CreateDrugsTable(scenario.OrderedDrugs);
+            body.Append(drugTable);
+            AddEmptyParagraph(body, 60);
+        }
+
+        // 6. Footer Note: User & Password
+        var userCode = string.IsNullOrWhiteSpace(scenario.HisUserCode) ? "USER_THI" : scenario.HisUserCode;
+        AddFooterNote(body, $"Lưu ý : User đăng nhập chương trình: {userCode}; PassWord : 123");
+    }
+
+    private static Table CreateBorderlessHeaderTable(ExamScenario scenario)
     {
         var table = new Table();
         var tableProps = new TableProperties(
-            new TableWidth { Type = TableWidthUnitValues.Pct, Width = "5000" },
-            new TableBorders(
-                new TopBorder { Val = BorderValues.Single, Size = 4, Color = "CBD5E1" },
-                new BottomBorder { Val = BorderValues.Single, Size = 4, Color = "CBD5E1" },
-                new LeftBorder { Val = BorderValues.Single, Size = 4, Color = "CBD5E1" },
-                new RightBorder { Val = BorderValues.Single, Size = 4, Color = "CBD5E1" },
-                new InsideHorizontalBorder { Val = BorderValues.Single, Size = 4, Color = "E2E8F0" },
-                new InsideVerticalBorder { Val = BorderValues.Single, Size = 4, Color = "E2E8F0" }
-            )
-        );
-        table.AppendChild(tableProps);
-        return table;
-    }
-
-    private static Table CreateSubTable(IReadOnlyList<string> headers)
-    {
-        var table = CreateStyledTable();
-        var headerRow = new TableRow();
-        foreach (var h in headers)
-        {
-            var cell = new TableCell(new TableCellProperties(new Shading { Fill = "F1F5F9", Val = ShadingPatternValues.Clear }));
-            AddParagraphToCell(cell, h, true, JustificationValues.Center, 10);
-            headerRow.Append(cell);
-        }
-        table.Append(headerRow);
-        return table;
-    }
-
-    private static void AddSubTableRow(Table table, IReadOnlyList<string> cells)
-    {
-        var row = new TableRow();
-        for (var i = 0; i < cells.Count; i++)
-        {
-            var cell = new TableCell();
-            var align = i == 0 ? JustificationValues.Center : (i == 3 ? JustificationValues.Right : JustificationValues.Left);
-            AddParagraphToCell(cell, cells[i], false, align, 10);
-            row.Append(cell);
-        }
-        table.Append(row);
-    }
-
-    private static Table CreateBorderLessTable()
-    {
-        var table = new Table();
-        var tableProps = new TableProperties(
-            new TableWidth { Type = TableWidthUnitValues.Pct, Width = "5000" },
+            new TableWidth { Type = TableWidthUnitValues.Dxa, Width = "10205" },
+            new TableJustification { Val = TableRowAlignmentValues.Center },
             new TableBorders(
                 new TopBorder { Val = BorderValues.None },
                 new BottomBorder { Val = BorderValues.None },
@@ -184,62 +136,267 @@ public sealed class WordExamWriter
             )
         );
         table.AppendChild(tableProps);
+
+        var row = new TableRow();
+
+        // Left column: Hospital and candidate info (6000 dxa)
+        var leftCell = new TableCell(new TableCellProperties(new TableCellWidth { Type = TableWidthUnitValues.Dxa, Width = "6000" }));
+        AddCellLine(leftCell, "BỆNH VIỆN ĐA KHOA THIỆN HẠNH", 12, bold: true, align: JustificationValues.Left);
+        AddCellLine(leftCell, $"Họ và tên: {scenario.CandidateName}", 11, bold: false, align: JustificationValues.Left);
+        AddCellLine(leftCell, $"Khoa :  {scenario.DepartmentName}", 11, bold: false, align: JustificationValues.Left);
+        AddCellLine(leftCell, $"Ngày thi :  {scenario.ExamDate:dd/MM/yyyy}", 11, bold: false, align: JustificationValues.Left);
+        AddCellLine(leftCell, $"Thời gian làm bài  :  {scenario.ExamDurationMinutes} phút", 11, bold: false, align: JustificationValues.Left);
+
+        // Right column: Examination Council (4205 dxa)
+        var rightCell = new TableCell(new TableCellProperties(new TableCellWidth { Type = TableWidthUnitValues.Dxa, Width = "4205" }));
+        AddCellLine(rightCell, "HỘI ĐỒNG THI TUYỂN DỤNG", 12, bold: true, align: JustificationValues.Center);
+
+        row.Append(leftCell, rightCell);
+        table.Append(row);
         return table;
     }
 
-    private static void AddTableRow(Table table, string l1, string v1, string l2, string v2)
+    private static Table CreateScoreSignTable()
     {
+        var table = new Table();
+        var tableProps = new TableProperties(
+            new TableWidth { Type = TableWidthUnitValues.Dxa, Width = "10205" },
+            new TableJustification { Val = TableRowAlignmentValues.Center },
+            new TableBorders(
+                new TopBorder { Val = BorderValues.Single, Size = 4, Color = "auto" },
+                new BottomBorder { Val = BorderValues.Single, Size = 4, Color = "auto" },
+                new LeftBorder { Val = BorderValues.Single, Size = 4, Color = "auto" },
+                new RightBorder { Val = BorderValues.Single, Size = 4, Color = "auto" },
+                new InsideHorizontalBorder { Val = BorderValues.Single, Size = 4, Color = "auto" },
+                new InsideVerticalBorder { Val = BorderValues.Single, Size = 4, Color = "auto" }
+            )
+        );
+        table.AppendChild(tableProps);
+
         var row = new TableRow();
-        var c1 = new TableCell(new TableCellProperties(new TableCellWidth { Type = TableWidthUnitValues.Pct, Width = "1200" }, new Shading { Fill = "F8FAFC", Val = ShadingPatternValues.Clear }));
-        AddParagraphToCell(c1, l1, true, JustificationValues.Left, 10);
-        var c2 = new TableCell(new TableCellProperties(new TableCellWidth { Type = TableWidthUnitValues.Pct, Width = "1300" }));
-        AddParagraphToCell(c2, v1, false, JustificationValues.Left, 10);
-        var c3 = new TableCell(new TableCellProperties(new TableCellWidth { Type = TableWidthUnitValues.Pct, Width = "1200" }, new Shading { Fill = "F8FAFC", Val = ShadingPatternValues.Clear }));
-        AddParagraphToCell(c3, l2, true, JustificationValues.Left, 10);
-        var c4 = new TableCell(new TableCellProperties(new TableCellWidth { Type = TableWidthUnitValues.Pct, Width = "1300" }));
-        AddParagraphToCell(c4, v2, false, JustificationValues.Left, 10);
-        row.Append(c1, c2, c3, c4);
+
+        // Col 1: Điểm (2500 dxa)
+        var cell1 = new TableCell(new TableCellProperties(new TableCellWidth { Type = TableWidthUnitValues.Dxa, Width = "2500" }));
+        AddCellLine(cell1, "Điểm:", 12, bold: true, underline: true, align: JustificationValues.Center);
+        for (var i = 0; i < 4; i++) AddCellEmptyLine(cell1, 12);
+
+        // Col 2: Chữ ký của cán bộ chấm thi (4300 dxa)
+        var cell2 = new TableCell(new TableCellProperties(new TableCellWidth { Type = TableWidthUnitValues.Dxa, Width = "4300" }));
+        AddCellLine(cell2, "Chữ ký của cán bộ chấm thi:", 12, bold: true, align: JustificationValues.Center);
+        for (var i = 0; i < 4; i++) AddCellEmptyLine(cell2, 12);
+
+        // Col 3: Chữ ký của cán bộ coi thi (3405 dxa)
+        var cell3 = new TableCell(new TableCellProperties(new TableCellWidth { Type = TableWidthUnitValues.Dxa, Width = "3405" }));
+        AddCellLine(cell3, "Chữ ký của cán bộ coi thi:", 12, bold: true, align: JustificationValues.Center);
+        for (var i = 0; i < 4; i++) AddCellEmptyLine(cell3, 12);
+
+        row.Append(cell1, cell2, cell3);
         table.Append(row);
+        return table;
     }
 
-    private static void AddQuestionHeader(Body body, int index, string title, double score)
+    private static Table CreateDrugsTable(IReadOnlyList<ScenarioDrug> drugs)
     {
-        var p = new Paragraph(new ParagraphProperties(new SpacingBetweenLines { Before = "160", After = "60" }));
-        var runNum = new Run(
-            new RunProperties(new RunFonts { Ascii = "Times New Roman", HighAnsi = "Times New Roman" }, new FontSize { Val = "22" }, new Bold(), new Color { Val = "0F172A" }),
-            new Text($"Câu {index} ({score:0.0} điểm): ")
+        var table = new Table();
+        var tableProps = new TableProperties(
+            new TableWidth { Type = TableWidthUnitValues.Dxa, Width = "10205" },
+            new TableJustification { Val = TableRowAlignmentValues.Center },
+            new TableBorders(
+                new TopBorder { Val = BorderValues.Single, Size = 4, Color = "auto" },
+                new BottomBorder { Val = BorderValues.Single, Size = 4, Color = "auto" },
+                new LeftBorder { Val = BorderValues.Single, Size = 4, Color = "auto" },
+                new RightBorder { Val = BorderValues.Single, Size = 4, Color = "auto" },
+                new InsideHorizontalBorder { Val = BorderValues.Single, Size = 4, Color = "auto" },
+                new InsideVerticalBorder { Val = BorderValues.Single, Size = 4, Color = "auto" }
+            )
         );
-        var runTitle = new Run(
-            new RunProperties(new RunFonts { Ascii = "Times New Roman", HighAnsi = "Times New Roman" }, new FontSize { Val = "22" }, new Bold(), new Color { Val = "0369A1" }),
-            new Text(title)
-        );
-        p.Append(runNum, runTitle);
-        body.Append(p);
-    }
+        table.AppendChild(tableProps);
 
-    private static void AddParagraphToCell(TableCell cell, string text, bool bold, JustificationValues alignment, int size)
-    {
-        var lines = (text ?? "").Split('\n');
-        foreach (var line in lines)
+        // Header Row: STT (700) | MaDuoc (1500) | Tên (4805) | ĐVT (1000) | SL (800) | Nguồn (1400) = 10205
+        var headerRow = new TableRow();
+        headerRow.Append(
+            CreateDrugTableCell("STT", 700, true, JustificationValues.Center, isHeader: true),
+            CreateDrugTableCell("MaDuoc", 1500, true, JustificationValues.Center, isHeader: true),
+            CreateDrugTableCell("Tên", 4805, true, JustificationValues.Center, isHeader: true),
+            CreateDrugTableCell("ĐVT", 1000, true, JustificationValues.Center, isHeader: true),
+            CreateDrugTableCell("SL", 800, true, JustificationValues.Center, isHeader: true),
+            CreateDrugTableCell("Nguồn", 1400, true, JustificationValues.Center, isHeader: true)
+        );
+        table.Append(headerRow);
+
+        for (var i = 0; i < drugs.Count; i++)
         {
-            var p = new Paragraph(new ParagraphProperties(new SpacingBetweenLines { After = "60" }, new Justification { Val = alignment }));
-            var r = new Run(
-                new RunProperties(new RunFonts { Ascii = "Times New Roman", HighAnsi = "Times New Roman" }, new FontSize { Val = (size * 2).ToString() }),
-                new Text(line) { Space = SpaceProcessingModeValues.Preserve }
+            var d = drugs[i];
+            var nguon = d.FundingSource.Contains("BHYT", StringComparison.OrdinalIgnoreCase) ? "BH" : "VP";
+            var dataRow = new TableRow();
+            dataRow.Append(
+                CreateDrugTableCell((i + 1).ToString(), 700, false, JustificationValues.Center),
+                CreateDrugTableCell(d.Code, 1500, false, JustificationValues.Center),
+                CreateDrugTableCell(d.Name, 4805, false, JustificationValues.Left),
+                CreateDrugTableCell(d.Unit, 1000, false, JustificationValues.Center),
+                CreateDrugTableCell(d.Quantity.ToString(), 800, false, JustificationValues.Center),
+                CreateDrugTableCell(nguon, 1400, false, JustificationValues.Center)
             );
-            if (bold) r.RunProperties!.Append(new Bold());
-            p.Append(r);
-            cell.Append(p);
+            table.Append(dataRow);
         }
+
+        return table;
     }
 
-    private static void AddParagraph(Body body, string text, bool bold, JustificationValues? alignment = null, int size = 11)
+    private static TableCell CreateDrugTableCell(string text, int widthDxa, bool isBold, JustificationValues align, bool isHeader = false)
     {
-        var p = new Paragraph(new ParagraphProperties(new SpacingBetweenLines { After = "80" }));
-        if (alignment is not null) p.ParagraphProperties!.Append(new Justification { Val = alignment.Value });
-        var runProps = new RunProperties(new RunFonts { Ascii = "Times New Roman", HighAnsi = "Times New Roman" }, new FontSize { Val = (size * 2).ToString() });
-        if (bold) runProps.Append(new Bold());
-        p.Append(new Run(runProps, new Text(text) { Space = SpaceProcessingModeValues.Preserve }));
+        var cellProps = new TableCellProperties(new TableCellWidth { Type = TableWidthUnitValues.Dxa, Width = widthDxa.ToString() });
+        if (isHeader)
+        {
+            cellProps.Append(new Shading { Val = ShadingPatternValues.Clear, Fill = "F1F5F9" });
+        }
+
+        var cell = new TableCell(cellProps);
+        var p = new Paragraph(new ParagraphProperties(
+            new SpacingBetweenLines { Before = "30", After = "30", Line = "240", LineRule = LineSpacingRuleValues.Auto },
+            new Justification { Val = align }
+        ));
+
+        var run = new Run(CreateRunProps(20, isBold: isBold), new Text(text) { Space = SpaceProcessingModeValues.Preserve });
+        p.Append(run);
+        cell.Append(p);
+        return cell;
+    }
+
+    private static void AddCellLine(TableCell cell, string text, int sizePt, bool bold = false, bool underline = false, JustificationValues? align = null)
+    {
+        var p = new Paragraph(new ParagraphProperties(
+            new SpacingBetweenLines { Before = "20", After = "20", Line = "250", LineRule = LineSpacingRuleValues.Auto },
+            new Justification { Val = align ?? JustificationValues.Left }
+        ));
+        var run = new Run(CreateRunProps(sizePt * 2, isBold: bold, isUnderline: underline), new Text(text) { Space = SpaceProcessingModeValues.Preserve });
+        p.Append(run);
+        cell.Append(p);
+    }
+
+    private static void AddCellEmptyLine(TableCell cell, int sizePt)
+    {
+        var p = new Paragraph(new ParagraphProperties(
+            new SpacingBetweenLines { Before = "20", After = "20", Line = "250", LineRule = LineSpacingRuleValues.Auto }
+        ));
+        var run = new Run(CreateRunProps(sizePt * 2), new Text("") { Space = SpaceProcessingModeValues.Preserve });
+        p.Append(run);
+        cell.Append(p);
+    }
+
+    private static void AddCenteredTitle(Body body, string text, int sizePt)
+    {
+        var p = new Paragraph(new ParagraphProperties(
+            new SpacingBetweenLines { Before = "100", After = "140", Line = "280", LineRule = LineSpacingRuleValues.Auto },
+            new Justification { Val = JustificationValues.Center }
+        ));
+        var run = new Run(CreateRunProps(sizePt * 2, isBold: true), new Text(text) { Space = SpaceProcessingModeValues.Preserve });
+        p.Append(run);
         body.Append(p);
+    }
+
+    private static void AddQuestionHeader(Body body, string headerText)
+    {
+        var p = new Paragraph(new ParagraphProperties(
+            new SpacingBetweenLines { Before = "80", After = "30", Line = "260", LineRule = LineSpacingRuleValues.Auto },
+            new Justification { Val = JustificationValues.Left }
+        ));
+        var run = new Run(CreateRunProps(23, isBold: true), new Text(headerText) { Space = SpaceProcessingModeValues.Preserve }); // 11.5pt
+        p.Append(run);
+        body.Append(p);
+    }
+
+    private static void AddBodyParagraph(Body body, string text)
+    {
+        var p = new Paragraph(new ParagraphProperties(
+            new SpacingBetweenLines { Before = "20", After = "25", Line = "260", LineRule = LineSpacingRuleValues.Auto },
+            new Justification { Val = JustificationValues.Left }
+        ));
+        var run = new Run(CreateRunProps(22), new Text(text) { Space = SpaceProcessingModeValues.Preserve }); // 11pt
+        p.Append(run);
+        body.Append(p);
+    }
+
+    private static void AddBulletParagraph(Body body, string text)
+    {
+        var p = new Paragraph(new ParagraphProperties(
+            new Indentation { Left = "280" },
+            new SpacingBetweenLines { Before = "20", After = "30", Line = "260", LineRule = LineSpacingRuleValues.Auto },
+            new Justification { Val = JustificationValues.Left }
+        ));
+
+        // Highlight label prefix before ':' with bold font if present
+        var colonIdx = text.IndexOf(':');
+        if (colonIdx > 0 && colonIdx < 45)
+        {
+            var prefix = text.Substring(0, colonIdx + 1);
+            var suffix = text.Substring(colonIdx + 1);
+
+            var runPrefix = new Run(CreateRunProps(22, isBold: true), new Text(prefix) { Space = SpaceProcessingModeValues.Preserve });
+            var runSuffix = new Run(CreateRunProps(22, isBold: false), new Text(suffix) { Space = SpaceProcessingModeValues.Preserve });
+            p.Append(runPrefix, runSuffix);
+        }
+        else
+        {
+            var run = new Run(CreateRunProps(22), new Text(text) { Space = SpaceProcessingModeValues.Preserve });
+            p.Append(run);
+        }
+
+        body.Append(p);
+    }
+
+    private static void AddScoreParagraph(Body body, string scoreText)
+    {
+        var p = new Paragraph(new ParagraphProperties(
+            new Indentation { Left = "140" },
+            new SpacingBetweenLines { Before = "25", After = "60", Line = "250", LineRule = LineSpacingRuleValues.Auto },
+            new Justification { Val = JustificationValues.Left }
+        ));
+        var run = new Run(CreateRunProps(21, isItalic: true), new Text(scoreText) { Space = SpaceProcessingModeValues.Preserve }); // 10.5pt
+        p.Append(run);
+        body.Append(p);
+    }
+
+    private static void AddSectionTitle(Body body, string title)
+    {
+        var p = new Paragraph(new ParagraphProperties(
+            new SpacingBetweenLines { Before = "80", After = "40", Line = "260", LineRule = LineSpacingRuleValues.Auto },
+            new Justification { Val = JustificationValues.Left }
+        ));
+        var run = new Run(CreateRunProps(22, isBold: true), new Text(title) { Space = SpaceProcessingModeValues.Preserve });
+        p.Append(run);
+        body.Append(p);
+    }
+
+    private static void AddFooterNote(Body body, string noteText)
+    {
+        var p = new Paragraph(new ParagraphProperties(
+            new SpacingBetweenLines { Before = "80", After = "100", Line = "260", LineRule = LineSpacingRuleValues.Auto },
+            new Justification { Val = JustificationValues.Left }
+        ));
+        var run = new Run(CreateRunProps(22, isBold: true, isItalic: true), new Text(noteText) { Space = SpaceProcessingModeValues.Preserve });
+        p.Append(run);
+        body.Append(p);
+    }
+
+    private static void AddEmptyParagraph(Body body, int sizeInDxa)
+    {
+        var p = new Paragraph(new ParagraphProperties(
+            new SpacingBetweenLines { Before = "0", After = sizeInDxa.ToString() }
+        ));
+        body.Append(p);
+    }
+
+    private static RunProperties CreateRunProps(int sizeHalfPt, bool isBold = false, bool isItalic = false, bool isUnderline = false)
+    {
+        var rPr = new RunProperties(
+            new RunFonts { Ascii = FontFamily, HighAnsi = FontFamily, ComplexScript = FontFamily },
+            new FontSize { Val = sizeHalfPt.ToString() },
+            new FontSizeComplexScript { Val = sizeHalfPt.ToString() }
+        );
+        if (isBold) rPr.Append(new Bold());
+        if (isItalic) rPr.Append(new Italic());
+        if (isUnderline) rPr.Append(new Underline { Val = UnderlineValues.Single });
+        return rPr;
     }
 }

@@ -56,15 +56,23 @@ public sealed class SqlScriptGenerator
         sb.AppendLine("SET XACT_ABORT ON;");
         sb.AppendLine();
 
-        var rendered = RenderAdmissionScript(scenario);
+        var rendered = RenderAdmissionScript(scenario, scenario.Patient);
         sb.AppendLine(rendered);
+
+        if (scenario.SecondPatient is not null)
+        {
+            sb.AppendLine("GO");
+            sb.AppendLine("-- [BỆNH NHÂN THỨ 2 (VIỆN PHÍ)]");
+            var rendered2 = RenderAdmissionScript(scenario, scenario.SecondPatient);
+            sb.AppendLine(rendered2);
+        }
+
         return sb.ToString();
     }
 
-    private string RenderAdmissionScript(ExamScenario scenario)
+    private string RenderAdmissionScript(ExamScenario scenario, ScenarioPatient p)
     {
         var script = _admissionScriptTemplate;
-        var p = scenario.Patient;
         var birthDate = p.DateOfBirth ?? new DateOnly(scenario.ExamDate.Year - (p.Age > 0 ? p.Age : 30), 1, 1);
         var genderCode = p.Gender.Trim().Equals("Nữ", StringComparison.OrdinalIgnoreCase) || p.Gender.Trim().Equals("G", StringComparison.OrdinalIgnoreCase) ? "G" : "T";
         var isBhyt = !string.IsNullOrWhiteSpace(p.InsuranceNumber);

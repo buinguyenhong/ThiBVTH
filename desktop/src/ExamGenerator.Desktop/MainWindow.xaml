@@ -89,14 +89,19 @@
 
                                 <Grid Margin="0,8,0,0">
                                     <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="2.5*"/>
+                                        <ColumnDefinition Width="2*"/>
+                                        <ColumnDefinition Width="1*"/>
                                         <ColumnDefinition Width="1.5*"/>
                                     </Grid.ColumnDefinitions>
                                     <StackPanel Margin="0,0,8,0">
                                         <TextBlock Text="Mẫu đề thi theo Khoa" FontWeight="Medium" Foreground="{StaticResource TextSecondary}"/>
                                         <ComboBox x:Name="ExamTemplateComboBox" SelectionChanged="ExamTemplateChanged"/>
                                     </StackPanel>
-                                    <StackPanel Grid.Column="1" Margin="8,0,0,0">
+                                    <StackPanel Grid.Column="1" Margin="8,0">
+                                        <TextBlock Text="Thời gian làm bài (phút)" FontWeight="Medium" Foreground="{StaticResource TextSecondary}"/>
+                                        <TextBox x:Name="ExamDurationTextBox" Text="30" VerticalContentAlignment="Center"/>
+                                    </StackPanel>
+                                    <StackPanel Grid.Column="2" Margin="8,0,0,0">
                                         <TextBlock Text="Phân bổ User HIS" FontWeight="Medium" Foreground="{StaticResource TextSecondary}"/>
                                         <Border Background="{StaticResource BrandTealSoft}" CornerRadius="6" Padding="10,7" Height="34" Margin="0,4,0,8">
                                             <TextBlock x:Name="UserAllocationSummaryText" Text="Tự động cấp User riêng không trùng" Foreground="{StaticResource BrandTeal}" FontWeight="SemiBold" VerticalAlignment="Center"/>
@@ -119,19 +124,19 @@
                             </StackPanel>
                         </Border>
 
-                        <!-- Card 2: Candidates Table & Generation -->
-                        <Border Style="{StaticResource CardBorder}">
+                        <!-- Candidates List Card -->
+                        <Border Style="{StaticResource CardBorder}" Margin="0,8,0,0">
                             <StackPanel>
                                 <Grid Margin="0,0,0,10">
-                                    <StackPanel Orientation="Horizontal">
-                                        <TextBlock Text="Danh sách Thí sinh Chờ sinh đề" FontSize="16" FontWeight="SemiBold" VerticalAlignment="Center"/>
-                                        <Border Background="{StaticResource BrandTealSoft}" CornerRadius="10" Padding="8,2" Margin="10,0">
-                                            <TextBlock x:Name="CandidatesCountBadge" Text="0 thí sinh" Foreground="{StaticResource BrandTeal}" FontSize="12" FontWeight="SemiBold"/>
+                                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                        <TextBlock Text="Danh sách Thí sinh chờ sinh đề" FontSize="16" FontWeight="SemiBold"/>
+                                        <Border Background="{StaticResource BrandCyanSoft}" CornerRadius="10" Padding="8,2" Margin="10,0,0,0">
+                                            <TextBlock x:Name="CandidatesCountBadge" Text="0 thí sinh" Foreground="{StaticResource BrandCyan}" FontWeight="SemiBold" FontSize="12"/>
                                         </Border>
                                     </StackPanel>
                                     <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
                                         <Button Content="Chọn tất cả" Style="{StaticResource SecondaryButton}" Click="SelectAllCandidates_Click"/>
-                                        <Button Content="Bỏ chọn" Style="{StaticResource SecondaryButton}" Click="ClearCandidateSelection_Click"/>
+                                        <Button Content="Bỏ chọn tất cả" Style="{StaticResource SecondaryButton}" Click="ClearCandidateSelection_Click"/>
                                         <Button Content="Xóa đã chọn" Style="{StaticResource SecondaryButton}" Click="RemoveSelectedCandidates_Click"/>
                                     </StackPanel>
                                 </Grid>
@@ -143,6 +148,7 @@
                                         <DataGridTextColumn Header="Số báo danh" Binding="{Binding Id}" Width="1*"/>
                                         <DataGridTextColumn Header="Khoa / Phòng" Binding="{Binding Department}" Width="1.5*"/>
                                         <DataGridTextColumn Header="Mẫu đề thi" Binding="{Binding Template}" Width="2*"/>
+                                        <DataGridTextColumn Header="Thời gian" Binding="{Binding DurationText}" Width="80"/>
                                         <DataGridTextColumn Header="Quy tắc cấp User HIS" Binding="{Binding UserStatus}" Width="1.5*"/>
                                     </DataGrid.Columns>
                                 </DataGrid>
@@ -238,8 +244,26 @@
                                 <ComboBox x:Name="MappingWarehouseComboBox" IsEditable="True"/>
 
                                 <TextBlock Text="Nhóm Dịch vụ Kỹ thuật / CLS được phép chỉ định" FontWeight="SemiBold" Margin="0,14,0,4"/>
-                                <TextBox x:Name="ServiceSearchTextBox" TextChanged="ServiceSearchChanged"/>
-                                <ListBox x:Name="ServiceGroupsList" SelectionMode="Multiple" Height="220" DisplayMemberPath="Name" BorderBrush="{StaticResource BorderSubtle}"/>
+                                <Grid Margin="0,0,0,6">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="Auto"/>
+                                    </Grid.ColumnDefinitions>
+                                    <TextBox x:Name="ServiceSearchTextBox" TextChanged="ServiceSearchChanged" Height="32"/>
+                                    <StackPanel Grid.Column="1" Orientation="Horizontal" Margin="8,0,0,0">
+                                        <Button Content="Chọn tất cả" Style="{StaticResource SecondaryButton}" Height="32" Padding="12,0" Margin="0,0,6,0" Click="SelectAllServices_Click"/>
+                                        <Button Content="Bỏ chọn tất cả" Style="{StaticResource SecondaryButton}" Height="32" Padding="12,0" Click="ClearAllServices_Click"/>
+                                    </StackPanel>
+                                </Grid>
+                                <ListBox x:Name="ServiceGroupsList" Height="240" BorderBrush="{StaticResource BorderSubtle}" ScrollViewer.HorizontalScrollBarVisibility="Disabled">
+                                    <ListBox.ItemTemplate>
+                                        <DataTemplate>
+                                            <CheckBox IsChecked="{Binding IsSelected, Mode=TwoWay}" Margin="2,4" VerticalAlignment="Center">
+                                                <TextBlock Text="{Binding Name}" FontSize="13" Foreground="{StaticResource TextPrimary}" Margin="6,0,0,0"/>
+                                            </CheckBox>
+                                        </DataTemplate>
+                                    </ListBox.ItemTemplate>
+                                </ListBox>
 
                                 <Grid Margin="0,16,0,0">
                                     <TextBlock x:Name="MappingStatusText" Text="Sẵn sàng lưu cấu hình." Foreground="{StaticResource TextSecondary}" VerticalAlignment="Center"/>
@@ -312,51 +336,51 @@
                                         <ColumnDefinition Width="*"/>
                                     </Grid.ColumnDefinitions>
                                     <StackPanel Margin="0,0,8,0">
-                                        <TextBlock Text="Profile kết nối" Foreground="{StaticResource TextSecondary}"/>
-                                        <TextBox x:Name="ProfileNameTextBox" Text="HIS_ThienHanh_Survey"/>
+                                        <TextBlock Text="Tên Profile" Foreground="{StaticResource TextSecondary}"/>
+                                        <TextBox x:Name="ProfileNameTextBox" Text="HIS_ThienHanh_Production"/>
                                     </StackPanel>
                                     <StackPanel Grid.Column="1" Margin="8,0">
-                                        <TextBlock Text="Server / Instance IP" Foreground="{StaticResource TextSecondary}"/>
-                                        <TextBox x:Name="ServerTextBox" Text="127.0.0.1"/>
+                                        <TextBlock Text="Máy chủ (Server / Instance)" Foreground="{StaticResource TextSecondary}"/>
+                                        <TextBox x:Name="ServerTextBox" Text="192.168.1.10\THIENHANH"/>
                                     </StackPanel>
                                     <StackPanel Grid.Column="2" Margin="8,0,0,0">
-                                        <TextBlock Text="Tên Database HIS" Foreground="{StaticResource TextSecondary}"/>
+                                        <TextBlock Text="Cơ sở dữ liệu (Database)" Foreground="{StaticResource TextSecondary}"/>
                                         <TextBox x:Name="DatabaseTextBox" Text="eHospital_ThienHanh"/>
                                     </StackPanel>
                                 </Grid>
 
-                                <CheckBox x:Name="WindowsAuthenticationCheckBox" Content="Sử dụng Windows Authentication" IsChecked="True" Checked="AuthenticationChanged" Unchecked="AuthenticationChanged" Margin="0,4,0,8"/>
-
-                                <Grid>
+                                <Grid Margin="0,10,0,0">
                                     <Grid.ColumnDefinitions>
                                         <ColumnDefinition Width="*"/>
                                         <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="*"/>
                                     </Grid.ColumnDefinitions>
-                                    <StackPanel Margin="0,0,8,0">
-                                        <TextBlock x:Name="SqlUserLabel" Text="Tài khoản SQL" Visibility="Collapsed" Foreground="{StaticResource TextSecondary}"/>
-                                        <TextBox x:Name="SqlUserTextBox" Visibility="Collapsed"/>
+                                    <CheckBox Grid.Column="0" x:Name="WindowsAuthenticationCheckBox" Content="Sử dụng Windows Authentication" VerticalAlignment="Center" Click="AuthenticationChanged"/>
+                                    <StackPanel Grid.Column="1" Margin="8,0">
+                                        <TextBlock x:Name="SqlUserLabel" Text="Tài khoản SQL (Username)" Foreground="{StaticResource TextSecondary}"/>
+                                        <TextBox x:Name="SqlUserTextBox" Text="sa"/>
                                     </StackPanel>
-                                    <StackPanel Grid.Column="1" Margin="8,0,0,0">
-                                        <TextBlock x:Name="SqlPasswordLabel" Text="Mật khẩu SQL" Visibility="Collapsed" Foreground="{StaticResource TextSecondary}"/>
-                                        <PasswordBox x:Name="SqlPasswordBox" Visibility="Collapsed"/>
+                                    <StackPanel Grid.Column="2" Margin="8,0,0,0">
+                                        <TextBlock x:Name="SqlPasswordLabel" Text="Mật khẩu SQL (Bảo mật DPAPI)" Foreground="{StaticResource TextSecondary}"/>
+                                        <PasswordBox x:Name="SqlPasswordBox"/>
                                     </StackPanel>
                                 </Grid>
 
-                                <Grid Margin="0,10,0,0">
-                                    <TextBlock x:Name="ConnectionStatusText" Text="Đã sẵn sàng thử kết nối." Foreground="{StaticResource TextSecondary}" VerticalAlignment="Center"/>
+                                <Grid Margin="0,16,0,0">
+                                    <TextBlock x:Name="ConnectionStatusText" Text="Chưa kết nối." Foreground="{StaticResource TextSecondary}" VerticalAlignment="Center"/>
                                     <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
-                                        <Button Content="Lưu Profile" Style="{StaticResource SecondaryButton}" Click="SaveSettings_Click"/>
-                                        <Button Content="Kiểm tra kết nối (SELECT 1)" Style="{StaticResource SecondaryButton}" Click="TestConnection_Click"/>
+                                        <Button Content="Kiểm tra kết nối (Test)" Style="{StaticResource SecondaryButton}" Click="TestConnection_Click"/>
+                                        <Button Content="Lưu Cấu Hình" Style="{StaticResource SecondaryButton}" Click="SaveSettings_Click"/>
                                         <Button Content="🔄 Đồng bộ Catalog HIS" Style="{StaticResource PrimaryButton}" Click="SynchronizeCatalogs_Click"/>
                                     </StackPanel>
                                 </Grid>
                             </StackPanel>
                         </Border>
 
-                        <!-- Summary Grid -->
-                        <Border Style="{StaticResource CardBorder}">
+                        <!-- Local Snapshot Status Card -->
+                        <Border Style="{StaticResource CardBorder}" Margin="0,12,0,0">
                             <StackPanel>
-                                <TextBlock Text="Chi tiết Trạng thái Danh mục Snapshot" FontSize="16" FontWeight="SemiBold" Margin="0,0,0,8"/>
+                                <TextBlock Text="Trạng thái Bản ghi Snapshot CSDL Nội bộ (Local SQLite)" FontSize="16" FontWeight="SemiBold" Margin="0,0,0,8"/>
                                 <DataGrid x:Name="CatalogsGrid" Height="180">
                                     <DataGrid.Columns>
                                         <DataGridTextColumn Header="Tên danh mục" Binding="{Binding Catalog}" Width="2*"/>
@@ -391,11 +415,11 @@
                                 </Grid.ColumnDefinitions>
                                 <StackPanel Margin="0,0,8,0">
                                     <TextBlock Text="Khoa / Phòng" Foreground="{StaticResource TextSecondary}"/>
-                                    <ComboBox x:Name="InventoryDepartmentComboBox" IsEditable="True"/>
+                                    <ComboBox x:Name="InventoryDepartmentComboBox" SelectionChanged="InventoryDepartmentChanged"/>
                                 </StackPanel>
                                 <StackPanel Grid.Column="1" Margin="8,0">
                                     <TextBlock Text="Kho Dược / Tủ trực" Foreground="{StaticResource TextSecondary}"/>
-                                    <ComboBox x:Name="InventoryWarehouseComboBox" IsEditable="True"/>
+                                    <ComboBox x:Name="InventoryWarehouseComboBox"/>
                                 </StackPanel>
                                 <StackPanel Grid.Column="2" Margin="8,0">
                                     <TextBlock Text="Nguồn cấp" Foreground="{StaticResource TextSecondary}"/>
@@ -403,7 +427,7 @@
                                 </StackPanel>
                                 <StackPanel Grid.Column="3" Margin="8,0">
                                     <TextBlock Text="Tìm kiếm Tên / Mã Thuốc" Foreground="{StaticResource TextSecondary}"/>
-                                    <TextBox x:Name="InventorySearchTextBox"/>
+                                    <TextBox x:Name="InventorySearchTextBox" KeyDown="InventorySearch_KeyDown"/>
                                 </StackPanel>
                                 <Button Grid.Column="4" Content="🔍 Tra cứu" Style="{StaticResource PrimaryButton}" VerticalAlignment="Bottom" Margin="8,0,0,8" Click="SearchInventory_Click"/>
                             </Grid>
@@ -415,10 +439,11 @@
                             <DataGrid.Columns>
                                 <DataGridTextColumn Header="Mã thuốc/VTYT" Binding="{Binding DrugCode}" Width="120"/>
                                 <DataGridTextColumn Header="Tên thuốc / Hàm lượng" Binding="{Binding DrugName}" Width="2.5*"/>
-                                <DataGridTextColumn Header="Đơn vị tính" Binding="{Binding Unit}" Width="90"/>
-                                <DataGridTextColumn Header="Kho dược" Binding="{Binding WarehouseName}" Width="1.5*"/>
-                                <DataGridTextColumn Header="Nguồn" Binding="{Binding FundingSource}" Width="80"/>
-                                <DataGridTextColumn Header="Số lượng tồn" Binding="{Binding QuantityOnHand}" Width="110"/>
+                                <DataGridTextColumn Header="Đơn vị tính" Binding="{Binding Unit}" Width="85"/>
+                                <DataGridTextColumn Header="Khoa / Phòng" Binding="{Binding DepartmentName}" Width="1.4*"/>
+                                <DataGridTextColumn Header="Kho dược" Binding="{Binding WarehouseName}" Width="1.4*"/>
+                                <DataGridTextColumn Header="Nguồn" Binding="{Binding FundingSource}" Width="75"/>
+                                <DataGridTextColumn Header="Số lượng tồn" Binding="{Binding QuantityOnHand}" Width="105"/>
                             </DataGrid.Columns>
                         </DataGrid>
                     </Border>

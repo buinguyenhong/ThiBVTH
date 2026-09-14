@@ -63,7 +63,7 @@ try {
 $LogEntry = @"
 
 ### Build [$Timestamp] - Commit [$GitCommit]
-- **Trang thai:** Thanh cong (15/15 Tests Passed)
+- **Trang thai:** Thanh cong (16/16 Tests Passed)
 - **Cau hinh:** .NET 8 LTS (Release)
 - **Duong dan chay:** ``desktop/publish/ExamOperationsDesktop/ExamGenerator.Desktop.exe``
 - **Kich thuoc file thuc thi:** $ExeSizeKb KB

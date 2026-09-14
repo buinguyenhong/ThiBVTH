@@ -35,6 +35,41 @@ public class CatalogSynchronizationTests
         Assert.Equal(snapshot.Id, store.Saved[0].Snapshot.Id);
     }
 
+    [Fact]
+    public async Task Inventory_search_filters_correctly_by_department_and_keyword()
+    {
+        var tempDir = Path.Combine(Path.GetTempPath(), "ExamGen_Test_" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(tempDir);
+        try
+        {
+            var storage = new Infrastructure.LocalApplicationStorage(tempDir);
+            var db = new Infrastructure.SqliteDatabase(storage);
+            await db.InitializeAsync();
+
+            await db.ReplaceSnapshotDrugsAsync(new[]
+            {
+                new Infrastructure.SnapshotDrugRow("d1", "PARA500", "Paracetamol 500mg", "Viên", "KHO_NOI", "Kho Nội", "BHYT", 100, "NOI", "Khoa Nội"),
+                new Infrastructure.SnapshotDrugRow("d2", "AMOX500", "Amoxicillin 500mg", "Viên", "KHO_NGOAI", "Kho Ngoại", "Viện phí", 50, "NGOAI", "Khoa Ngoại"),
+                new Infrastructure.SnapshotDrugRow("d3", "CEF200", "Cefixim 200mg", "Viên", "KHO_NOI", "Kho Nội", "BHYT", 80, "NOI", "Khoa Nội")
+            });
+
+            // Search by department
+            var noiDrugs = await db.SearchInventoryAsync("Khoa Nội", null, null, null);
+            Assert.Equal(2, noiDrugs.Count);
+            Assert.All(noiDrugs, d => Assert.Equal("Khoa Nội", d.DepartmentName));
+
+            // Search by keyword
+            var para = await db.SearchInventoryAsync(null, null, null, "Para");
+            Assert.Single(para);
+            Assert.Equal("PARA500", para[0].DrugCode);
+        }
+        finally
+        {
+            Microsoft.Data.Sqlite.SqliteConnection.ClearAllPools();
+            try { if (Directory.Exists(tempDir)) Directory.Delete(tempDir, true); } catch { }
+        }
+    }
+
     private static CatalogDataSet CreateDataSet(IReadOnlyList<Warehouse> warehouses)
     {
         var snapshot = new CatalogSnapshot(

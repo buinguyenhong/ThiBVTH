@@ -2,6 +2,62 @@
 
 Nhật ký ghi lại các thay đổi, quyết định thiết kế và tiến trình thực thi của Antigravity Coding Assistant trong suốt phiên làm việc.
 
+## [2026-09-14] Chuẩn hóa toàn diện Đề thi theo mẫu thực tế BV Thiện Hạnh (Thi_2021) & Tối ưu in ấn, kiểm soát tồn kho lũy kế
+
+### 1. Quyết định nghiệp vụ & Thiết kế:
+*   **Cấu trúc Đề thi Word & Layout in ấn 2 trang:**
+    - Bổ sung Bảng Điểm & Chữ ký của cán bộ coi thi/chấm thi (Table 1) ngay trên đầu đề thi.
+    - Đồng bộ 100% font chữ Times New Roman trên mọi thành phần văn bản.
+    - Tối ưu căn lề trang in A4: Lề trái 20mm (dập ghim), lề trên/dưới/phải 10mm. Đề thi lâm sàng 8 câu vừa khít trong đúng 2 trang (1 tờ A4 in 2 mặt).
+*   **Cấu hình Thời gian làm bài thi:**
+    - Mặc định 30 phút cho đề lâm sàng/nội trú, 15 phút cho Lễ tân/Khám bệnh/Xét nghiệm.
+    - Hiển thị trên giao diện và tự động điền vào phần thông tin đầu đề thi.
+*   **Câu 2: Phân loại CĐHA/CLS ngẫu nhiên theo 4 modality:**
+    - Tự động phân chia dịch vụ Cấp 1 (`Cap = 1 OR Cap IS NULL`) thành 4 nhóm: Siêu âm, X-quang, CT/MRI, Xét nghiệm.
+    - Bốc ngẫu nhiên theo từng nhóm, in đậm tiêu đề từng mục. Câu 5 đổi/hủy dịch vụ liên kết chặt chẽ với Câu 2.
+*   **Câu 3: Chuẩn hóa 5 dòng Dược & Kiểm soát Tồn kho lũy kế (Cumulative Stock Tracking):**
+    - Chuẩn hóa đúng tỷ lệ: 3 dòng đầu là Thuốc nguồn BHYT (SL: 1, 2, 1); 2 dòng sau là VTYT nguồn Viện phí (SL: 2, 2).
+    - Khấu trừ tồn kho khả dụng `remainingStock` liên tục giữa các thí sinh trong cùng khoa thi để đảm bảo:
+      $$\sum_{\text{thí sinh}} \text{SL xuất Dược } i \le \text{Tồn kho Dược } i$$
+    - Tránh tình trạng nhiều thí sinh cùng xuất dẫn đến vượt tồn kho và bị lỗi trên HIS. Chặn trước (preflight) nếu kho không đủ hàng.
+*   **Câu 6, 7, 8:**
+    - Câu 6 đa dạng hóa loại dược Viện phí tra cứu giữa các thí sinh.
+    - Câu 7 & 8 tự động đặt mốc ngày chặn $X = \text{ExamDate} - 10\text{ ngày}$.
+    - Bổ sung dòng chấm `....................` để thí sinh ghi câu trả lời.
+*   **Tính năng In Gộp Toàn Bộ Đề Thi (`_InGop_TatCaDeThi...`):**
+    - Tự động xuất thêm 1 tệp Word duy nhất chứa toàn bộ đề thi của các thí sinh với ngắt trang chuẩn `BreakValues.Page` để in 1 lần ra toàn bộ đề của cả hội đồng.
+*   **Kiểm thử & Bản phát hành:**
+    - 20/20 Unit tests Passed 100%.
+    - Cập nhật bản phát hành hoàn thiện tại `desktop/publish/ExamOperationsDesktop-final/`.
+
+---
+
+## [2026-09-14] Hiệu chỉnh theo phản hồi kiểm thử CSDL thi thử eHospital: Lọc Khoa Cấp 1, Popup Thông Báo Chi Tiết, Tối Ưu Mapping & Tra Cứu Tồn Kho
+
+### 1. Quyết định nghiệp vụ & Thiết kế:
+*   **Lọc Khoa/Phòng Cấp 1 (`DM_PhongBan`):**
+    - Áp dụng điều kiện `AND Cap = 1` trong câu query đồng bộ: `SELECT ... FROM dbo.DM_PhongBan WHERE ISNULL(TamNgung, 0) = 0 AND Cap = 1 ORDER BY TenPhongBan`.
+    - Loại bỏ các buồng khám lẻ, phòng khám con, chỉ lấy các Khoa và Phòng ban chính thức.
+*   **Popup Thông Báo Đồng Bộ Chi Tiết:**
+    - Sau khi bấm "Đồng bộ Catalog HIS", nếu thành công sẽ hiển thị hộp thoại `MessageBox` liệt kê chi tiết số lượng bản ghi từng danh mục (Khoa phòng, Kho dược, Nhóm dịch vụ, Dịch vụ CLS, User HIS, Thuốc tồn kho, Bệnh nhân).
+    - Nếu thất bại, bắt ngoại lệ và hiển thị `MessageBox` lỗi (`MessageBoxImage.Error`) nêu rõ nguyên nhân.
+*   **Tối ưu Giao diện Mapping (Phân quyền):**
+    - Chỉ hiển thị Tên trực tiếp, không kèm mã.
+    - Chuyển `ServiceGroupsList` sang mô hình `ServiceGroupItemViewModel` với `CheckBox` hai chiều (`IsChecked`), bổ sung nút "Chọn tất cả" và "Bỏ chọn tất cả".
+    - Tìm kiếm nhóm dịch vụ không làm mất các lựa chọn đã tích trước đó.
+*   **Bổ sung Bộ Đề Mẫu Chuẩn Phong Phú (Seed Data):**
+    - Mở rộng `EnsureDefaultTemplatesAsync()` nạp sẵn 12 đề thi chuẩn (Điều dưỡng Nội, Ngoại, CTCH, HSTC, Sản, Nhi, Cấp cứu; Lễ tân Nội trú, Khám bệnh; KTV Xét nghiệm, CĐHA; Thu ngân viện phí) theo cấu trúc họ đề từ hệ thống cũ.
+*   **Hiệu chỉnh Tra cứu Tồn kho Chính xác:**
+    - Truy vấn tồn kho trích xuất quan hệ `DM_KhoDuoc.PhongBan_Id -> DM_PhongBan` để lưu `DepartmentCode`, `DepartmentName` vào `SnapshotDrug`.
+    - Khi chọn Khoa tại Tab Tra cứu tồn kho, combobox Kho Dược tự động lọc theo các kho thuộc khoa quản lý.
+    - Cập nhật câu lệnh SQLite lọc đúng theo Khoa và Kho, hỗ trợ tìm kiếm tên/mã thuốc không phân biệt hoa thường và không dấu.
+    - Bổ sung cột hiển thị `Khoa / Phòng` trong bảng kết quả tra cứu tồn kho.
+*   **Kiểm thử & Đóng gói:**
+    - Toàn bộ 16/16 unit tests Passed 100%.
+    - Đóng gói cả bản Framework-dependent tại `desktop/publish/ExamOperationsDesktop/` và bản Single-file Self-contained tại `desktop/publish/ExamOperationsDesktop-final/`.
+
+---
+
 ## [2026-09-07] Chuẩn hóa Dữ liệu Đồng bộ HIS: Loại bỏ hoàn toàn Dữ liệu Mẫu Offline, Snapshot SQLite là Duy nhất & Bất biến
 
 ### 1. Quyết định nghiệp vụ & Thiết kế:
