@@ -266,40 +266,50 @@ Phải hỗ trợ tìm theo batch/thí sinh/SBD/khoa/template, refresh, preview 
 
 ## 11. Trạng thái Triển khai Hiện hành (Tháng 9/2026)
 
-Hệ thống **Exam Operations Desktop (C# .NET 8 LTS / WPF / SQLite)** đã hoàn thành các cấu phần trọng yếu sau:
+Hệ thống **Exam Operations Desktop (C# .NET 8 LTS / WPF / SQLite / OpenXML)** đã hoàn thành và chuẩn hóa toàn diện theo các yêu cầu thực tế của Hội đồng tuyển dụng Bệnh viện Đa khoa Thiện Hạnh:
 
-1. **Phân bổ Kịch bản Khảo thí (`ExamScenarioAllocator`):**
-   * Đảm bảo tuân thủ nghiêm ngặt **Quy tắc Rule 3.2**: Mỗi thí sinh được tự động cấp đúng một User HIS riêng biệt thuộc khoa đăng ký thi.
-   * Cơ chế **Preflight Fail-Fast**: Tự động phát hiện và chặn sinh đề nếu số lượng thí sinh đăng ký trong khoa vượt quá số User HIS khả dụng.
-   * Tự động bốc bệnh nhân nguồn hoặc sinh bệnh nhân biến thể khảo thí (hạn thẻ BHYT chuẩn hóa, mã TE1 5 năm, nơi ĐKKCB `66232`).
-   * Phân bổ thuốc tồn kho dương từ đúng kho thi đã map và phân bổ dịch vụ kỹ thuật theo phân quyền của khoa.
-   * Liên kết câu hỏi: Câu đổi dịch vụ hủy đúng dịch vụ đã chỉ định, câu trả thuốc trả đúng thuốc đã kê.
+1. **Chuẩn hóa Đề thi theo Đề Mẫu Thực tế BV Thiện Hạnh (Kho đề `Thi_2021`):**
+   * **Bố cục in ấn chuẩn A4 2 trang:** Tinh chỉnh lề in A4 (lề trái 20mm dập ghim, lề trên/dưới/phải 10mm), độ rộng bảng chuẩn `10205 dxa`. Toàn bộ đề thi lâm sàng 8 câu vừa khít trong đúng **2 trang** (1 tờ A4 in 2 mặt), không bị rớt lẻ dòng sang trang 3.
+   * **Bảng Điểm & Chữ ký (Table 1):** Bổ sung bảng kẻ viền ngay trên đầu đề thi gồm 3 ô: Điểm (có gạch chân), Chữ ký của cán bộ chấm thi, Chữ ký của cán bộ coi thi (kèm 4 dòng trống để ký).
+   * **Typography thống nhất 100% Times New Roman:** Áp dụng triệt để cho mọi run, đoạn văn, bảng biểu, ghi chú (`w:rFonts w:ascii="Times New Roman" w:hAnsi="Times New Roman" w:cs="Times New Roman"`).
+   * **Cấu hình Thời gian làm bài:** Mặc định 30 phút cho đề lâm sàng/nội trú, 15 phút cho Lễ tân/Khám bệnh/Xét nghiệm; hiển thị trên giao diện và tự động điền vào thông tin đầu đề thi.
+   * **Chỗ trống điền kết quả:** Tự động tạo dòng chấm `....................` cho Số vào viện VP, Số vào viện BHYT, Tồn kho cuối kỳ, Khoa chuyển đến, Tình trạng ra viện.
+   * **Mốc ngày chặn $X$ (Câu 7 & 8):** Tự động đặt $X = \text{ExamDate} - 10\text{ ngày}$ để ngăn thí sinh dùng bệnh nhân mới thi ra chuyển khoa hoặc làm thủ tục ra viện.
 
-2. **Bộ sinh T-SQL Khảo thí (`SqlScriptGenerator`):**
-   * Tích hợp trực tiếp logic từ `Scripts/02_tao_benh_nhan_tiep_nhan_chi_dinh_vao_khoa.sql`.
-   * Đối với đề Tiếp nhận trực tiếp (`requires_direct_reception`): In cảnh báo hướng dẫn thí sinh tự tiếp nhận ca, tuyệt đối không sinh SQL nạp sẵn.
-   * Đối với đề Nhận bệnh vào khoa (`requires_exam_setup_sql`): Sinh script T-SQL đầy đủ tham số để chạy thủ công trên server thi, không sinh câu lệnh giả.
+2. **Câu 2: Phân nhóm CĐHA/CLS theo 4 Modality chuyên môn:**
+   * Lọc dịch vụ Cấp 1 (`(Cap = 1 OR Cap IS NULL)`) từ `DM_DichVu`.
+   * Tự động phân loại thành 4 nhóm chuyên môn: *Siêu âm, X-quang, CT/MRI, Xét nghiệm*.
+   * Bốc ngẫu nhiên (random) theo từng nhóm và trình bày rõ ràng có in đậm tiêu đề từng mục.
+   * Câu 5 (Đổi/thêm dịch vụ) liên kết logic tuyệt đối với Câu 2: hủy 1 dịch vụ đã chỉ định, đổi sang 1 dịch vụ khác, bổ sung thêm 1 dịch vụ mới.
 
-3. **Bộ sinh Tài liệu Word (`WordExamWriter`):**
-   * Render trực tiếp tệp tin DOCX chuẩn A4 bằng OpenXML SDK.
-   * Khung tiêu đề Bệnh viện Đa khoa Thiện Hạnh và Hội đồng tuyển dụng.
-   * Bảng thông tin thí sinh và tài khoản HIS riêng biệt (mật khẩu mặc định `123`).
-   * Bảng thông tin hành chính bệnh nhân (PID, BHYT, DKKCB 66232, Chẩn đoán sơ bộ).
-   * Bảng chỉ định dịch vụ CLS và bảng y lệnh thuốc & VTYT (liều dùng, đường dùng theo ĐVT).
-   * Thang điểm chi tiết từng câu và khung chữ ký 2 Cán bộ chấm thi & Thí sinh xác nhận.
+3. **Câu 3: Chuẩn hóa 5 dòng Dược & Kiểm soát Tồn kho lũy kế (Cumulative Stock Tracking):**
+   * **Cơ cấu chuẩn cố định:** 3 dòng đầu là Thuốc nguồn BHYT (`BH`, SL lần lượt: 1, 2, 1); 2 dòng sau là VTYT nguồn Viện phí (`VP`, SL lần lượt: 2, 2).
+   * **Kiểm soát tồn kho lũy kế:** Theo dõi `remainingStock` liên tục giữa tất cả thí sinh thi cùng khoa trong đợt để đảm bảo:
+     $$\sum_{\text{các thí sinh}} \text{Số lượng xuất của Dược } i \le \text{QuantityOnHand của Dược } i$$
+   * Khi một mặt hàng tồn ít (ví dụ: chỉ còn 2 viên/ống), thí sinh trước bốc thì thí sinh sau tự động chuyển sang mặt hàng khác; nếu kho không đủ hàng cho cả đợt sẽ chặn trước (preflight fail-fast) và báo lỗi chi tiết trên giao diện, ngăn ngừa tuyệt đối tình trạng thí sinh làm bài trên HIS bị lỗi "Không đủ tồn kho để xuất y lệnh".
+   * Câu 6 (Báo tồn kho cơ số nguồn Viện phí): Tự động bốc ngẫu nhiên các loại dược Viện phí khác nhau giữa các thí sinh.
 
-4. **Giao diện Modern Healthcare UI:**
-   * Design System `ModernTheme.xaml` với bảng màu chuẩn y tế: Deep Navy (`#0F172A`), Slate (`#1E293B`), Medical Teal (`#0D9488`), Cyan (`#0284C7`), nền sáng `#F8FAFC`.
-   * Thẻ Card bo góc mềm mại (`CornerRadius="8"`), viền mỏng `#E2E8F0`.
-   * Dashboard thống kê trực quan 4 chỉ số (Khoa, Kho, Thuốc có tồn, User HIS).
-   * 6 Phân hệ hoàn chỉnh: Thực thi tạo đề, Quản lý mẫu đề, Phân quyền dịch vụ & kho, Cài đặt & Danh mục HIS, Tra cứu tồn kho, Lịch sử sinh đề.
+4. **Tính năng In Gộp Toàn Bộ Đề Thi (`_InGop_TatCaDeThi...`):**
+   * Bổ sung phương thức `CreateMerged` trong `WordExamWriter.cs`.
+   * Khi sinh đề, ngoài các tệp đề thi Word riêng lẻ (`De_{SBD}_{HoTen}_{NgayThi}.docx`), hệ thống tự động xuất thêm tệp:
+     `_InGop_TatCaDeThi_{batchName}_{examDate}.docx`
+   * Tệp được xếp ở đầu thư mục xuất và file ZIP (tiền tố `_`), chèn ngắt trang chuẩn (`BreakValues.Page`) giữa từng thí sinh. Cán bộ coi thi chỉ cần mở tệp này và bấm **Ctrl + P (In 1 lần)** cho toàn bộ hội đồng thi.
 
-5. **Lưu trữ & Khảo thí Offline:**
-   * Database SQLite cục bộ `exam-generator.sqlite` cạnh phần mềm.
-   * Quản lý bảng `UsedPatient` chống tái sử dụng bệnh nhân.
-   * Tích hợp bộ dữ liệu mẫu đa khoa phòng mặc định để người dùng trải nghiệm ngay lập tức mà không cần mạng SQL Server.
+5. **Đồng bộ Catalog HIS & Tối ưu Giao diện:**
+   * Lọc khoa phòng Cấp 1 (`Cap = 1`) từ `DM_PhongBan`, chỉ lấy các khoa lâm sàng và phòng ban chính thức.
+   * Hộp thoại popup thông báo chi tiết số lượng bản ghi từng danh mục sau khi đồng bộ thành công.
+   * Màn hình Phân quyền dịch vụ & Mapping kho hiển thị tên trực tiếp dễ tìm kiếm; nhóm dịch vụ hỗ trợ checkbox chọn tất cả / bỏ tất cả mà không mất trạng thái khi search.
+   * Tra cứu tồn kho độc lập theo Khoa - Kho, tìm kiếm thuốc không dấu, hiển thị nguồn và tồn kho thực tế snapshot.
+   * Nạp sẵn bộ 12 đề mẫu chuẩn phong phú theo cấu trúc hệ thống cũ.
 
-6. **Kiểm thử & Đóng gói:**
-   * Toàn bộ 14/14 tests đơn vị trong `desktop/tests/ExamGenerator.Tests` đều đạt (`Passed: 14, Failed: 0`).
-   * Đóng gói bản Release sẵn sàng vận hành tại `desktop/publish/ExamOperationsDesktop/`.
+6. **Phân bổ Kịch bản & SQL Khảo thí (`ExamScenarioAllocator` & `SqlScriptGenerator`):**
+   * Tuân thủ nghiêm ngặt **Quy tắc Rule 3.2**: Mỗi thí sinh 1 User HIS riêng biệt thuộc đúng khoa thi; chặn sinh đề nếu thiếu User HIS.
+   * Bốc đủ 2 bệnh nhân (1 BHYT, 1 Viện phí) từ snapshot hoặc sinh bệnh nhân biến thể khảo thí.
+   * Đối với đề Tiếp nhận trực tiếp: hướng dẫn thí sinh tự tiếp nhận, không sinh SQL nạp sẵn. Đối với đề Nhận bệnh vào khoa: sinh script T-SQL an toàn có kiểm tra tồn tại và `ROLLBACK` khi lỗi.
+   * Quản lý bảng `UsedPatient` trong SQLite để tránh trùng lặp bệnh nhân giữa các đợt thi.
+
+7. **Kiểm thử & Bản phát hành:**
+   * Toàn bộ **20/20 tests** đơn vị trong `desktop/tests/ExamGenerator.Tests` đều đạt **100% Passed**.
+   * Đóng gói bản Release hoàn thiện sẵn sàng vận hành tại:
+     `desktop/publish/ExamOperationsDesktop-final/ExamGenerator.Desktop.exe`
 
