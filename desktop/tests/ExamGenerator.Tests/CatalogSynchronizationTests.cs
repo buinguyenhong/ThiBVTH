@@ -102,4 +102,116 @@ public class CatalogSynchronizationTests
             return Task.CompletedTask;
         }
     }
+
+    [Fact]
+    public async Task Departments_additive_sync_preserves_existing_departments_and_mappings()
+    {
+        var tempDir = Path.Combine(Path.GetTempPath(), "ExamGen_AdditiveTest_" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(tempDir);
+        try
+        {
+            var storage = new Infrastructure.LocalApplicationStorage(tempDir);
+            var db = new Infrastructure.SqliteDatabase(storage);
+            await db.InitializeAsync();
+            await db.EnsureDefaultTemplatesAsync();
+
+            // 1. Initial sync with 2 departments
+            var initialHisDepts = new (string Id, string Code, string Name, string? ParentId)[]
+            {
+                ("pb1", "NOI", "Khoa Nội", null),
+                ("pb2", "NGOAI", "Khoa Ngoại tổng hợp", null)
+            };
+            var (total1, added1, preserved1) = await db.SyncDepartmentsAdditiveAsync(initialHisDepts);
+            Assert.Equal(2, total1);
+            Assert.Equal(2, added1);
+            Assert.Equal(0, preserved1);
+
+            // 2. Configure mapping Khoa - Kho thi
+            await db.SaveDepartmentConfigurationAsync("NOI", "Khoa Nội", "KHO_NOI", "Kho trực Nội");
+            var mappingsBefore = await db.GetDepartmentConfigurationsAsync();
+            Assert.Single(mappingsBefore);
+
+            // 3. Second sync: HIS only returns NGOAI and new SAN (NOI is missing or suspended on HIS)
+            var secondHisDepts = new (string Id, string Code, string Name, string? ParentId)[]
+            {
+                ("pb2", "NGOAI", "Khoa Ngoại tổng hợp", null),
+                ("pb3", "SAN", "Khoa Phụ Sản", null)
+            };
+            var (total2, added2, preserved2) = await db.SyncDepartmentsAdditiveAsync(secondHisDepts);
+            Assert.Equal(3, total2);
+            Assert.Equal(1, added2); // Only SAN is added
+            Assert.Equal(2, preserved2); // NOI and NGOAI are preserved
+
+            // 4. Verify all 3 departments exist and NOI was not deleted
+            var allDepts = await db.GetDepartmentsWithStatusAsync();
+            Assert.Equal(3, allDepts.Count);
+            Assert.Contains(allDepts, d => d.Code == "NOI");
+            Assert.Contains(allDepts, d => d.Code == "NGOAI");
+            Assert.Contains(allDepts, d => d.Code == "SAN");
+
+            // 5. Verify mappings and templates for Khoa Nội remain 100% intact
+            var mappingsAfter = await db.GetDepartmentConfigurationsAsync();
+            Assert.Single(mappingsAfter);
+            Assert.Equal("NOI", mappingsAfter[0].DepartmentCode);
+            Assert.Equal("Khoa Nội", mappingsAfter[0].DepartmentName);
+
+            var templates = await db.GetTemplatesAsync();
+            Assert.Contains(templates, t => t.Department == "Khoa Nội");
+        }
+        finally
+        {
+            Microsoft.Data.Sqlite.SqliteConnection.ClearAllPools();
+            try { if (Directory.Exists(tempDir)) Directory.Delete(tempDir, true); } catch { }
+        }
+    }
+
+    [Fact]
+    public async Task Manual_department_exam_status_toggle_is_persisted_and_not_overwritten_by_sync()
+    {
+        var tempDir = Path.Combine(Path.GetTempPath(), "ExamGen_StatusToggleTest_" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(tempDir);
+        try
+        {
+            var storage = new Infrastructure.LocalApplicationStorage(tempDir);
+            var db = new Infrastructure.SqliteDatabase(storage);
+            await db.InitializeAsync();
+
+            var hisDepts = new (string Id, string Code, string Name, string? ParentId)[]
+            {
+                ("pb1", "NOI", "Khoa Nội", null),
+                ("pb2", "NGOAI", "Khoa Ngoại tổng hợp", null)
+            };
+            await db.SyncDepartmentsAdditiveAsync(hisDepts);
+
+            // User manually disables "NOI" for exam
+            await db.SetDepartmentExamStatusAsync("NOI", true);
+
+            var deptsAfterDisable = await db.GetDepartmentsWithStatusAsync();
+            var noi = deptsAfterDisable.First(d => d.Code == "NOI");
+            var ngoai = deptsAfterDisable.First(d => d.Code == "NGOAI");
+            Assert.True(noi.IsDisabled);
+            Assert.False(ngoai.IsDisabled);
+
+            // Another sync from HIS with NOI and a new dept
+            var newSyncDepts = new (string Id, string Code, string Name, string? ParentId)[]
+            {
+                ("pb1", "NOI", "Khoa Nội", null),
+                ("pb2", "NGOAI", "Khoa Ngoại tổng hợp", null),
+                ("pb4", "CC", "Khoa Cấp cứu", null)
+            };
+            await db.SyncDepartmentsAdditiveAsync(newSyncDepts);
+
+            // Verify NOI is STILL disabled (manual toggle preserved)
+            var deptsAfterSync = await db.GetDepartmentsWithStatusAsync();
+            var noiAfterSync = deptsAfterSync.First(d => d.Code == "NOI");
+            var ccAfterSync = deptsAfterSync.First(d => d.Code == "CC");
+            Assert.True(noiAfterSync.IsDisabled);
+            Assert.False(ccAfterSync.IsDisabled);
+        }
+        finally
+        {
+            Microsoft.Data.Sqlite.SqliteConnection.ClearAllPools();
+            try { if (Directory.Exists(tempDir)) Directory.Delete(tempDir, true); } catch { }
+        }
+    }
 }

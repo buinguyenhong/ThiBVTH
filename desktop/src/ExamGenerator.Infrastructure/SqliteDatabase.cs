@@ -45,6 +45,7 @@ public sealed class SqliteDatabase
                 ItemName TEXT NOT NULL,
                 ParentId TEXT NULL,
                 ImportedAt TEXT NOT NULL,
+                IsDisabledForExam INTEGER NOT NULL DEFAULT 0,
                 PRIMARY KEY(CatalogType, ItemId)
             );
             CREATE TABLE IF NOT EXISTS ExamTemplate (
@@ -124,6 +125,14 @@ public sealed class SqliteDatabase
             var alter2 = connection.CreateCommand();
             alter2.CommandText = "ALTER TABLE SnapshotDrug ADD COLUMN DepartmentName TEXT NULL";
             await alter2.ExecuteNonQueryAsync(cancellationToken);
+        }
+        catch { /* column may already exist */ }
+
+        try
+        {
+            var alter3 = connection.CreateCommand();
+            alter3.CommandText = "ALTER TABLE CatalogItem ADD COLUMN IsDisabledForExam INTEGER NOT NULL DEFAULT 0";
+            await alter3.ExecuteNonQueryAsync(cancellationToken);
         }
         catch { /* column may already exist */ }
     }
@@ -496,6 +505,93 @@ public sealed class SqliteDatabase
         await using var reader = await command.ExecuteReaderAsync(cancellationToken);
         while (await reader.ReadAsync(cancellationToken))
             items.Add((reader.GetString(0), reader.GetString(1)));
+        return items;
+    }
+
+    /// <summary>
+    /// Đồng bộ Khoa/Phòng theo cơ chế Cộng dồn (Additive / Non-destructive):
+    /// - Chỉ thêm mới những khoa có mã hoặc ID chưa tồn tại trong SQLite.
+    /// - Tuyệt đối không xóa và không sửa đổi các khoa phòng hiện hữu.
+    /// - Bảo lưu toàn bộ cấu hình Mapping Kho thi, Nhóm dịch vụ và Mẫu đề thi gắn với khoa.
+    /// </summary>
+    public async Task<(int TotalCount, int AddedCount, int PreservedCount)> SyncDepartmentsAdditiveAsync(
+        IReadOnlyList<(string Id, string Code, string Name, string? ParentId)> hisDepartments,
+        CancellationToken cancellationToken = default)
+    {
+        await using var connection = new SqliteConnection($"Data Source={DatabasePath}");
+        await connection.OpenAsync(cancellationToken);
+
+        var existingCodes = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        var existingIds = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        var readCmd = connection.CreateCommand();
+        readCmd.CommandText = "SELECT ItemId, ItemCode FROM CatalogItem WHERE CatalogType = 'Departments'";
+        await using (var reader = await readCmd.ExecuteReaderAsync(cancellationToken))
+        {
+            while (await reader.ReadAsync(cancellationToken))
+            {
+                existingIds.Add(reader.GetString(0));
+                existingCodes.Add(reader.GetString(1));
+            }
+        }
+
+        int preservedCount = existingIds.Count;
+        int addedCount = 0;
+
+        await using var transaction = connection.BeginTransaction();
+        foreach (var item in hisDepartments)
+        {
+            if (!existingIds.Contains(item.Id) && !existingCodes.Contains(item.Code))
+            {
+                var insert = connection.CreateCommand();
+                insert.Transaction = transaction;
+                insert.CommandText = "INSERT INTO CatalogItem (CatalogType, ItemId, ItemCode, ItemName, ParentId, ImportedAt, IsDisabledForExam) VALUES ('Departments', $id, $code, $name, $parent, $at, 0)";
+                insert.Parameters.AddWithValue("$id", item.Id);
+                insert.Parameters.AddWithValue("$code", item.Code);
+                insert.Parameters.AddWithValue("$name", item.Name);
+                insert.Parameters.AddWithValue("$parent", (object?)item.ParentId ?? DBNull.Value);
+                insert.Parameters.AddWithValue("$at", DateTimeOffset.Now.ToString("O"));
+                await insert.ExecuteNonQueryAsync(cancellationToken);
+
+                existingIds.Add(item.Id);
+                existingCodes.Add(item.Code);
+                addedCount++;
+            }
+        }
+        await transaction.CommitAsync(cancellationToken);
+
+        int totalCount = preservedCount + addedCount;
+        return (totalCount, addedCount, preservedCount);
+    }
+
+    /// <summary>
+    /// Bật / Tắt trạng thái tham gia khảo thí của một Khoa/Phòng (thực hiện thủ công bởi người dùng).
+    /// </summary>
+    public async Task SetDepartmentExamStatusAsync(string departmentCode, bool isDisabled, CancellationToken cancellationToken = default)
+    {
+        await using var connection = new SqliteConnection($"Data Source={DatabasePath}");
+        await connection.OpenAsync(cancellationToken);
+        var cmd = connection.CreateCommand();
+        cmd.CommandText = "UPDATE CatalogItem SET IsDisabledForExam = $disabled WHERE CatalogType = 'Departments' AND (ItemCode = $code OR ItemId = $code)";
+        cmd.Parameters.AddWithValue("$disabled", isDisabled ? 1 : 0);
+        cmd.Parameters.AddWithValue("$code", departmentCode);
+        await cmd.ExecuteNonQueryAsync(cancellationToken);
+    }
+
+    /// <summary>
+    /// Lấy danh sách Khoa/Phòng kèm trạng thái Tạm ngưng do người dùng thiết lập thủ công.
+    /// </summary>
+    public async Task<IReadOnlyList<(string Code, string Name, bool IsDisabled)>> GetDepartmentsWithStatusAsync(CancellationToken cancellationToken = default)
+    {
+        var items = new List<(string, string, bool)>();
+        await using var connection = new SqliteConnection($"Data Source={DatabasePath}");
+        await connection.OpenAsync(cancellationToken);
+        var command = connection.CreateCommand();
+        command.CommandText = "SELECT ItemCode, ItemName, COALESCE(IsDisabledForExam, 0) FROM CatalogItem WHERE CatalogType = 'Departments' ORDER BY ItemName";
+        await using var reader = await command.ExecuteReaderAsync(cancellationToken);
+        while (await reader.ReadAsync(cancellationToken))
+        {
+            items.Add((reader.GetString(0), reader.GetString(1), reader.GetInt32(2) == 1));
+        }
         return items;
     }
 

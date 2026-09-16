@@ -42,3 +42,10 @@
 - **Duong dan chay:** `desktop/publish/ExamOperationsDesktop/ExamGenerator.Desktop.exe`
 - **Kich thuoc file thuc thi:** 148.5 KB
 - **Ghi chu thay doi:** Automated release build
+
+### Build [2026-09-16 14:33:49] - Commit [926a723]
+- **Trang thai:** Thanh cong (16/16 Tests Passed)
+- **Cau hinh:** .NET 8 LTS (Release)
+- **Duong dan chay:** `desktop/publish/ExamOperationsDesktop/ExamGenerator.Desktop.exe`
+- **Kich thuoc file thuc thi:** 148.5 KB
+- **Ghi chu thay doi:** Bao ve danh muc khoa phong, mapping va de thi voi co che additive sync va quan ly tam ngung thu cong

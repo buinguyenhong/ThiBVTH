@@ -229,7 +229,22 @@
                         <DockPanel>
                             <TextBlock DockPanel.Dock="Top" Text="Khoa / Phòng Khảo thí" FontSize="16" FontWeight="SemiBold" Margin="0,0,0,8"/>
                             <TextBox DockPanel.Dock="Top" x:Name="MappingSearchTextBox" TextChanged="MappingSearchChanged" Margin="0,0,0,8"/>
-                            <ListBox x:Name="MappingDepartmentList" SelectionChanged="MappingDepartmentChanged" DisplayMemberPath="Name" BorderBrush="{StaticResource BorderSubtle}"/>
+                            <ListBox x:Name="MappingDepartmentList" SelectionChanged="MappingDepartmentChanged" BorderBrush="{StaticResource BorderSubtle}">
+                                <ListBox.ItemTemplate>
+                                    <DataTemplate>
+                                        <Grid Margin="2,4">
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="*"/>
+                                                <ColumnDefinition Width="Auto"/>
+                                            </Grid.ColumnDefinitions>
+                                            <TextBlock Text="{Binding Name}" FontSize="13" Foreground="{StaticResource TextPrimary}" VerticalAlignment="Center"/>
+                                            <Border Grid.Column="1" Background="#FEF2F2" BorderBrush="#F87171" BorderThickness="1" CornerRadius="4" Padding="6,1" Margin="6,0,0,0" Visibility="{Binding DisabledBadgeVisibility}">
+                                                <TextBlock Text="Tạm ngưng" FontSize="11" Foreground="#DC2626" FontWeight="SemiBold"/>
+                                            </Border>
+                                        </Grid>
+                                    </DataTemplate>
+                                </ListBox.ItemTemplate>
+                            </ListBox>
                         </DockPanel>
                     </Border>
 
@@ -238,7 +253,13 @@
                         <ScrollViewer VerticalScrollBarVisibility="Auto">
                             <StackPanel>
                                 <TextBlock x:Name="MappingTitleText" Text="Cấu hình Kho thi &amp; Nhóm Dịch vụ" FontSize="18" FontWeight="SemiBold" Foreground="{StaticResource BrandNavy}"/>
-                                <TextBlock Text="Quy tắc chuẩn: Mỗi khoa chỉ được gắn đúng một Kho thi duy nhất để đảm bảo tính nhất quán của đề thi." Foreground="{StaticResource TextSecondary}" Margin="0,2,0,16"/>
+                                <TextBlock Text="Quy tắc chuẩn: Mỗi khoa chỉ được gắn đúng một Kho thi duy nhất để đảm bảo tính nhất quán của đề thi." Foreground="{StaticResource TextSecondary}" Margin="0,2,0,12"/>
+
+                                <Border Background="#F1F5F9" BorderBrush="{StaticResource BorderSubtle}" BorderThickness="1" CornerRadius="6" Padding="12,8" Margin="0,0,0,14">
+                                    <CheckBox x:Name="DepartmentActiveCheckBox" Click="DepartmentActive_Click" VerticalAlignment="Center" IsChecked="True">
+                                        <TextBlock Text="Cho phép khoa này tham gia khảo thí (Bỏ chọn để Tạm ngưng thi thủ công mà không làm mất mapping &amp; đề thi)" FontWeight="Medium" Foreground="{StaticResource TextPrimary}" Margin="6,0,0,0"/>
+                                    </CheckBox>
+                                </Border>
 
                                 <TextBlock Text="Kho Dược / Tủ trực thi duy nhất (Bắt buộc)" FontWeight="SemiBold" Margin="0,0,0,4"/>
                                 <ComboBox x:Name="MappingWarehouseComboBox" IsEditable="True"/>

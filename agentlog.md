@@ -2,6 +2,29 @@
 
 Nhật ký ghi lại các thay đổi, quyết định thiết kế và tiến trình thực thi của Antigravity Coding Assistant trong suốt phiên làm việc.
 
+## [2026-09-16] Bảo vệ Danh mục Khoa/Phòng, Cấu hình Mapping và Mẫu Đề thi khi Đồng bộ HIS
+
+### 1. Quyết định nghiệp vụ & Thiết kế:
+*   **Chiến lược Đồng bộ Cộng dồn (Additive / Non-destructive Sync) cho Khoa/Phòng:**
+    - Khoa/Phòng ban trong bệnh viện mang tính ổn định cao, hiếm khi thay đổi.
+    - Loại bỏ hoàn toàn lệnh `DELETE FROM CatalogItem WHERE CatalogType = 'Departments'`.
+    - Khi đồng bộ từ SQL Server HIS, hệ thống chỉ kiểm tra và `INSERT` những Khoa/Phòng mới phát sinh trên HIS (`SyncDepartmentsAdditiveAsync`).
+    - Các Khoa/Phòng hiện hữu và toàn bộ cấu hình Mapping Kho thi (`DepartmentConfiguration`), Nhóm Dịch vụ (`DepartmentServiceGroup`), Mẫu Đề thi (`ExamTemplate`) được bảo lưu nguyên vẹn 100%.
+*   **Quyền Quản lý Tạm ngưng Thi do Người dùng Làm chủ (User-Controlled Status):**
+    - Trạng thái một khoa có tham gia kỳ thi hay không là quyết định của Hội đồng thi, không phụ thuộc máy móc vào cờ `TamNgung` trên HIS.
+    - Bổ sung trường `IsDisabledForExam` vào bảng `CatalogItem`.
+    - Thêm Checkbox tại màn hình Phân quyền: *"Cho phép khoa này tham gia khảo thí (Bỏ chọn để Tạm ngưng thi thủ công mà không làm mất mapping & đề thi)"*.
+    - Thêm badge trực quan `[Tạm ngưng]` màu đỏ trên danh sách Khoa/Phòng khi khoa bị tạm dừng.
+    - ComboBox chọn Khoa tại màn hình **Thực thi tạo đề** tự động lọc chỉ hiển thị các Khoa đang kích hoạt thi (`!IsDisabled`).
+*   **Báo cáo Đồng bộ Chi tiết:**
+    - Popup thông báo sau khi đồng bộ HIS thể hiện rõ:
+      `• Khoa / Phòng (Cấp 1): {deptTotal} khoa (Bảo lưu: {deptPreserved} khoa & mapping/mẫu đề; Bổ sung mới: {deptAdded} khoa)`
+*   **Kiểm thử & Phát hành:**
+    - Bổ sung 2 bài test tự động chuyên biệt trong `CatalogSynchronizationTests.cs` kiểm chứng cơ chế Additive Sync và việc duy trì trạng thái Tạm ngưng khi đồng bộ. Toàn bộ **22/22 unit tests Passed 100%**.
+    - Cập nhật bản phát hành tại `desktop/publish/ExamOperationsDesktop/` và `desktop/publish/ExamOperationsDesktop-final/`.
+
+---
+
 ## [2026-09-14] Chuẩn hóa toàn diện Đề thi theo mẫu thực tế BV Thiện Hạnh (Thi_2021) & Tối ưu in ấn, kiểm soát tồn kho lũy kế
 
 ### 1. Quyết định nghiệp vụ & Thiết kế:

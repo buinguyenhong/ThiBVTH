@@ -70,8 +70,8 @@ public partial class MainWindow : Window
     private async Task LoadStaticViewsAsync()
     {
         _departments.Clear();
-        var depts = await _database.GetCatalogItemsAsync("Departments");
-        _departments.AddRange(depts.Select(d => new DepartmentRow(d.Name, d.Code)));
+        var depts = await _database.GetDepartmentsWithStatusAsync();
+        _departments.AddRange(depts.Select(d => new DepartmentRow(d.Name, d.Code, d.IsDisabled)));
 
         _warehouses.Clear();
         var whs = await _database.GetWarehousesWithDepartmentAsync();
@@ -99,19 +99,25 @@ public partial class MainWindow : Window
         TemplatesGrid.ItemsSource = null;
         TemplatesGrid.ItemsSource = _templates;
 
+        // Chỉ nạp các Khoa đang kích hoạt thi vào ComboBox chọn khoa của Tab 1 (Tạo đề thi)
+        var activeDepts = _departments.Where(x => !x.IsDisabled).Select(x => x.Name).ToList();
         ExamDepartmentComboBox.ItemsSource = null;
-        ExamDepartmentComboBox.ItemsSource = _departments.Select(x => x.Name).ToList();
-        if (_departments.Count > 0)
+        ExamDepartmentComboBox.ItemsSource = activeDepts;
+        if (activeDepts.Count > 0)
         {
             ExamDepartmentComboBox.SelectedIndex = 0;
         }
         else
         {
-            ExamDepartmentComboBox.Text = "(Chưa đồng bộ khoa từ HIS)";
+            ExamDepartmentComboBox.Text = _departments.Count > 0 ? "(Tất cả khoa đang tạm ngưng thi)" : "(Chưa đồng bộ khoa từ HIS)";
         }
 
         MappingDepartmentList.ItemsSource = null;
         MappingDepartmentList.ItemsSource = _departments;
+        if (_departments.Count > 0 && MappingDepartmentList.SelectedIndex < 0)
+        {
+            MappingDepartmentList.SelectedIndex = 0;
+        }
 
         InventoryDepartmentComboBox.ItemsSource = null;
         InventoryDepartmentComboBox.ItemsSource = new[] { "Tất cả khoa" }.Concat(_departments.Select(x => x.Name)).ToList();
@@ -390,6 +396,7 @@ public partial class MainWindow : Window
         if (MappingDepartmentList.SelectedItem is not DepartmentRow d) return;
         _selectedMappingDepartment = d.Code;
         MappingTitleText.Text = $"Cấu hình: {d.Name}";
+        DepartmentActiveCheckBox.IsChecked = !d.IsDisabled;
 
         var configs = await _database.GetDepartmentConfigurationsAsync();
         var current = configs.FirstOrDefault(x => x.DepartmentCode == d.Code);
@@ -423,6 +430,27 @@ public partial class MainWindow : Window
     private void ServiceSearchChanged(object sender, TextChangedEventArgs e)
     {
         RefreshServiceGroupsList();
+    }
+
+    private async void DepartmentActive_Click(object sender, RoutedEventArgs e)
+    {
+        if (MappingDepartmentList.SelectedItem is not DepartmentRow dept) return;
+        bool isActive = DepartmentActiveCheckBox.IsChecked == true;
+        bool isDisabled = !isActive;
+
+        await _database.SetDepartmentExamStatusAsync(dept.Code, isDisabled);
+        MappingStatusText.Text = isActive
+            ? $"Đã mở lại trạng thái khảo thí cho {dept.Name}."
+            : $"Đã tạm ngưng khảo thí cho {dept.Name} (Cấu hình mapping & đề thi vẫn được bảo toàn nguyên vẹn).";
+
+        var currentCode = dept.Code;
+        await LoadStaticViewsAsync();
+
+        var reselect = _departments.FirstOrDefault(x => x.Code == currentCode);
+        if (reselect is not null)
+        {
+            MappingDepartmentList.SelectedItem = reselect;
+        }
     }
 
     private void SelectAllServices_Click(object sender, RoutedEventArgs e)
@@ -544,8 +572,12 @@ public partial class MainWindow : Window
             await LoadMappingsAsync();
             await RefreshDashboardCardsAsync();
 
+            var deptTotal = counts.GetValueOrDefault("Departments", 0);
+            var deptAdded = counts.GetValueOrDefault("Departments_Added", 0);
+            var deptPreserved = counts.GetValueOrDefault("Departments_Preserved", 0);
+
             var summaryText =
-                $"• Khoa / Phòng (Cấp 1): {counts.GetValueOrDefault("Departments", 0):N0} bản ghi\n" +
+                $"• Khoa / Phòng (Cấp 1): {deptTotal:N0} khoa (Bảo lưu: {deptPreserved:N0} khoa & mapping/mẫu đề; Bổ sung mới: {deptAdded:N0} khoa)\n" +
                 $"• Kho Dược / Tủ trực: {counts.GetValueOrDefault("Warehouses", 0):N0} bản ghi\n" +
                 $"• Nhóm Dịch vụ CLS: {counts.GetValueOrDefault("ServiceGroups", 0):N0} bản ghi\n" +
                 $"• Dịch vụ Kỹ thuật / CLS: {counts.GetValueOrDefault("Services", 0):N0} bản ghi\n" +
@@ -774,7 +806,11 @@ public partial class MainWindow : Window
     }
 
     private sealed record TemplateRow(string Id, string Name, string Department, string Position, int QuestionCount, double TotalScore, string Status);
-    private sealed record DepartmentRow(string Name, string Code);
+    private sealed record DepartmentRow(string Name, string Code, bool IsDisabled = false)
+    {
+        public Visibility DisabledBadgeVisibility => IsDisabled ? Visibility.Visible : Visibility.Collapsed;
+        public string DisplayText => IsDisabled ? $"{Name} (Tạm ngưng)" : Name;
+    }
     private sealed record WarehouseRow(string Name, string Code);
     private sealed record CatalogRow(string Catalog, string Status, string Count);
     private sealed record HistoryRow(string Batch, string ExamDate, string FilePath, string CreatedAt);

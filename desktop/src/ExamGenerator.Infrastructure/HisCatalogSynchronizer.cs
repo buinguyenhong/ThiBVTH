@@ -60,11 +60,33 @@ public sealed class HisCatalogSynchronizer
 
         var counts = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
 
-        // 1. Synchronize Standard CatalogItems (Departments, Warehouses, ServiceGroups, Services)
-        onProgress?.Invoke("Đang đồng bộ Khoa/Phòng, Kho Dược, Nhóm Dịch Vụ và Dịch Vụ kỹ thuật...");
+        // 1. Synchronize Departments (Additive: Chỉ thêm mới, bảo vệ tuyệt đối danh mục hiện có, mapping và mẫu đề)
+        onProgress?.Invoke("Đang đồng bộ Khoa/Phòng (Cơ chế bảo vệ danh mục & mapping)...");
+        var deptQuery = "SELECT CAST(PhongBan_Id AS varchar(50)), ISNULL(MaPhongBan, CAST(PhongBan_Id AS varchar(50))), ISNULL(TenPhongBan, N'Khoa phòng'), NULL FROM dbo.DM_PhongBan WITH (NOLOCK) WHERE ISNULL(TamNgung, 0) = 0 AND Cap = 1 ORDER BY TenPhongBan";
+        var deptRows = new List<(string Id, string Code, string Name, string? ParentId)>();
+        await using (var deptCmd = new SqlCommand(deptQuery, connection))
+        {
+            deptCmd.CommandTimeout = 120;
+            await using var reader = await deptCmd.ExecuteReaderAsync(cancellationToken);
+            while (await reader.ReadAsync(cancellationToken))
+            {
+                deptRows.Add((
+                    SafeGetString(reader, 0),
+                    SafeGetString(reader, 1),
+                    SafeGetString(reader, 2),
+                    reader.IsDBNull(3) ? null : SafeGetString(reader, 3)
+                ));
+            }
+        }
+        var (deptTotal, deptAdded, deptPreserved) = await sqlite.SyncDepartmentsAdditiveAsync(deptRows, cancellationToken);
+        counts["Departments"] = deptTotal;
+        counts["Departments_Added"] = deptAdded;
+        counts["Departments_Preserved"] = deptPreserved;
+
+        // 2. Synchronize Other Standard Catalogs (Warehouses, ServiceGroups, Services)
+        onProgress?.Invoke("Đang đồng bộ Kho Dược, Nhóm Dịch Vụ và Dịch Vụ kỹ thuật...");
         var basicDefinitions = new Dictionary<string, string>
         {
-            ["Departments"] = "SELECT CAST(PhongBan_Id AS varchar(50)), ISNULL(MaPhongBan, CAST(PhongBan_Id AS varchar(50))), ISNULL(TenPhongBan, N'Khoa phòng'), NULL FROM dbo.DM_PhongBan WITH (NOLOCK) WHERE ISNULL(TamNgung, 0) = 0 AND Cap = 1 ORDER BY TenPhongBan",
             ["Warehouses"] = "SELECT CAST(KhoDuoc_Id AS varchar(50)), ISNULL(MaKho, CAST(KhoDuoc_Id AS varchar(50))), ISNULL(TenKho, N'Kho dược'), CAST(PhongBan_Id AS varchar(50)) FROM dbo.DM_KhoDuoc WITH (NOLOCK) WHERE ISNULL(TamNgung, 0) = 0 ORDER BY TenKho",
             ["ServiceGroups"] = "SELECT CAST(NhomDichVu_Id AS varchar(50)), ISNULL(MaNhomDichVu, CAST(NhomDichVu_Id AS varchar(50))), ISNULL(TenNhomDichVu, N'Nhóm dịch vụ'), NULL FROM dbo.DM_NhomDichVu WITH (NOLOCK) WHERE ISNULL(TamNgung, 0) = 0 ORDER BY TenNhomDichVu",
             ["Services"] = "SELECT CAST(d.DichVu_Id AS varchar(50)), ISNULL(d.MaDichVu, CAST(d.DichVu_Id AS varchar(50))), ISNULL(d.TenDichVu, N'Dịch vụ kỹ thuật'), CAST(d.NhomDichVu_Id AS varchar(50)) FROM dbo.DM_DichVu d WITH (NOLOCK) WHERE ISNULL(d.TamNgung, 0) = 0 AND (d.Cap = 1 OR d.Cap IS NULL) ORDER BY d.TenDichVu"
