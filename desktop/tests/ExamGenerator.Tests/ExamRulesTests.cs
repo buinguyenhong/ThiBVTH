@@ -36,7 +36,7 @@ public class ExamRulesTests
     }
 
     [Fact]
-    public void Batch_requires_exactly_one_warehouse_per_enabled_department()
+    public void Batch_allows_multiple_warehouses_per_department_and_requires_at_least_one()
     {
         var errors = ExamBatchRules.ValidateWarehouseMappings(
             new[]
@@ -47,8 +47,37 @@ public class ExamRulesTests
             },
             new[] { "NOI", "NHI", "SAN" });
 
-        Assert.Contains(errors, error => error.Contains("NOI", StringComparison.OrdinalIgnoreCase));
+        // NOI has 2 warehouses, NHI has 1 => both are valid
+        Assert.DoesNotContain(errors, error => error.Contains("NOI", StringComparison.OrdinalIgnoreCase));
+        Assert.DoesNotContain(errors, error => error.Contains("NHI", StringComparison.OrdinalIgnoreCase));
+        // SAN has 0 warehouses => invalid
         Assert.Contains(errors, error => error.Contains("SAN", StringComparison.OrdinalIgnoreCase));
+    }
+
+    [Fact]
+    public void Candidate_must_select_warehouse_mapped_to_department()
+    {
+        var mappings = new[]
+        {
+            new DepartmentWarehouseMapping("NOI", "KHO-01"),
+            new DepartmentWarehouseMapping("NOI", "KHO-02")
+        };
+
+        var validCandidates = new (string CandidateName, string DepartmentCode, string? WarehouseCode)[]
+        {
+            ("TS-01", "NOI", "KHO-01"),
+            ("TS-02", "NOI", "KHO-02")
+        };
+        var validErrors = ExamBatchRules.ValidateCandidateWarehouseSelections(validCandidates, mappings);
+        Assert.Empty(validErrors);
+
+        var invalidCandidates = new (string CandidateName, string DepartmentCode, string? WarehouseCode)[]
+        {
+            ("TS-03", "NOI", "KHO-KHAC"),
+            ("TS-04", "NOI", "")
+        };
+        var invalidErrors = ExamBatchRules.ValidateCandidateWarehouseSelections(invalidCandidates, mappings);
+        Assert.Equal(2, invalidErrors.Count);
     }
 
     [Fact]
@@ -74,5 +103,19 @@ public class ExamRulesTests
             new[] { new CandidateAssignment("A", "NOI", "user01") });
 
         Assert.True(result.IsValid);
+    }
+
+    [Fact]
+    public void System_action_catalog_contains_standard_his_actions()
+    {
+        var actions = SystemActionCatalog.All;
+        Assert.NotEmpty(actions);
+        Assert.Contains(actions, a => a.Code == "TN_TIEP_NHAN");
+        Assert.Contains(actions, a => a.Code == "NT_NHAN_BENH_KHOA");
+        Assert.Contains(actions, a => a.Code == "YL_CHI_DINH_CLS");
+        Assert.Contains(actions, a => a.Code == "YL_CHI_DINH_THUOC_VTYT");
+        Assert.Contains(actions, a => a.Code == "TK_KIEM_TON_KHO");
+        Assert.Contains(actions, a => a.Code == "CK_CHUYEN_KHOA");
+        Assert.Contains(actions, a => a.Code == "RV_CHO_RA_VIEN");
     }
 }

@@ -17,6 +17,7 @@ $WorkspaceRoot = $PSScriptRoot
 $DesktopProj = Join-Path $WorkspaceRoot "desktop\src\ExamGenerator.Desktop\ExamGenerator.Desktop.csproj"
 $TestProj = Join-Path $WorkspaceRoot "desktop\tests\ExamGenerator.Tests\ExamGenerator.Tests.csproj"
 $PublishDir = Join-Path $WorkspaceRoot "desktop\publish\ExamOperationsDesktop"
+$PublishStandaloneDir = Join-Path $WorkspaceRoot "desktop\publish\ExamOperationsDesktop-Standalone"
 $BuildHistoryFile = Join-Path $WorkspaceRoot "BUILD_HISTORY.md"
 
 # 1. Chay Unit Tests
@@ -28,29 +29,72 @@ if ($LASTEXITCODE -ne 0) {
 }
 Write-Host "-> Toan bo Unit Tests PASSED thanh cong!" -ForegroundColor Green
 
-# 2. Publish Release
-Write-Host "`n[2/4] Build va Publish phien ban Release..." -ForegroundColor Yellow
+# 2. Publish Release (Bản tiêu chuẩn & Bản Standalone)
+Write-Host "`n[2/4] Build va Publish phien ban Tieu Chuan (Framework-dependent)..." -ForegroundColor Yellow
 dotnet publish $DesktopProj -c Release -o $PublishDir
 if ($LASTEXITCODE -ne 0) {
-    Write-Error "Dotnet publish that bai!"
+    Write-Error "Dotnet publish ban tieu chuan that bai!"
     exit 1
 }
 
-# 3. Lam sach SQLite cu trong thu muc publish
-$StaleDb = Join-Path $PublishDir "exam-generator.sqlite"
-if (Test-Path $StaleDb) {
-    Remove-Item $StaleDb -Force -ErrorAction SilentlyContinue
-    Write-Host "-> Da don dep file SQLite cu trong thu muc publish (san sang cho dong bo HIS)." -ForegroundColor Gray
+Write-Host "`n[2b/4] Build va Publish phien ban Standalone (Self-Contained win-x64)..." -ForegroundColor Yellow
+dotnet publish $DesktopProj -c Release -r win-x64 --self-contained true -p:PublishSingleFile=false -o $PublishStandaloneDir
+if ($LASTEXITCODE -ne 0) {
+    Write-Error "Dotnet publish ban Standalone that bai!"
+    exit 1
 }
+
+# 3. Tao script cap nhat an toan va huong dan sao chep cho ca 2 ban
+$BatchContent = @"
+@echo off
+chcp 65001 >nul
+echo ========================================================
+echo  CAP NHAT PHAN MEM TAO DE THI - KHONG MAT DU LIEU / MAPPING
+echo ========================================================
+echo.
+set /p TARGET_DIR="Nhap duong dan thu muc dang chay that (VD: D:\ExamGenerator): "
+if "%TARGET_DIR%"=="" (
+    echo [LOI] Chua nhap duong dan thu muc!
+    pause
+    exit /b 1
+)
+
+if not exist "%TARGET_DIR%" (
+    echo [LOI] Thu muc khong ton tai: %TARGET_DIR%
+    pause
+    exit /b 1
+)
+
+echo.
+echo Dang sao chep file chay moi (TU DONG BO QUA: thu muc data, database, cau hinh va output)...
+robocopy "%~dp0." "%TARGET_DIR%" /E /XF "exam-generator.sqlite*" "appsettings.local.json" "credentials.local.bin" "CapNhat_KhongMatDuLieu.bat" /XD "data" "output" /NP /R:1 /W:1
+
+echo.
+echo ========================================================
+echo  HOAN TAT CAP NHAT AN TOAN!
+echo  Toan bo thu muc data/ (Mapping, Mau de, CSDL va Lich su) da duoc giu nguyen 100%%.
+echo ========================================================
+pause
+"@
+
+foreach ($targetDir in @($PublishDir, $PublishStandaloneDir)) {
+    $stale = Join-Path $targetDir "data"
+    if (Test-Path $stale) {
+        Remove-Item $stale -Recurse -Force -ErrorAction SilentlyContinue
+    }
+    $scriptPath = Join-Path $targetDir "CapNhat_KhongMatDuLieu.bat"
+    [System.IO.File]::WriteAllText($scriptPath, $BatchContent, [System.Text.Encoding]::ASCII)
+}
+Write-Host "-> Da tao script cap nhat an toan trong ca 2 thu muc publish" -ForegroundColor Green
 
 $ExePath = Join-Path $PublishDir "ExamGenerator.Desktop.exe"
-if (-not (Test-Path $ExePath)) {
-    Write-Error "Khong tim thay file thuc thi $ExePath sau khi publish!"
-    exit 1
-}
+$ExeStandalonePath = Join-Path $PublishStandaloneDir "ExamGenerator.Desktop.exe"
+
 $ExeItem = Get-Item $ExePath
 $ExeSizeKb = [Math]::Round($ExeItem.Length / 1024, 1)
-Write-Host "-> File thuc thi san sang: $($ExeItem.FullName) ($ExeSizeKb KB)" -ForegroundColor Green
+
+$ExeStandaloneItem = Get-Item $ExeStandalonePath
+$ExeStandaloneSizeKb = [Math]::Round($ExeStandaloneItem.Length / 1024, 1)
 
 # 4. Ghi vet Build History
 Write-Host "`n[3/4] Ghi nhan lich su build vao BUILD_HISTORY.md..." -ForegroundColor Yellow
@@ -63,10 +107,11 @@ try {
 $LogEntry = @"
 
 ### Build [$Timestamp] - Commit [$GitCommit]
-- **Trang thai:** Thanh cong (16/16 Tests Passed)
-- **Cau hinh:** .NET 8 LTS (Release)
-- **Duong dan chay:** ``desktop/publish/ExamOperationsDesktop/ExamGenerator.Desktop.exe``
-- **Kich thuoc file thuc thi:** $ExeSizeKb KB
+- **Trang thai:** Thanh cong (34/34 Tests Passed)
+- **Cau hinh:** .NET 8 LTS (Release) + Standalone (Self-Contained win-x64)
+- **Duong dan chay:**
+  - Tieu chuan: ``desktop/publish/ExamOperationsDesktop/ExamGenerator.Desktop.exe`` ($ExeSizeKb KB)
+  - Standalone: ``desktop/publish/ExamOperationsDesktop-Standalone/ExamGenerator.Desktop.exe`` ($ExeStandaloneSizeKb KB)
 - **Ghi chu thay doi:** $Note
 "@
 
@@ -76,7 +121,7 @@ if (-not (Test-Path $BuildHistoryFile)) {
 $LogEntry | Out-File -FilePath $BuildHistoryFile -Append -Encoding utf8
 
 Write-Host "==========================================================" -ForegroundColor Cyan
-Write-Host "  BUILD HOAN TAT THANH CONG!" -ForegroundColor Green
-Write-Host "  Thu muc ung dung: $PublishDir" -ForegroundColor White
-Write-Host "  File chay: $ExePath" -ForegroundColor White
+Write-Host "  BUILD HOAN TAT THANH CONG CA 2 PHIEN BAN!" -ForegroundColor Green
+Write-Host "  1. Ban Tieu chuan: $PublishDir" -ForegroundColor White
+Write-Host "  2. Ban Standalone (Self-Contained): $PublishStandaloneDir" -ForegroundColor White
 Write-Host "==========================================================" -ForegroundColor Cyan

@@ -25,6 +25,14 @@ public sealed class SqliteDatabase
                 WarehouseName TEXT NOT NULL,
                 UpdatedAt TEXT NOT NULL
             );
+            CREATE TABLE IF NOT EXISTS DepartmentWarehouseMapping (
+                DepartmentCode TEXT NOT NULL,
+                DepartmentName TEXT NOT NULL,
+                WarehouseCode TEXT NOT NULL,
+                WarehouseName TEXT NOT NULL,
+                UpdatedAt TEXT NOT NULL,
+                PRIMARY KEY(DepartmentCode, WarehouseCode)
+            );
             CREATE TABLE IF NOT EXISTS ExamBatch (
                 BatchId TEXT PRIMARY KEY NOT NULL,
                 BatchName TEXT NOT NULL,
@@ -108,6 +116,15 @@ public sealed class SqliteDatabase
                 Diagnosis TEXT NOT NULL,
                 PaymentType TEXT NOT NULL
             );
+            CREATE TABLE IF NOT EXISTS ActionDefinition (
+                ActionCode TEXT PRIMARY KEY NOT NULL,
+                ActionName TEXT NOT NULL,
+                DefaultScore REAL NOT NULL,
+                Category TEXT NOT NULL,
+                Description TEXT NOT NULL,
+                IsBuiltIn INTEGER NOT NULL DEFAULT 0,
+                CreatedAt TEXT NOT NULL
+            );
             """;
         await command.ExecuteNonQueryAsync(cancellationToken);
 
@@ -135,6 +152,45 @@ public sealed class SqliteDatabase
             await alter3.ExecuteNonQueryAsync(cancellationToken);
         }
         catch { /* column may already exist */ }
+
+        // Tự động bảo lưu và di chuyển mapping kho cũ sang bảng đa kho DepartmentWarehouseMapping
+        try
+        {
+            var migrateWh = connection.CreateCommand();
+            migrateWh.CommandText = """
+                INSERT OR IGNORE INTO DepartmentWarehouseMapping (DepartmentCode, DepartmentName, WarehouseCode, WarehouseName, UpdatedAt)
+                SELECT DepartmentCode, DepartmentName, WarehouseCode, WarehouseName, UpdatedAt FROM DepartmentConfiguration;
+            """;
+            await migrateWh.ExecuteNonQueryAsync(cancellationToken);
+        }
+        catch { }
+
+        // Seed default action catalog items if not present or refresh built-in definitions
+        foreach (var def in SystemActionCatalog.DefaultActions)
+        {
+            try
+            {
+                var insertCmd = connection.CreateCommand();
+                insertCmd.CommandText = """
+                    INSERT INTO ActionDefinition (ActionCode, ActionName, DefaultScore, Category, Description, IsBuiltIn, CreatedAt)
+                    VALUES (@code, @name, @score, @cat, @desc, 1, @created)
+                    ON CONFLICT(ActionCode) DO UPDATE SET
+                        ActionName = excluded.ActionName,
+                        Category = excluded.Category,
+                        Description = excluded.Description,
+                        IsBuiltIn = 1
+                    WHERE ActionDefinition.IsBuiltIn = 1;
+                """;
+                insertCmd.Parameters.AddWithValue("@code", def.Code);
+                insertCmd.Parameters.AddWithValue("@name", def.Name);
+                insertCmd.Parameters.AddWithValue("@score", def.DefaultScore);
+                insertCmd.Parameters.AddWithValue("@cat", def.Category);
+                insertCmd.Parameters.AddWithValue("@desc", def.Description);
+                insertCmd.Parameters.AddWithValue("@created", DateTime.UtcNow.ToString("O"));
+                await insertCmd.ExecuteNonQueryAsync(cancellationToken);
+            }
+            catch { }
+        }
     }
 
     /// <summary>
@@ -343,13 +399,22 @@ public sealed class SqliteDatabase
         clear.Parameters.AddWithValue("$id", id);
         await clear.ExecuteNonQueryAsync(cancellationToken);
 
+        var seenCodes = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        var counter = 2;
         foreach (var action in actions)
         {
+            var code = action.Code;
+            if (seenCodes.Contains(code))
+            {
+                code = $"{code}_{counter++}";
+            }
+            seenCodes.Add(code);
+
             var insert = connection.CreateCommand();
             insert.Transaction = transaction;
             insert.CommandText = "INSERT INTO TemplateAction (TemplateId,ActionCode,ActionName,Score) VALUES ($id,$code,$name,$score)";
             insert.Parameters.AddWithValue("$id", id);
-            insert.Parameters.AddWithValue("$code", action.Code);
+            insert.Parameters.AddWithValue("$code", code);
             insert.Parameters.AddWithValue("$name", action.Name);
             insert.Parameters.AddWithValue("$score", action.Score);
             await insert.ExecuteNonQueryAsync(cancellationToken);
@@ -371,13 +436,77 @@ public sealed class SqliteDatabase
         await template.ExecuteNonQueryAsync(cancellationToken);
     }
 
+    public async Task<IReadOnlyList<SystemActionDefinition>> GetActionDefinitionsAsync(CancellationToken cancellationToken = default)
+    {
+        await using var connection = new SqliteConnection($"Data Source={DatabasePath}");
+        await connection.OpenAsync(cancellationToken);
+        var command = connection.CreateCommand();
+        command.CommandText = "SELECT ActionCode, ActionName, DefaultScore, Category, Description, IsBuiltIn FROM ActionDefinition ORDER BY IsBuiltIn DESC, ActionCode ASC";
+        await using var reader = await command.ExecuteReaderAsync(cancellationToken);
+        var list = new List<SystemActionDefinition>();
+        while (await reader.ReadAsync(cancellationToken))
+        {
+            list.Add(new SystemActionDefinition(
+                reader.GetString(0),
+                reader.GetString(1),
+                reader.GetDouble(2),
+                reader.GetString(3),
+                reader.GetString(4),
+                reader.GetInt32(5) == 1
+            ));
+        }
+        return list;
+    }
+
+    public async Task SaveActionDefinitionAsync(SystemActionDefinition definition, CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(definition);
+        if (string.IsNullOrWhiteSpace(definition.Code)) throw new ArgumentException("Mã dạng câu hỏi không được để trống.", nameof(definition));
+        if (string.IsNullOrWhiteSpace(definition.Name)) throw new ArgumentException("Tên dạng câu hỏi không được để trống.", nameof(definition));
+
+        await using var connection = new SqliteConnection($"Data Source={DatabasePath}");
+        await connection.OpenAsync(cancellationToken);
+        var command = connection.CreateCommand();
+        command.CommandText = """
+            INSERT INTO ActionDefinition (ActionCode, ActionName, DefaultScore, Category, Description, IsBuiltIn, CreatedAt)
+            VALUES (@code, @name, @score, @cat, @desc, @builtIn, @created)
+            ON CONFLICT(ActionCode) DO UPDATE SET
+                ActionName = excluded.ActionName,
+                DefaultScore = excluded.DefaultScore,
+                Category = excluded.Category,
+                Description = excluded.Description;
+        """;
+        command.Parameters.AddWithValue("@code", definition.Code.Trim().ToUpperInvariant());
+        command.Parameters.AddWithValue("@name", definition.Name.Trim());
+        command.Parameters.AddWithValue("@score", definition.DefaultScore);
+        command.Parameters.AddWithValue("@cat", string.IsNullOrWhiteSpace(definition.Category) ? "Nghiệp vụ chung" : definition.Category.Trim());
+        command.Parameters.AddWithValue("@desc", definition.Description ?? string.Empty);
+        command.Parameters.AddWithValue("@builtIn", definition.IsBuiltIn ? 1 : 0);
+        command.Parameters.AddWithValue("@created", DateTime.UtcNow.ToString("O"));
+        await command.ExecuteNonQueryAsync(cancellationToken);
+    }
+
+    public async Task<bool> DeleteActionDefinitionAsync(string actionCode, CancellationToken cancellationToken = default)
+    {
+        if (string.IsNullOrWhiteSpace(actionCode)) return false;
+
+        await using var connection = new SqliteConnection($"Data Source={DatabasePath}");
+        await connection.OpenAsync(cancellationToken);
+        var command = connection.CreateCommand();
+        // Bảo vệ dạng câu hỏi mặc định của hệ thống
+        command.CommandText = "DELETE FROM ActionDefinition WHERE ActionCode = @code AND IsBuiltIn = 0";
+        command.Parameters.AddWithValue("@code", actionCode.Trim());
+        var affected = await command.ExecuteNonQueryAsync(cancellationToken);
+        return affected > 0;
+    }
+
     public async Task<IReadOnlyList<(string BatchName, string ExamDate, string FilePath, string CreatedAt)>> GetGeneratedFilesAsync(CancellationToken cancellationToken = default)
     {
         var items = new List<(string, string, string, string)>();
         await using var connection = new SqliteConnection($"Data Source={DatabasePath}");
         await connection.OpenAsync(cancellationToken);
         var command = connection.CreateCommand();
-        command.CommandText = "SELECT b.BatchName, b.ExamDate, f.FilePath, f.CreatedAt FROM GeneratedFile f JOIN ExamBatch b ON b.BatchId = f.BatchId ORDER BY f.Id DESC";
+        command.CommandText = "SELECT COALESCE(b.BatchName, 'Đợt thi'), COALESCE(b.ExamDate, ''), f.FilePath, f.CreatedAt FROM GeneratedFile f LEFT JOIN ExamBatch b ON b.BatchId = f.BatchId ORDER BY f.Id DESC";
         await using var reader = await command.ExecuteReaderAsync(cancellationToken);
         while (await reader.ReadAsync(cancellationToken))
             items.Add((reader.GetString(0), reader.GetString(1), reader.GetString(2), reader.GetString(3)));
@@ -663,36 +792,108 @@ public sealed class SqliteDatabase
         string warehouseName,
         CancellationToken cancellationToken = default)
     {
+        await SaveDepartmentWarehouseMappingsAsync(
+            departmentCode,
+            departmentName,
+            new[] { (warehouseCode, warehouseName) },
+            cancellationToken);
+    }
+
+    public async Task SaveDepartmentWarehouseMappingsAsync(
+        string departmentCode,
+        string departmentName,
+        IReadOnlyList<(string WarehouseCode, string WarehouseName)> warehouses,
+        CancellationToken cancellationToken = default)
+    {
         await using var connection = new SqliteConnection($"Data Source={DatabasePath}");
         await connection.OpenAsync(cancellationToken);
-        var command = connection.CreateCommand();
-        command.CommandText = """
-            INSERT INTO DepartmentConfiguration (DepartmentCode, DepartmentName, WarehouseCode, WarehouseName, UpdatedAt)
-            VALUES ($departmentCode, $departmentName, $warehouseCode, $warehouseName, $updatedAt)
-            ON CONFLICT(DepartmentCode) DO UPDATE SET
-                DepartmentName = excluded.DepartmentName,
-                WarehouseCode = excluded.WarehouseCode,
-                WarehouseName = excluded.WarehouseName,
-                UpdatedAt = excluded.UpdatedAt;
+        await using var transaction = connection.BeginTransaction();
+
+        // 1. Xóa các mapping cũ của khoa trong bảng DepartmentWarehouseMapping
+        var delCmd = connection.CreateCommand();
+        delCmd.Transaction = transaction;
+        delCmd.CommandText = "DELETE FROM DepartmentWarehouseMapping WHERE DepartmentCode = $deptCode";
+        delCmd.Parameters.AddWithValue("$deptCode", departmentCode.Trim());
+        await delCmd.ExecuteNonQueryAsync(cancellationToken);
+
+        // 2. Chèn các kho mới được chọn
+        var updatedAt = DateTimeOffset.Now.ToString("O");
+        foreach (var wh in warehouses)
+        {
+            var insCmd = connection.CreateCommand();
+            insCmd.Transaction = transaction;
+            insCmd.CommandText = """
+                INSERT INTO DepartmentWarehouseMapping (DepartmentCode, DepartmentName, WarehouseCode, WarehouseName, UpdatedAt)
+                VALUES ($deptCode, $deptName, $whCode, $whName, $updatedAt);
             """;
-        command.Parameters.AddWithValue("$departmentCode", departmentCode.Trim());
-        command.Parameters.AddWithValue("$departmentName", departmentName.Trim());
-        command.Parameters.AddWithValue("$warehouseCode", warehouseCode.Trim());
-        command.Parameters.AddWithValue("$warehouseName", warehouseName.Trim());
-        command.Parameters.AddWithValue("$updatedAt", DateTimeOffset.Now.ToString("O"));
-        await command.ExecuteNonQueryAsync(cancellationToken);
+            insCmd.Parameters.AddWithValue("$deptCode", departmentCode.Trim());
+            insCmd.Parameters.AddWithValue("$deptName", departmentName.Trim());
+            insCmd.Parameters.AddWithValue("$whCode", wh.WarehouseCode.Trim());
+            insCmd.Parameters.AddWithValue("$whName", wh.WarehouseName.Trim());
+            insCmd.Parameters.AddWithValue("$updatedAt", updatedAt);
+            await insCmd.ExecuteNonQueryAsync(cancellationToken);
+        }
+
+        // 3. Đồng bộ vào DepartmentConfiguration (lấy kho đầu tiên làm đại diện tương thích ngược)
+        var syncLegacy = connection.CreateCommand();
+        syncLegacy.Transaction = transaction;
+        if (warehouses.Count > 0)
+        {
+            var firstWh = warehouses[0];
+            syncLegacy.CommandText = """
+                INSERT INTO DepartmentConfiguration (DepartmentCode, DepartmentName, WarehouseCode, WarehouseName, UpdatedAt)
+                VALUES ($deptCode, $deptName, $whCode, $whName, $updatedAt)
+                ON CONFLICT(DepartmentCode) DO UPDATE SET
+                    DepartmentName = excluded.DepartmentName,
+                    WarehouseCode = excluded.WarehouseCode,
+                    WarehouseName = excluded.WarehouseName,
+                    UpdatedAt = excluded.UpdatedAt;
+            """;
+            syncLegacy.Parameters.AddWithValue("$deptCode", departmentCode.Trim());
+            syncLegacy.Parameters.AddWithValue("$deptName", departmentName.Trim());
+            syncLegacy.Parameters.AddWithValue("$whCode", firstWh.WarehouseCode.Trim());
+            syncLegacy.Parameters.AddWithValue("$whName", firstWh.WarehouseName.Trim());
+            syncLegacy.Parameters.AddWithValue("$updatedAt", updatedAt);
+        }
+        else
+        {
+            syncLegacy.CommandText = "DELETE FROM DepartmentConfiguration WHERE DepartmentCode = $deptCode";
+            syncLegacy.Parameters.AddWithValue("$deptCode", departmentCode.Trim());
+        }
+        await syncLegacy.ExecuteNonQueryAsync(cancellationToken);
+
+        await transaction.CommitAsync(cancellationToken);
     }
 
     public async Task<IReadOnlyList<(string DepartmentCode, string DepartmentName, string WarehouseCode, string WarehouseName)>> GetDepartmentConfigurationsAsync(CancellationToken cancellationToken = default)
+    {
+        return await GetDepartmentWarehouseMappingsAsync(cancellationToken);
+    }
+
+    public async Task<IReadOnlyList<(string DepartmentCode, string DepartmentName, string WarehouseCode, string WarehouseName)>> GetDepartmentWarehouseMappingsAsync(CancellationToken cancellationToken = default)
     {
         var rows = new List<(string, string, string, string)>();
         await using var connection = new SqliteConnection($"Data Source={DatabasePath}");
         await connection.OpenAsync(cancellationToken);
         var command = connection.CreateCommand();
-        command.CommandText = "SELECT DepartmentCode, DepartmentName, WarehouseCode, WarehouseName FROM DepartmentConfiguration ORDER BY DepartmentName";
+        command.CommandText = "SELECT DepartmentCode, DepartmentName, WarehouseCode, WarehouseName FROM DepartmentWarehouseMapping ORDER BY DepartmentName, WarehouseName";
         await using var reader = await command.ExecuteReaderAsync(cancellationToken);
         while (await reader.ReadAsync(cancellationToken))
             rows.Add((reader.GetString(0), reader.GetString(1), reader.GetString(2), reader.GetString(3)));
+        return rows;
+    }
+
+    public async Task<IReadOnlyList<(string WarehouseCode, string WarehouseName)>> GetWarehousesForDepartmentAsync(string departmentCode, CancellationToken cancellationToken = default)
+    {
+        var rows = new List<(string, string)>();
+        await using var connection = new SqliteConnection($"Data Source={DatabasePath}");
+        await connection.OpenAsync(cancellationToken);
+        var command = connection.CreateCommand();
+        command.CommandText = "SELECT WarehouseCode, WarehouseName FROM DepartmentWarehouseMapping WHERE DepartmentCode = $deptCode ORDER BY WarehouseName";
+        command.Parameters.AddWithValue("$deptCode", departmentCode.Trim());
+        await using var reader = await command.ExecuteReaderAsync(cancellationToken);
+        while (await reader.ReadAsync(cancellationToken))
+            rows.Add((reader.GetString(0), reader.GetString(1)));
         return rows;
     }
 

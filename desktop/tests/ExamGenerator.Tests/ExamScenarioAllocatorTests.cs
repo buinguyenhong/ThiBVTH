@@ -334,13 +334,14 @@ public class ExamScenarioAllocatorTests : IDisposable
     {
         await SetupSyncedCatalogAsync();
 
-        // Seed 4 BHYT drugs and 3 VP supplies with specific stock limits
+        // Seed 5 BHYT drugs and 3 VP supplies with specific stock limits
         await _database.ReplaceSnapshotDrugsAsync(new[]
         {
             new SnapshotDrugRow("bh1", "BH_DRUG_1", "Thuốc BHYT 1", "Viên", "KHO-NOI", "Kho trực Nội", "BHYT", 1), // Only 1 in stock!
             new SnapshotDrugRow("bh2", "BH_DRUG_2", "Thuốc BHYT 2", "Viên", "KHO-NOI", "Kho trực Nội", "BHYT", 2), // Only 2 in stock!
             new SnapshotDrugRow("bh3", "BH_DRUG_3", "Thuốc BHYT 3", "Viên", "KHO-NOI", "Kho trực Nội", "BHYT", 100),
             new SnapshotDrugRow("bh4", "BH_DRUG_4", "Thuốc BHYT 4", "Viên", "KHO-NOI", "Kho trực Nội", "BHYT", 100),
+            new SnapshotDrugRow("bh5", "BH_DRUG_5", "Thuốc BHYT 5", "Viên", "KHO-NOI", "Kho trực Nội", "BHYT", 100),
             new SnapshotDrugRow("vp1", "VP_SUPP_1", "Bơm tiêm 10ml", "Cái", "KHO-NOI", "Kho trực Nội", "Viện phí", 2), // Only 2 in stock!
             new SnapshotDrugRow("vp2", "VP_SUPP_2", "Kim tiêm G18", "Cái", "KHO-NOI", "Kho trực Nội", "Viện phí", 100),
             new SnapshotDrugRow("vp3", "VP_SUPP_3", "Dây truyền dịch", "Bộ", "KHO-NOI", "Kho trực Nội", "Viện phí", 100)
@@ -362,6 +363,7 @@ public class ExamScenarioAllocatorTests : IDisposable
             ["BH_DRUG_2"] = 2,
             ["BH_DRUG_3"] = 100,
             ["BH_DRUG_4"] = 100,
+            ["BH_DRUG_5"] = 100,
             ["VP_SUPP_1"] = 2,
             ["VP_SUPP_2"] = 100,
             ["VP_SUPP_3"] = 100
@@ -394,5 +396,209 @@ public class ExamScenarioAllocatorTests : IDisposable
             var maxStock = originalStocks[code];
             Assert.True(qty <= maxStock, $"Dược '{code}' bị xuất quá số lượng tồn kho! (Đã xuất: {qty}, Tồn kho: {maxStock})");
         }
+    }
+
+    [Fact]
+    public async Task Scenario_uses_custom_action_definition_description_in_questions()
+    {
+        await SetupSyncedCatalogAsync();
+
+        // Save a custom action definition
+        await _database.SaveActionDefinitionAsync(new SystemActionDefinition(
+            "KD_NGOAI_TRU",
+            "Kê đơn thuốc ngoại trú",
+            2.0,
+            "Khám bệnh & Ngoại trú",
+            "Mở phân hệ Khám bệnh ngoại trú, chọn người bệnh và kê đơn 3 loại thuốc theo phác đồ.",
+            IsBuiltIn: false
+        ));
+
+        // Save a template using this custom action
+        await _database.SaveTemplateAsync(
+            "tpl_custom_act",
+            "Đề Khám Bệnh Nội Khoa",
+            "Khoa Nội",
+            "Bác sĩ",
+            "DirectReception",
+            new[]
+            {
+                ("TN_TIEP_NHAN", "Tiếp nhận trực tiếp", 2.0),
+                ("KD_NGOAI_TRU", "Kê đơn thuốc ngoại trú", 2.0)
+            }
+        );
+
+        var allocator = new ExamScenarioAllocator(_database);
+        var candidates = new[]
+        {
+            new CandidateInput("Bác sĩ Nguyễn", "BS01", "Khoa Nội", "Đề Khám Bệnh Nội Khoa")
+        };
+
+        var scenarios = await allocator.AllocateBatchScenariosAsync("Dot_Custom_Act", new DateOnly(2026, 9, 20), candidates);
+        Assert.Single(scenarios);
+
+        var sc = scenarios[0];
+        Assert.Equal(2, sc.Questions.Count);
+
+        var q2 = sc.Questions[1];
+        Assert.Equal("KD_NGOAI_TRU", q2.ActionCode);
+        Assert.Equal("Kê đơn thuốc ngoại trú", q2.Title);
+        Assert.Contains("Mở phân hệ Khám bệnh ngoại trú, chọn người bệnh và kê đơn 3 loại thuốc theo phác đồ.", q2.Instruction);
+        Assert.Contains("Số điểm đạt được:………(đ)", q2.Instruction);
+    }
+
+    [Fact]
+    public async Task Candidates_in_same_department_can_select_different_warehouses_and_allocate_correct_drugs()
+    {
+        await SetupSyncedCatalogAsync();
+
+        // Map Khoa Nội to two distinct warehouses
+        await _database.SaveDepartmentWarehouseMappingsAsync("NOI", "Khoa Nội", new[]
+        {
+            ("KHO-NOI-A", "Kho trực Nội A"),
+            ("KHO-NOI-B", "Kho tủ trực B")
+        });
+
+        // Add drugs for KHO-NOI-A
+        var drugsA = new[]
+        {
+            new SnapshotDrugRow("da1", "DRUG_A1", "Thuốc A1", "Viên", "KHO-NOI-A", "Kho trực Nội A", "BHYT", 10, "NOI", "Khoa Nội"),
+            new SnapshotDrugRow("da2", "DRUG_A2", "Thuốc A2", "Viên", "KHO-NOI-A", "Kho trực Nội A", "BHYT", 10, "NOI", "Khoa Nội"),
+            new SnapshotDrugRow("da3", "DRUG_A3", "Thuốc A3", "Viên", "KHO-NOI-A", "Kho trực Nội A", "BHYT", 10, "NOI", "Khoa Nội"),
+            new SnapshotDrugRow("da4", "DRUG_A4", "Thuốc A4", "Lọ", "KHO-NOI-A", "Kho trực Nội A", "Viện phí", 10, "NOI", "Khoa Nội"),
+            new SnapshotDrugRow("da5", "DRUG_A5", "Thuốc A5", "Ống", "KHO-NOI-A", "Kho trực Nội A", "Viện phí", 10, "NOI", "Khoa Nội")
+        };
+
+        // Add drugs for KHO-NOI-B
+        var drugsB = new[]
+        {
+            new SnapshotDrugRow("db1", "DRUG_B1", "Thuốc B1", "Viên", "KHO-NOI-B", "Kho tủ trực B", "BHYT", 10, "NOI", "Khoa Nội"),
+            new SnapshotDrugRow("db2", "DRUG_B2", "Thuốc B2", "Viên", "KHO-NOI-B", "Kho tủ trực B", "BHYT", 10, "NOI", "Khoa Nội"),
+            new SnapshotDrugRow("db3", "DRUG_B3", "Thuốc B3", "Viên", "KHO-NOI-B", "Kho tủ trực B", "BHYT", 10, "NOI", "Khoa Nội"),
+            new SnapshotDrugRow("db4", "DRUG_B4", "Thuốc B4", "Lọ", "KHO-NOI-B", "Kho tủ trực B", "Viện phí", 10, "NOI", "Khoa Nội"),
+            new SnapshotDrugRow("db5", "DRUG_B5", "Thuốc B5", "Ống", "KHO-NOI-B", "Kho tủ trực B", "Viện phí", 10, "NOI", "Khoa Nội")
+        };
+
+        await _database.ReplaceSnapshotDrugsAsync(drugsA.Concat(drugsB).ToList());
+
+        var allocator = new ExamScenarioAllocator(_database);
+        var candidates = new[]
+        {
+            new CandidateInput("Thí sinh Kho A", "TS_A", "Khoa Nội", "Đề Mẫu Điều Dưỡng Khoa Nội", 30, "KHO-NOI-A", "Kho trực Nội A"),
+            new CandidateInput("Thí sinh Kho B", "TS_B", "Khoa Nội", "Đề Mẫu Điều Dưỡng Khoa Nội", 30, "KHO-NOI-B", "Kho tủ trực B")
+        };
+
+        var scenarios = await allocator.AllocateBatchScenariosAsync("Dot_Multi_Wh", new DateOnly(2026, 9, 21), candidates);
+        Assert.Equal(2, scenarios.Count);
+
+        var scA = scenarios.First(s => s.CandidateId == "TS_A");
+        var scB = scenarios.First(s => s.CandidateId == "TS_B");
+
+        // Assert Candidate A only got drugs from KHO-NOI-A
+        Assert.NotEmpty(scA.OrderedDrugs);
+        Assert.All(scA.OrderedDrugs, d => Assert.Equal("KHO-NOI-A", d.WarehouseCode));
+        Assert.Equal("KHO-NOI-A", scA.InventoryCheckDrug?.WarehouseCode);
+
+        // Assert Candidate B only got drugs from KHO-NOI-B
+        Assert.NotEmpty(scB.OrderedDrugs);
+        Assert.All(scB.OrderedDrugs, d => Assert.Equal("KHO-NOI-B", d.WarehouseCode));
+        Assert.Equal("KHO-NOI-B", scB.InventoryCheckDrug?.WarehouseCode);
+    }
+
+    [Fact]
+    public async Task Direct_reception_instruction_includes_full_patient_demographics_and_insurance()
+    {
+        await SetupSyncedCatalogAsync();
+
+        var allocator = new ExamScenarioAllocator(_database);
+        var candidates = new[]
+        {
+            new CandidateInput("Thí sinh Tiếp Nhận", "TS_TN", "Khoa Nhi", "Đề Điều dưỡng Nhi (Tiếp nhận trực tiếp)")
+        };
+
+        var scenarios = await allocator.AllocateBatchScenariosAsync("Dot_Direct_Reception", new DateOnly(2026, 9, 23), candidates);
+        Assert.Single(scenarios);
+
+        var sc = scenarios[0];
+        var q1 = sc.Questions[0];
+
+        // Must contain instruction to open reception module and input patient information
+        Assert.Contains("Mở phân hệ Tiếp nhận trên phần mềm HIS, thực hiện tiếp nhận trực tiếp người bệnh với thông tin sau:", q1.Instruction);
+        Assert.Contains(sc.Patient.FullName.ToUpperInvariant(), q1.Instruction);
+        Assert.Contains(sc.Patient.Gender, q1.Instruction);
+        Assert.Contains(sc.Patient.Address, q1.Instruction);
+        Assert.Contains(sc.Patient.Diagnosis, q1.Instruction);
+        Assert.Contains("Số vào viện (SVV) / Mã tiếp nhận sau khi lưu: ………………………………", q1.Instruction);
+        Assert.Contains("Số điểm đạt được:………(đ)", q1.Instruction);
+    }
+
+    [Fact]
+    public async Task New_inpatient_and_outpatient_actions_render_correct_instructions()
+    {
+        await SetupSyncedCatalogAsync();
+
+        // Create a custom template testing the 4 new actions
+        await _database.SaveTemplateAsync(
+            "tpl_new_actions",
+            "Đề Test Nghiệp Vụ Ngoại Trú & Cấp Giường",
+            "Khoa Nội",
+            "Bác sĩ",
+            "WardAdmissionPreparation",
+            new[]
+            {
+                ("NT_CAP_GIUONG", "Cấp giường cho bệnh nhân", 1.0),
+                ("KB_CHI_DINH_CLS", "Chỉ định CLS ngoại trú", 2.0),
+                ("KB_BENH_AN_NGOAI_TRU", "Tạo bệnh án ngoại trú", 2.0),
+                ("KB_CHI_DINH_NOI_TRU", "Chỉ định điều trị nội trú", 1.0),
+                ("HC_TRA_CUU_THANH_TOAN", "Tra cứu thông tin thanh toán", 2.0)
+            }
+        );
+
+        var allocator = new ExamScenarioAllocator(_database);
+        var candidates = new[]
+        {
+            new CandidateInput("Bác sĩ Ngoại Trú", "BS_NT", "Khoa Nội", "Đề Test Nghiệp Vụ Ngoại Trú & Cấp Giường")
+        };
+
+        var scenarios = await allocator.AllocateBatchScenariosAsync("Dot_New_Actions", new DateOnly(2026, 9, 23), candidates);
+        Assert.Single(scenarios);
+
+        var sc = scenarios[0];
+        Assert.Equal(5, sc.Questions.Count);
+
+        // 1. Cấp giường
+        var qCapGiuong = sc.Questions[0];
+        Assert.Equal("NT_CAP_GIUONG", qCapGiuong.ActionCode);
+        Assert.Contains("Cấp giường cho các bệnh nhân được tiếp nhận ở câu 1", qCapGiuong.Instruction);
+
+        // 2. Chỉ định CLS ngoại trú
+        var qChiDinhCls = sc.Questions[1];
+        Assert.Equal("KB_CHI_DINH_CLS", qChiDinhCls.ActionCode);
+        Assert.Contains("Trên màn hình khám bệnh Chỉ định CLS – Thủ thuật cho bệnh nhân : ……………………………………, Mã Y tế : ……………………", qChiDinhCls.Instruction);
+        // Must contain 2 randomized services
+        var clsLines = qChiDinhCls.Instruction.Split('\n').Where(l => l.StartsWith("+")).ToList();
+        Assert.Equal(2, clsLines.Count);
+
+        // 3. Tạo bệnh án ngoại trú
+        var qBaNgoaiTru = sc.Questions[2];
+        Assert.Equal("KB_BENH_AN_NGOAI_TRU", qBaNgoaiTru.ActionCode);
+        Assert.Contains("Chỉ định điều trị ngoại trú và lập bệnh án ngoại trú cho bệnh nhân : ……………………………………, Mã Y tế : …………………… (2 đ)", qBaNgoaiTru.Instruction);
+        Assert.Contains("Số bệnh án ngoại trú : …………………………………………………", qBaNgoaiTru.Instruction);
+
+        // 4. Chỉ định điều trị nội trú
+        var qChiDinhNoiTru = sc.Questions[3];
+        Assert.Equal("KB_CHI_DINH_NOI_TRU", qChiDinhNoiTru.ActionCode);
+        Assert.Contains("Chỉ định nhập viện điều trị nội trú cho bệnh nhân : ……………………………………, Mã y tế : …………………… (1 đ)", qChiDinhNoiTru.Instruction);
+        Assert.Contains("Nhập khoa :", qChiDinhNoiTru.Instruction);
+        Assert.Contains("Số bệnh án nội trú : ……………………………………………………", qChiDinhNoiTru.Instruction);
+
+        // 5. Tra cứu thông tin thanh toán
+        var qThanhToan = sc.Questions[4];
+        Assert.Equal("HC_TRA_CUU_THANH_TOAN", qThanhToan.ActionCode);
+        Assert.Contains("Kiểm tra thông tin thanh toán cho bệnh nhân : ……………………………………, Mã y tế : ……………………", qThanhToan.Instruction);
+        Assert.Contains("Số bệnh án nội trú : ……………………………………………………", qThanhToan.Instruction);
+        Assert.Contains("Số tiền người bệnh đã thanh toán : ……………………………………………………", qThanhToan.Instruction);
+        Assert.Contains("Số tiền người bệnh đã tạm ứng : ……………………………………………………", qThanhToan.Instruction);
+        Assert.Contains("Số tiền còn phải thu người bệnh : ……………………………………………………", qThanhToan.Instruction);
+        Assert.Contains("Tổng số tiền người bệnh trả : ……………", qThanhToan.Instruction);
     }
 }

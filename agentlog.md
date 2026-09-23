@@ -2,6 +2,160 @@
 
 Nhật ký ghi lại các thay đổi, quyết định thiết kế và tiến trình thực thi của Antigravity Coding Assistant trong suốt phiên làm việc.
 
+## [2026-09-23] Khắc phục Lịch sử Sinh Đề, Cách ly Thư mục data/ & Bổ sung Câu hỏi Tra cứu Thanh toán
+
+### 1. Khắc phục Lỗi "Lịch sử tạo đề chưa được lưu":
+* **Nguyên nhân:**
+  - `ReloadHistoryDataAsync()` không được gọi trong `Window_Loaded` khi ứng dụng khởi động.
+  - Tab 6 ("6. Lịch sử Sinh đề") chưa bắt sự kiện chuyển tab (`SelectionChanged`).
+* **Giải pháp:**
+  - Tự động nạp lịch sử trong `Window_Loaded` và khi người dùng bấm chuyển sang Tab 6.
+  - Cải tiến giao diện Tab 6: cột Ngày thi chuẩn `dd/MM/yyyy`, Tệp tin ZIP ngắn gọn, Thời điểm tạo định dạng `dd/MM/yyyy HH:mm:ss`.
+  - Hỗ trợ Double-click vào dòng lịch sử để mở Explorer và chọn đúng file ZIP (có fallback tìm trong `./data/output/`).
+  - Thêm unit test `Exam_generation_history_is_persisted_and_retrieved_in_descending_order`.
+
+### 2. Cách ly Thư mục Dữ liệu `data/` (Bảo vệ tuyệt đối Mapping & CSDL):
+* **Kiến trúc mới:**
+  - Thư mục gốc chỉ chứa file nhị phân và mã thực thi (`.exe`, `.dll`, `.json` runtime, `runtimes/`).
+  - Thư mục `data/` chứa toàn bộ dữ liệu người dùng: `data/exam-generator.sqlite`, `data/appsettings.local.json`, `data/credentials.local.bin`, và `data/output/`.
+* **Tự động chuyển đổi dữ liệu cũ (Auto-migration):**
+  - `LocalApplicationStorage` tự động phát hiện file database/cấu hình ở thư mục gốc và di chuyển an toàn vào `data/` trong lần đầu khởi động.
+* **Cập nhật không mất dữ liệu:**
+  - Thư mục phát hành (Publish) không chứa thư mục `data/`. Người dùng có thể copy đè tất cả file mới vào thư mục chạy mà không lo đè mất dữ liệu hay mapping.
+  - Cung cấp script tự động `CapNhat_KhongMatDuLieu.bat` với bộ lọc loại trừ thông minh của `robocopy`.
+
+### 3. Đóng gói Bản Standalone (Self-Contained win-x64):
+* `build_release.ps1` tự động đóng gói cả 2 bản:
+  - Bản Tiêu chuẩn: `desktop/publish/ExamOperationsDesktop/`
+  - Bản Standalone win-x64: `desktop/publish/ExamOperationsDesktop-Standalone/` (đầy đủ .NET 8 Runtime, chạy trên mọi máy tính).
+
+### 4. Bổ sung Câu hỏi Thư viện HIS: `HC_TRA_CUU_THANH_TOAN`:
+* Thêm dạng câu hỏi "Tra cứu thông tin thanh toán" (2.0 đ) thuộc phân hệ "Hành chính & Tra cứu".
+* Render đầy đủ các trường bệnh nhân, số bệnh án nội trú, số tiền thanh toán, tạm ứng, còn phải thu và tổng số tiền trả ra đề thi Word.
+
+### 5. Rà soát & Đảm bảo An toàn Tuyệt đối Dữ liệu Mapping Khoa - Kho:
+* Khẳng định và kiểm chứng: Mapping Khoa - Kho Dược được bảo vệ 3 lớp, không thể bị mất khi cập nhật code, khi đồng bộ từ HIS, hay khi chỉnh sửa mẫu đề.
+* Toàn bộ 34/34 Unit Tests PASSED 100%.
+
+---
+
+## [2026-09-23] Xử lý Triệt để Lỗi APPCRASH (Stop Working) trên Windows 7 khi vào Quản lý Biên tập Mẫu Đề
+
+### 1. Phân tích Nguyên nhân Gốc rễ (Root Cause Analysis):
+*   **Báo cáo lỗi của người dùng:**
+    - `Problem Event Name: APPCRASH`, `Fault Module: KERNELBASE.dll`, `Exception Code: e0434352` (Mã ngoại lệ CLR không bắt được trong .NET).
+    - `OS Version: 6.1.7601` (Windows 7 SP1 64-bit).
+*   **Các nguyên nhân kỹ thuật cụ thể đã phát hiện:**
+    1.  **Thiếu tài nguyên XAML `BrandTealDark`:** Trong `ManageActionCatalogWindow.xaml` có dòng `<Setter Property="Foreground" Value="{StaticResource BrandTealDark}"/>` nhưng trong `ModernTheme.xaml` chưa định nghĩa khóa `BrandTealDark`. Khi mở cửa sổ, WPF ném ra `XamlParseException` (`ResourceReferenceKeyNotFoundException`). Do không có bộ bắt lỗi toàn cục, ứng dụng bị ngắt đột ngột và báo lỗi APPCRASH ra hệ điều hành.
+    2.  **Định nghĩa ControlTemplate tùy biến trong DataGrid không hoàn chỉnh:** Thẻ `<ControlTemplate TargetType="TextBox">` có `ScrollViewer x:Name="PART_ContentHost"` trong `<DataGrid.Resources>` thiếu các thuộc tính native (như `Focusable="false"`, VisualStateManager triggers), dẫn tới lỗi layout/measure trên Windows 7 SP1 khi DataGrid kết xuất các dòng câu hỏi.
+    3.  **Lỗi bất đồng bộ không được bọc try-catch trong `TemplateSelected`:** Sự kiện `SelectionChanged` của `TemplatesGrid` chạy hàm `async void TemplateSelected`. Khi có ngoại lệ phát sinh trong hàm `async void`, ngoại lệ sẽ thoát khỏi luồng UI và bị ném thẳng ra ThreadPool/SynchronizationContext gây sập ứng dụng.
+    4.  **Xung đột đồ họa phần cứng trên Windows 7:** Trên Windows 7 SP1, driver đồ họa DirectX 11 cũ hoặc thiếu bản vá cập nhật Direct3D có thể gây lỗi `COMException` / `D3DCompiler` khi WPF kết xuất tăng tốc phần cứng.
+
+### 2. Giải pháp Xử lý Toàn diện:
+*   **Bổ sung Bắt lỗi Toàn cục & Ghi nhật ký Crash (`App.xaml.cs`):**
+    - Đăng ký lắng nghe 3 sự kiện lỗi cấp cao nhất: `DispatcherUnhandledException`, `AppDomain.CurrentDomain.UnhandledException`, và `TaskScheduler.UnobservedTaskException`.
+    - Khi có lỗi phát sinh bất ngờ: Đặt `args.Handled = true` để **ngăn chặn tuyệt đối việc Windows tắt ứng dụng với thông báo Stop working**, ghi lại toàn bộ StackTrace và InnerException vào file `crash_log.txt`, đồng thời hiển thị hộp thoại `MessageBox` giải thích chi tiết nguyên nhân.
+    - Tự động kích hoạt cơ chế `RenderOptions.ProcessRenderMode = RenderMode.SoftwareOnly` nếu phát hiện hệ điều hành là Windows 7 / Windows 8 (`Major < 10`), loại bỏ hoàn toàn nguy cơ sập ứng dụng do driver đồ họa.
+*   **Sửa lỗi Tài nguyên XAML:**
+    - Khai báo bổ sung `<SolidColorBrush x:Key="BrandTealDark" Color="#0F766E"/>` trong `ModernTheme.xaml`.
+    - Chuẩn hóa style của `TextBox` trong `<DataGrid.Resources>`: loại bỏ `ControlTemplate` thừa, giữ nguyên template gốc của hệ thống và chỉ thiết lập `Height="28"`, `Padding="6,2"`, `VerticalContentAlignment="Center"`.
+*   **Bọc Try-Catch An toàn cho các Sự kiện Biên tập:**
+    - Bọc toàn bộ logic trong `TemplateSelected` và `ManageActionLibrary_Click` bằng khối `try ... catch`.
+    - Thay thế các lệnh ép kiểu tài nguyên thô `(Brush)FindResource(...)` bằng hàm an toàn `TryFindResource(...) as Brush ?? fallbackBrush`.
+*   **Đóng gói Cập nhật:**
+    - 27/27 Unit tests Passed 100%.
+    - Cập nhật cả 2 bản build: Framework-Dependent (`desktop/publish/ExamOperationsDesktop/`) và Standalone Self-Contained (`desktop/publish/ExamOperationsDesktop-Standalone/`).
+
+---
+
+## [2026-09-23] Tự do Thêm & Quản lý Dạng Câu hỏi Mới với Số điểm Mẫu vào Thư viện Nghiệp vụ HIS
+
+### 1. Quyết định nghiệp vụ & Thiết kế:
+*   **Bảng CSDL SQLite mới (`ActionDefinition`):**
+    - Thiết kế bảng lưu trữ vĩnh viễn các dạng câu hỏi/thao tác nghiệp vụ: `ActionCode`, `ActionName`, `DefaultScore`, `Category`, `Description`, `IsBuiltIn`, `CreatedAt`.
+    - Tự động nạp sẵn 13 dạng nghiệp vụ chuẩn (`IsBuiltIn = 1`) trong `SqliteDatabase.InitializeAsync`.
+    - Bảo vệ toàn vẹn hệ thống: Chặn xóa các dạng câu hỏi mặc định của hệ thống, chỉ cho phép xóa các dạng câu hỏi do người dùng tự tạo.
+*   **Giao diện Quản lý Thư viện (`ManageActionCatalogWindow`):**
+    - Bổ sung nút `⚙ Quản lý Thư viện / Thêm dạng mới...` ngay tại khung Thêm câu hỏi ở Tab 2 (Biên tập mẫu đề).
+    - Cung cấp Form trực quan để tạo dạng câu hỏi mới: Mã hành động (tự động chuẩn hóa viết hoa và gạch dưới), Tên câu hỏi, Số điểm mẫu mặc định (hỗ trợ nhập cả `.` và `,`), Phân hệ nghiệp vụ, và Mô tả thao tác / Hướng dẫn mẫu.
+    - Hiển thị bảng tra cứu toàn bộ câu hỏi trong thư viện, phân loại rõ ràng bằng badge `Hệ thống` / `Tự tạo`.
+    - Cho phép xóa câu hỏi tự tạo khi không còn nhu cầu sử dụng.
+*   **Phản ứng Tức thì (Reactive Auto-Reload):**
+    - Khi lưu dạng câu hỏi mới trong cửa sổ quản lý, hệ thống tự động lưu vào SQLite, đóng/cập nhật và `ActionLibraryComboBox` ở Tab 2 sẽ tự động nạp lại, đồng thời tự động chọn ngay dạng câu hỏi vừa tạo để người dùng bấm `+ Thêm vào đề`.
+*   **Tích hợp với Sinh Đề thi & Văn bản Word (`ExamScenarioAllocator`):**
+    - Khi sinh đề thi có chứa dạng câu hỏi tự tạo, hệ thống tự động nạp mô tả thao tác tùy biến từ bảng `ActionDefinition` và in trực tiếp vào câu hỏi trong tệp đề thi Word kèm dòng chấm điểm `Số điểm đạt được:………(đ)`.
+*   **Kiểm thử & Phát hành:**
+    - Bổ sung 2 bài test tự động chuyên biệt trong `CatalogSynchronizationTests.cs` và `ExamScenarioAllocatorTests.cs`.
+    - Toàn bộ **27/27 Unit tests Passed 100%**.
+    - Cập nhật bản phát hành Release tại `desktop/publish/ExamOperationsDesktop/ExamGenerator.Desktop.exe`.
+
+---
+
+## [2026-09-23] Khắc phục lỗi Co chữ DataGrid Câu hỏi & Rà soát Toàn diện Phần mềm
+
+### 1. Khắc phục Triệt để Lỗi Co chữ / Mất chữ trên DataGrid Câu hỏi & Thang điểm:
+*   **Nguyên nhân gốc rễ (Root Cause):**
+    - Trong `ModernTheme.xaml`, style toàn cục `Style TargetType="TextBox"` đặt thuộc tính `Height="34"` và `Margin="0,4,0,8"`.
+    - Khi `DataGrid` đặt `RowHeight="34"`, ô nhập liệu TextBox bên trong cell có chiều cao cộng dồn lề lên tới $34 + 4 + 8 = 46$px, vượt quá kích thước hàng $34$px dẫn đến chữ bị cắt xén (clip) ở cạnh trên và cạnh dưới, không nhìn rõ dấu tiếng Việt (`hành`, `định`, `thuốc`).
+*   **Giải pháp xử lý:**
+    - Định nghĩa override riêng cho `TextBox` bên trong `<DataGrid.Resources>`: `Height="30"`, `Margin="2,0"`, `Padding="6,2"`, `VerticalContentAlignment="Center"`, `VerticalAlignment="Center"`.
+    - Tăng `RowHeight="44"` và tăng chiều cao lưới `Height="270"` để chữ hiển thị thoáng, đẹp mắt, giữ nguyên dấu thanh tiếng Việt.
+    - Bổ sung style toàn cục cho `DataGridCell` với `VerticalContentAlignment="Center"`, `Padding="4,0"`, `BorderThickness="0"`.
+    - Căn giữa cột STT, nới rộng cột Mã hành động lên `190` font Consolas để không bị cụt mã dài như `YL_CHI_DINH_THUOC_VTYT`.
+    - Nới rộng cột Điểm `Width="85"`, font chữ đậm (Bold), căn giữa. Cột Thao tác nới `Width="110"`.
+*   **Khắc phục ComboBox Khoa/Phòng áp dụng trên Form Editor:**
+    - Cấu hình `IsEditable="True"` và nạp nguồn dữ liệu gộp từ cả snapshot SQLite và các khoa từ mẫu đề mẫu (`allKnownDepts`), giúp ComboBox luôn hiển thị đúng Khoa của mẫu đề đang chọn (ví dụ: *Khoa Chấn thương chỉnh hình*) ngay cả trước khi đồng bộ SQL Server HIS.
+    - Cập nhật tương tự cho ComboBox Khoa phòng ở `CloneTemplateWindow` và màn hình Tạo đề.
+
+### 2. Rà soát Toàn diện Hệ thống Phần mềm (Comprehensive Audit):
+*   **Tab 1: Thực thi Tạo đề thi:**
+    - Đã có cơ chế bảo vệ trước khi sinh đề (Preflight Validation: kiểm tra tồn kho, số lượng User HIS, số hồ sơ bệnh nhân BHYT/Viện phí).
+    - Cảnh báo rõ ràng và thân thiện nếu chưa đồng bộ catalog.
+*   **Tab 2: Quản lý & Biên tập Mẫu đề thi:**
+    - Lưu hai chiều, tính tổng điểm thời gian thực, clone đề sang khoa khác mượt mà.
+    - Xóa/sắp xếp câu hỏi hoạt động ổn định.
+*   **Tab 3: Phân quyền Kho thi & Dịch vụ:**
+    - Mapping 1 Khoa - 1 Kho cơ số (Rule 3.3).
+    - Quản lý trạng thái Tạm ngưng thi độc lập với cờ TamNgung trên HIS.
+    - Cơ chế đồng bộ Additive Sync bảo toàn toàn bộ cấu hình đã thiết lập.
+*   **Tab 4: Cài đặt & HIS Catalog:**
+    - Kết nối an toàn qua ADO.NET SqlConnectionStringBuilder; đường dẫn SQLite cục bộ tương đối an toàn.
+*   **Tab 5: Tra cứu Tồn kho Dược:**
+    - Bộ lọc theo Kho và từ khóa, phân trang nhanh.
+*   **Độ tin cậy Test & Build:**
+    - Hoàn thiện thuật toán băm hạt giống ngẫu nhiên xác định `GetDeterministicHashCode` trong `ExamScenarioAllocator`, giúp kết quả sinh đề và test chạy đồng nhất tuyệt đối trên cả môi trường Debug và Release.
+    - **25/25 Unit tests Passed 100%**.
+    - Bản build Release tại `desktop/publish/ExamOperationsDesktop/ExamGenerator.Desktop.exe` đã được cập nhật thành công.
+
+---
+
+## [2026-09-23] Nâng cấp Toàn diện Bộ Biên tập Mẫu Đề Thi (Interactive Template Editor), Tùy chỉnh Câu hỏi & Phân bổ Điểm số, Nhân bản Đề Linh hoạt
+
+### 1. Quyết định nghiệp vụ & Thiết kế:
+*   **Bộ biên tập Mẫu đề Trực quan (Interactive Template Editor):**
+    - Chuyển đổi khung xem chi tiết readonly trước đây thành Form biên tập động hai chiều tại Tab 2.
+    - Cho phép chỉnh sửa trực tiếp Tên mẫu đề, Khoa/Phòng áp dụng, Vị trí chuyên môn và Hình thức nhận ca (Tiếp nhận trực tiếp vs Hàng chờ nhận ca).
+*   **Thư viện Dạng câu hỏi Nghiệp vụ HIS chuẩn (`SystemActionCatalog`):**
+    - Chuẩn hóa 13 dạng câu hỏi nghiệp vụ HIS: Tiếp nhận, Nhận bệnh vào khoa, Chỉ định CLS, Lên y lệnh Dược/VTYT, Trả thuốc, Đổi/thêm CLS, Kiểm tra tồn kho cơ số, Chuyển khoa, Cho ra viện, Thu tạm ứng, Thanh toán ra viện, Tra cứu bệnh sử, Trả kết quả CLS.
+    - Tích hợp ComboBox chọn nhanh dạng câu hỏi kèm gợi ý điểm mặc định và nút `+ Thêm vào đề`.
+*   **Phân bổ Điểm số Linh hoạt & Kiểm soát Tổng điểm Thời gian thực:**
+    - Cho phép sửa điểm từng câu trực tiếp trên DataGrid (hỗ trợ cả dấu `.` và dấu `,`).
+    - Hỗ trợ đổi thứ tự câu hỏi trong đề (`▲` Lên, `▼` Xuống) và xóa câu (`✕`).
+    - Tính tổng điểm tự động: Hiển thị Badge trực quan màu xanh lá khi đủ 10.0đ; cảnh báo màu cam nếu khác 10.0đ và xác nhận khi lưu.
+*   **Hộp thoại Nhân bản Đề thi Linh hoạt (`CloneTemplateWindow`):**
+    - Khi bấm Clone, mở hộp thoại cho phép nhập Tên mẫu đề mới, chọn Khoa/Phòng áp dụng đích và Vị trí.
+    - Mẫu đề sau khi nhân bản tự động lưu và mở ngay trên khung Editor để người dùng tinh chỉnh.
+*   **Tạo mới Mẫu đề trống & Bộ lọc Khoa:**
+    - Nút `+ Tạo mới` chuyển sang chế độ tạo đề sạch, tự do chọn khoa, vị trí và tự thêm các câu hỏi mong muốn.
+    - Bổ sung ComboBox lọc danh sách đề thi theo Khoa/Phòng tại cột bên trái.
+    - Đồng bộ ngay lập tức sang Tab 1 (Tạo đề thi) sau mỗi thao tác Lưu, Clone, Xóa.
+*   **Kiểm thử & Phát hành:**
+    - Bổ sung 3 unit tests mới trong `ExamRulesTests.cs` và `CatalogSynchronizationTests.cs` kiểm tra `SystemActionCatalog`, lưu điểm số tùy biến và nhân bản mẫu đề sang khoa mới.
+    - Toàn bộ **25/25 unit tests Passed 100%**.
+    - Đóng gói bản phát hành Release tại `desktop/publish/ExamOperationsDesktop/ExamGenerator.Desktop.exe`.
+
+---
+
 ## [2026-09-16] Bảo vệ Danh mục Khoa/Phòng, Cấu hình Mapping và Mẫu Đề thi khi Đồng bộ HIS
 
 ### 1. Quyết định nghiệp vụ & Thiết kế:
@@ -422,7 +576,47 @@ Nhật ký ghi lại các thay đổi, quyết định thiết kế và tiến t
     *   Tạo file thông tin dự án [project.md](file:///C:/Users/Admin/.gemini/antigravity/scratch/ExamGenerator/project.md) chỉ định các quy tắc Vibe Coding chuyên nghiệp.
     *   Tạo file nhật ký [agentlog.md](file:///C:/Users/Admin/.gemini/antigravity/scratch/ExamGenerator/agentlog.md) (File này).
 
-### 2. Các bước tiếp theo:
-1.  Tạo các file Excel danh mục mẫu (`patients.xlsx`, `drugs.xlsx`, `services.xlsx`, `users.xlsx`) trong thư mục `data/catalogs/`.
-2.  Viết file `backend/requirements.txt` và cài đặt các dependencies.
-3.  Lập trình bộ quản lý danh mục `backend/catalog_manager.py`.
+
+---
+
+## [2026-09-23] Hỗ trợ Mapping nhiều Kho Dược cho 1 Khoa & Chọn 1 Kho cụ thể khi Tạo Đề Thi
+
+### 1. Công việc đã thực hiện:
+*   **Domain & CSDL (`SqliteDatabase`, `ExamRules`):**
+    *   Tạo bảng `DepartmentWarehouseMapping` (`DepartmentCode`, `DepartmentName`, `WarehouseCode`, `WarehouseName`, `CreatedAt`) với khoá chính kép `(DepartmentCode, WarehouseCode)`.
+    *   Tự động di chuyển dữ liệu (Migration) từ bảng cũ `DepartmentConfiguration` sang `DepartmentWarehouseMapping`.
+    *   Bổ sung phương thức `SaveDepartmentWarehouseMappingsAsync`, `GetDepartmentWarehouseMappingsAsync`, `GetWarehousesForDepartmentAsync`.
+    *   Duy trì `GetDepartmentConfigurationsAsync` và `SaveDepartmentConfigurationAsync` để tương thích ngược.
+    *   Điều chỉnh quy tắc Rule 3.3 trong `ExamBatchRules`: Một khoa có thể có $\ge 1$ kho thi. Bổ sung `ValidateCandidateWarehouseSelections`: Mỗi thí sinh khi thi phải chọn 1 kho cụ thể trong danh sách kho đã map của khoa mình.
+*   **Thuật toán Phân bổ Đề thi (`ExamScenarioAllocator`):**
+    *   Bổ sung `WarehouseCode` và `WarehouseName` vào `CandidateInput`.
+    *   Tách biệt bộ nhớ đệm tồn kho (`warehouseStockMap`, `warehouseDrugsCache`) theo từng kho cụ thể.
+    *   Thí sinh cùng khoa chọn các kho khác nhau (hoặc cùng kho) sẽ được cấp thuốc và kiểm tra tồn kho (Câu 6) tương ứng chính xác với kho đó mà không làm cạn kiệt lẫn nhau.
+*   **Giao diện Desktop (`MainWindow.xaml`, `MainWindow.xaml.cs`):**
+    *   **Tab 3 (Phân quyền Dịch vụ & Kho):** Chuyển từ ComboBox 1 kho sang danh sách CheckBox `WarehouseMappingsList` kèm ô tìm kiếm và 2 nút "Chọn tất cả" / "Bỏ chọn tất cả", cho phép tick chọn nhiều kho cho một khoa phòng.
+    *   **Tab 1 (Thực thi tạo đề):** Bổ sung ComboBox `ExamWarehouseComboBox` (chọn kho dược thi). Khi đổi Khoa thi, tự động lọc và nạp danh sách các kho đã map của khoa đó. Thêm cột `Kho Dược thi` trong `CandidatesGrid` hiển thị kho đã chọn của từng thí sinh.
+*   **Kiểm thử & Đóng gói:**
+    *   Bổ sung 3 unit tests mới trong `ExamRulesTests`, `ExamScenarioAllocatorTests`, `CatalogSynchronizationTests`. Toàn bộ 30/30 unit tests PASSED.
+    *   Chạy build Release và cập nhật cả 2 bản:
+
+---
+
+## [2026-09-23] Bổ sung Dữ liệu Bệnh nhân Tiếp nhận Trực tiếp & 4 Dạng Câu hỏi Mới vào Thư viện HIS
+
+### 1. Công việc đã thực hiện:
+*   **Tiếp nhận trực tiếp (`ExamScenarioAllocator`):**
+    *   Cập nhật `InstructionForAction`: Khi tạo câu hỏi Tiếp nhận trực tiếp (`TN_TIEP_NHAN` hoặc `isDirectReception`), hệ thống tự động trích xuất đầy đủ thông tin hành chính của bệnh nhân (`patient`) gồm: Họ và tên (in hoa), Ngày sinh, Tuổi, Giới tính, Địa chỉ, Đối tượng (BHYT/Viện phí), Số thẻ BHYT, Hạn thẻ BHYT, Nơi ĐKKCB ban đầu, Chẩn đoán ban đầu.
+    *   Bổ sung dòng điền: `- Số vào viện (SVV) / Mã tiếp nhận sau khi lưu: ………………………………` để thí sinh ghi nhận kết quả thao tác trên phần mềm HIS.
+*   **Thêm 4 dạng câu hỏi chuẩn vào Thư viện Nghiệp vụ HIS (`SystemActionCatalog`, `SqliteDatabase`):**
+    1.  `NT_CAP_GIUONG` (1.0 đ) - Nhóm *Điều trị Nội trú*: `"Cấp giường cho các bệnh nhân được tiếp nhận ở câu 1"`
+    2.  `KB_CHI_DINH_CLS` (2.0 đ) - Nhóm *Khám bệnh & Ngoại trú*: Chỉ định CLS ngoại trú, tự động random 2 dịch vụ X-quang & Siêu âm khi đưa vào đề thi, kèm chỗ trống cho người chấm điền Tên bệnh nhân và Mã y tế.
+    3.  `KB_BENH_AN_NGOAI_TRU` (2.0 đ) - Nhóm *Khám bệnh & Ngoại trú*: Chỉ định điều trị ngoại trú và lập bệnh án ngoại trú kèm dòng điền `Số bệnh án ngoại trú`.
+    4.  `KB_CHI_DINH_NOI_TRU` (1.0 đ) - Nhóm *Khám bệnh & Ngoại trú*: Chỉ định nhập viện điều trị nội trú, tự động gán Khoa chuyển đến và dòng điền `Số bệnh án nội trú`.
+*   **Cập nhật CSDL SQLite (`SqliteDatabase.InitializeAsync`):**
+    *   Cơ chế `ON CONFLICT` tự động nạp bổ sung 4 dạng câu hỏi mới vào bảng `ActionDefinition` khi khởi chạy mà không ghi đè câu hỏi tự tạo của người dùng.
+*   **Kiểm thử & Đóng gói:**
+    *   Bổ sung 2 bài unit tests mới trong `ExamScenarioAllocatorTests`: kiểm tra in dữ liệu bệnh nhân tiếp nhận và phân bổ các câu hỏi ngoại trú / nội trú mới. Đạt **32/32 Tests PASSED 100%**.
+    *   Build Release và phát hành:
+        *   `desktop/publish/ExamOperationsDesktop/ExamGenerator.Desktop.exe`
+        *   `desktop/publish/ExamOperationsDesktop-Standalone/ExamGenerator.Desktop.exe` (Standalone win-x64).
+

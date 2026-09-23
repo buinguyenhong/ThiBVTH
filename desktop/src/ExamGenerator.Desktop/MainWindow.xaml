@@ -30,7 +30,7 @@
                             <TextBlock Text=".NET 8 LTS · WPF" Foreground="White" FontSize="12"/>
                         </Border>
                     </StackPanel>
-                    <TextBlock x:Name="HeaderSubText" Text="Cơ sở dữ liệu: exam-generator.sqlite" Foreground="{StaticResource TextMuted}" FontSize="11" HorizontalAlignment="Right"/>
+                    <TextBlock x:Name="HeaderSubText" Text="Cơ sở dữ liệu: data/exam-generator.sqlite" Foreground="{StaticResource TextMuted}" FontSize="11" HorizontalAlignment="Right"/>
                 </StackPanel>
             </Grid>
         </Border>
@@ -44,7 +44,7 @@
         </Border>
 
         <!-- Main Workspace Tabs -->
-        <TabControl x:Name="MainTabs" Margin="20,14,20,16">
+        <TabControl x:Name="MainTabs" Margin="20,14,20,16" SelectionChanged="MainTabs_SelectionChanged">
 
             <!-- TAB 1: THỰC THI TẠO ĐỀ -->
             <TabItem Header="1. Thực thi tạo đề">
@@ -89,22 +89,27 @@
 
                                 <Grid Margin="0,8,0,0">
                                     <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="2*"/>
+                                        <ColumnDefinition Width="1.8*"/>
+                                        <ColumnDefinition Width="1.8*"/>
                                         <ColumnDefinition Width="1*"/>
-                                        <ColumnDefinition Width="1.5*"/>
+                                        <ColumnDefinition Width="1.4*"/>
                                     </Grid.ColumnDefinitions>
                                     <StackPanel Margin="0,0,8,0">
                                         <TextBlock Text="Mẫu đề thi theo Khoa" FontWeight="Medium" Foreground="{StaticResource TextSecondary}"/>
                                         <ComboBox x:Name="ExamTemplateComboBox" SelectionChanged="ExamTemplateChanged"/>
                                     </StackPanel>
                                     <StackPanel Grid.Column="1" Margin="8,0">
+                                        <TextBlock Text="Kho Dược thi (chọn trong các kho của khoa)" FontWeight="Medium" Foreground="{StaticResource TextSecondary}"/>
+                                        <ComboBox x:Name="ExamWarehouseComboBox"/>
+                                    </StackPanel>
+                                    <StackPanel Grid.Column="2" Margin="8,0">
                                         <TextBlock Text="Thời gian làm bài (phút)" FontWeight="Medium" Foreground="{StaticResource TextSecondary}"/>
                                         <TextBox x:Name="ExamDurationTextBox" Text="30" VerticalContentAlignment="Center"/>
                                     </StackPanel>
-                                    <StackPanel Grid.Column="2" Margin="8,0,0,0">
+                                    <StackPanel Grid.Column="3" Margin="8,0,0,0">
                                         <TextBlock Text="Phân bổ User HIS" FontWeight="Medium" Foreground="{StaticResource TextSecondary}"/>
                                         <Border Background="{StaticResource BrandTealSoft}" CornerRadius="6" Padding="10,7" Height="34" Margin="0,4,0,8">
-                                            <TextBlock x:Name="UserAllocationSummaryText" Text="Tự động cấp User riêng không trùng" Foreground="{StaticResource BrandTeal}" FontWeight="SemiBold" VerticalAlignment="Center"/>
+                                            <TextBlock x:Name="UserAllocationSummaryText" Text="Tự động cấp User riêng" Foreground="{StaticResource BrandTeal}" FontWeight="SemiBold" VerticalAlignment="Center"/>
                                         </Border>
                                     </StackPanel>
                                 </Grid>
@@ -144,12 +149,13 @@
                                 <DataGrid x:Name="CandidatesGrid" Height="240">
                                     <DataGrid.Columns>
                                         <DataGridCheckBoxColumn Header="Chọn" Binding="{Binding Selected, UpdateSourceTrigger=PropertyChanged}" Width="55"/>
-                                        <DataGridTextColumn Header="Họ và Tên" Binding="{Binding Name}" Width="1.8*"/>
-                                        <DataGridTextColumn Header="Số báo danh" Binding="{Binding Id}" Width="1*"/>
-                                        <DataGridTextColumn Header="Khoa / Phòng" Binding="{Binding Department}" Width="1.5*"/>
-                                        <DataGridTextColumn Header="Mẫu đề thi" Binding="{Binding Template}" Width="2*"/>
-                                        <DataGridTextColumn Header="Thời gian" Binding="{Binding DurationText}" Width="80"/>
-                                        <DataGridTextColumn Header="Quy tắc cấp User HIS" Binding="{Binding UserStatus}" Width="1.5*"/>
+                                        <DataGridTextColumn Header="Họ và Tên" Binding="{Binding Name}" Width="1.6*"/>
+                                        <DataGridTextColumn Header="Số báo danh" Binding="{Binding Id}" Width="0.9*"/>
+                                        <DataGridTextColumn Header="Khoa / Phòng" Binding="{Binding Department}" Width="1.3*"/>
+                                        <DataGridTextColumn Header="Kho Dược thi" Binding="{Binding WarehouseName}" Width="1.3*"/>
+                                        <DataGridTextColumn Header="Mẫu đề thi" Binding="{Binding Template}" Width="1.8*"/>
+                                        <DataGridTextColumn Header="Thời gian" Binding="{Binding DurationText}" Width="75"/>
+                                        <DataGridTextColumn Header="Quy tắc cấp User HIS" Binding="{Binding UserStatus}" Width="1.4*"/>
                                     </DataGrid.Columns>
                                 </DataGrid>
 
@@ -172,42 +178,201 @@
             <TabItem Header="2. Quản lý Mẫu đề">
                 <Grid Margin="6,12">
                     <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="1.6*"/>
-                        <ColumnDefinition Width="1.4*"/>
+                        <ColumnDefinition Width="1*"/>
+                        <ColumnDefinition Width="1.5*"/>
                     </Grid.ColumnDefinitions>
 
                     <!-- Left: Templates List -->
                     <Border Style="{StaticResource CardBorder}" Margin="0,0,10,0">
                         <DockPanel>
                             <Grid DockPanel.Dock="Top" Margin="0,0,0,10">
-                                <TextBlock Text="Danh sách Mẫu Đề Thi" FontSize="16" FontWeight="SemiBold"/>
-                                <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
-                                    <Button Content="+ Tạo mẫu mới" Style="{StaticResource PrimaryButton}" Click="NewTemplate_Click"/>
-                                    <Button Content="Clone" Style="{StaticResource SecondaryButton}" Click="CloneTemplate_Click"/>
-                                    <Button Content="Xóa" Style="{StaticResource DangerButton}" Click="DeleteTemplate_Click"/>
+                                <Grid.RowDefinitions>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="Auto"/>
+                                </Grid.RowDefinitions>
+
+                                <TextBlock Grid.Row="0" Text="Danh sách Mẫu Đề Thi" FontSize="16" FontWeight="SemiBold"/>
+
+                                <Grid Grid.Row="1" Margin="0,8,0,8">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="Auto"/>
+                                        <ColumnDefinition Width="*"/>
+                                    </Grid.ColumnDefinitions>
+                                    <TextBlock Text="Lọc theo khoa:" VerticalAlignment="Center" Margin="0,0,8,0" Foreground="{StaticResource TextSecondary}"/>
+                                    <ComboBox Grid.Column="1" x:Name="TemplateDeptFilterComboBox" SelectionChanged="TemplateDeptFilterChanged"/>
+                                </Grid>
+
+                                <StackPanel Grid.Row="2" Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,0,0,4">
+                                    <Button Content="+ Tạo mới" Style="{StaticResource PrimaryButton}" Padding="12,6" Click="NewTemplate_Click" ToolTip="Tạo một mẫu đề thi mới"/>
+                                    <Button Content="📋 Clone" Style="{StaticResource SecondaryButton}" Padding="12,6" Click="CloneTemplate_Click" ToolTip="Nhân bản mẫu đề đang chọn và đổi tên/khoa"/>
+                                    <Button Content="🗑️ Xóa" Style="{StaticResource DangerButton}" Padding="12,6" Click="DeleteTemplate_Click" ToolTip="Xóa mẫu đề đang chọn"/>
                                 </StackPanel>
                             </Grid>
+
                             <DataGrid x:Name="TemplatesGrid" SelectionChanged="TemplateSelected">
                                 <DataGrid.Columns>
-                                    <DataGridTextColumn Header="Tên mẫu đề" Binding="{Binding Name}" Width="2*"/>
-                                    <DataGridTextColumn Header="Khoa áp dụng" Binding="{Binding Department}" Width="1.2*"/>
-                                    <DataGridTextColumn Header="Số câu" Binding="{Binding QuestionCount}" Width="60"/>
-                                    <DataGridTextColumn Header="Tổng điểm" Binding="{Binding TotalScore}" Width="80"/>
-                                    <DataGridTextColumn Header="Hình thức nhận ca" Binding="{Binding Status}" Width="1.5*"/>
+                                    <DataGridTextColumn Header="Tên mẫu đề" Binding="{Binding Name}" Width="1.6*"/>
+                                    <DataGridTextColumn Header="Khoa áp dụng" Binding="{Binding Department}" Width="1.1*"/>
+                                    <DataGridTextColumn Header="Số câu" Binding="{Binding QuestionCount}" Width="55"/>
+                                    <DataGridTextColumn Header="Tổng điểm" Binding="{Binding TotalScore}" Width="70"/>
+                                    <DataGridTextColumn Header="Hình thức nhận ca" Binding="{Binding Status}" Width="1.2*"/>
                                 </DataGrid.Columns>
                             </DataGrid>
                         </DockPanel>
                     </Border>
 
-                    <!-- Right: Selected Template Questions -->
+                    <!-- Right: Interactive Template Editor -->
                     <Border Grid.Column="1" Style="{StaticResource CardBorder}" Margin="10,0,0,0">
                         <DockPanel>
-                            <TextBlock DockPanel.Dock="Top" Text="Chi tiết Câu hỏi &amp; Thang điểm" FontSize="16" FontWeight="SemiBold" Margin="0,0,0,10"/>
+                            <!-- Editor Header -->
+                            <Grid DockPanel.Dock="Top" Margin="0,0,0,12">
+                                <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                    <TextBlock x:Name="TemplateEditorTitle" Text="Biên tập Mẫu Đề Thi" FontSize="16" FontWeight="Bold" Foreground="{StaticResource BrandNavy}"/>
+                                    <Border x:Name="TemplateEditorModeBadgeBorder" Background="{StaticResource BrandTealSoft}" BorderBrush="{StaticResource BrandTeal}" BorderThickness="1" CornerRadius="4" Padding="6,2" Margin="10,0,0,0">
+                                        <TextBlock x:Name="TemplateEditorModeBadge" Text="Đang chỉnh sửa" FontSize="11" FontWeight="SemiBold" Foreground="{StaticResource BrandTeal}"/>
+                                    </Border>
+                                </StackPanel>
+                                <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+                                    <Button Content="Hủy bỏ" Style="{StaticResource SecondaryButton}" Padding="12,6" Click="CancelEditTemplate_Click"/>
+                                    <Button Content="💾 Lưu Mẫu Đề" Style="{StaticResource PrimaryButton}" Padding="16,6" Click="SaveTemplate_Click"/>
+                                </StackPanel>
+                            </Grid>
+
                             <ScrollViewer VerticalScrollBarVisibility="Auto">
                                 <StackPanel>
-                                    <TextBlock x:Name="TemplateDetailTitle" Text="Chọn một mẫu đề để xem nội dung" FontWeight="SemiBold" Foreground="{StaticResource BrandTeal}" Margin="0,0,0,8"/>
-                                    <Border Background="#F8FAFC" BorderBrush="{StaticResource BorderSubtle}" BorderThickness="1" CornerRadius="6" Padding="14">
-                                        <TextBlock x:Name="TemplateActionsText" Text="Danh sách câu hỏi..." TextWrapping="Wrap" LineHeight="20"/>
+                                    <!-- Section 1: Template Basic Info -->
+                                    <Border Background="#F8FAFC" BorderBrush="{StaticResource BorderSubtle}" BorderThickness="1" CornerRadius="6" Padding="12" Margin="0,0,0,12">
+                                        <Grid>
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="1.2*"/>
+                                                <ColumnDefinition Width="1*"/>
+                                            </Grid.ColumnDefinitions>
+
+                                            <!-- Left fields -->
+                                            <StackPanel Grid.Column="0" Margin="0,0,10,0">
+                                                <TextBlock Text="Tên mẫu đề thi (*):" FontWeight="SemiBold" Margin="0,0,0,4"/>
+                                                <TextBox x:Name="EditorTemplateNameTextBox" Margin="0,0,0,10" Padding="8,5"/>
+
+                                                <TextBlock Text="Khoa / Phòng áp dụng (*):" FontWeight="SemiBold" Margin="0,0,0,4"/>
+                                                <ComboBox x:Name="EditorDepartmentComboBox" IsEditable="True" Margin="0,0,0,0" Padding="8,5"/>
+                                            </StackPanel>
+
+                                            <!-- Right fields -->
+                                            <StackPanel Grid.Column="1" Margin="10,0,0,0">
+                                                <TextBlock Text="Vị trí chuyên môn:" FontWeight="SemiBold" Margin="0,0,0,4"/>
+                                                <ComboBox x:Name="EditorPositionComboBox" IsEditable="True" Margin="0,0,0,10" Padding="8,5"/>
+
+                                                <TextBlock Text="Hình thức nhận ca (*):" FontWeight="SemiBold" Margin="0,0,0,4"/>
+                                                <ComboBox x:Name="EditorReceptionModeComboBox" Margin="0,0,0,0" Padding="8,5"/>
+                                            </StackPanel>
+                                        </Grid>
+                                    </Border>
+
+                                    <!-- Section 2: Questions and Scores Editor -->
+                                    <Grid Margin="0,0,0,8">
+                                        <TextBlock Text="Danh sách Câu hỏi &amp; Phân bổ Thang điểm" FontSize="14" FontWeight="SemiBold" VerticalAlignment="Center"/>
+                                        <TextBlock x:Name="QuestionsCountText" Text="(0 câu)" Foreground="{StaticResource TextSecondary}" HorizontalAlignment="Right" VerticalAlignment="Center"/>
+                                    </Grid>
+
+                                    <DataGrid x:Name="EditorQuestionsGrid" RowHeight="40" Height="270" AutoGenerateColumns="False" CanUserAddRows="False" CanUserDeleteRows="False" Margin="0,0,0,10">
+                                        <DataGrid.Resources>
+                                            <Style TargetType="TextBox">
+                                                <Setter Property="Height" Value="28"/>
+                                                <Setter Property="Margin" Value="2,1"/>
+                                                <Setter Property="Padding" Value="6,2"/>
+                                                <Setter Property="VerticalContentAlignment" Value="Center"/>
+                                                <Setter Property="VerticalAlignment" Value="Center"/>
+                                            </Style>
+                                        </DataGrid.Resources>
+                                        <DataGrid.Columns>
+                                            <DataGridTextColumn Header="STT" Binding="{Binding OrderIndex}" Width="45" IsReadOnly="True">
+                                                <DataGridTextColumn.ElementStyle>
+                                                    <Style TargetType="TextBlock">
+                                                        <Setter Property="HorizontalAlignment" Value="Center"/>
+                                                        <Setter Property="VerticalAlignment" Value="Center"/>
+                                                        <Setter Property="FontWeight" Value="SemiBold"/>
+                                                    </Style>
+                                                </DataGridTextColumn.ElementStyle>
+                                            </DataGridTextColumn>
+                                            <DataGridTextColumn Header="Mã hành động" Binding="{Binding ActionCode}" Width="190" IsReadOnly="True" Foreground="{StaticResource TextSecondary}">
+                                                <DataGridTextColumn.ElementStyle>
+                                                    <Style TargetType="TextBlock">
+                                                        <Setter Property="VerticalAlignment" Value="Center"/>
+                                                        <Setter Property="Padding" Value="4,0"/>
+                                                        <Setter Property="FontFamily" Value="Consolas, Segoe UI"/>
+                                                    </Style>
+                                                </DataGridTextColumn.ElementStyle>
+                                            </DataGridTextColumn>
+                                            <DataGridTemplateColumn Header="Tên câu hỏi trong đề thi" Width="*">
+                                                <DataGridTemplateColumn.CellTemplate>
+                                                    <DataTemplate>
+                                                        <TextBox Text="{Binding ActionName, UpdateSourceTrigger=PropertyChanged}" VerticalAlignment="Center"/>
+                                                    </DataTemplate>
+                                                </DataGridTemplateColumn.CellTemplate>
+                                            </DataGridTemplateColumn>
+                                            <DataGridTemplateColumn Header="Điểm (đ)" Width="85">
+                                                <DataGridTemplateColumn.CellTemplate>
+                                                    <DataTemplate>
+                                                        <TextBox Text="{Binding ScoreText, UpdateSourceTrigger=PropertyChanged}" TextAlignment="Center" FontWeight="Bold" VerticalAlignment="Center"/>
+                                                    </DataTemplate>
+                                                </DataGridTemplateColumn.CellTemplate>
+                                            </DataGridTemplateColumn>
+                                            <DataGridTemplateColumn Header="Thao tác" Width="110">
+                                                <DataGridTemplateColumn.CellTemplate>
+                                                    <DataTemplate>
+                                                        <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" VerticalAlignment="Center">
+                                                            <Button Content="▲" Width="26" Height="26" Margin="1,0" Padding="0" Click="QuestionMoveUp_Click" Tag="{Binding}" ToolTip="Đẩy câu hỏi lên trên" Cursor="Hand"/>
+                                                            <Button Content="▼" Width="26" Height="26" Margin="1,0" Padding="0" Click="QuestionMoveDown_Click" Tag="{Binding}" ToolTip="Đẩy câu hỏi xuống dưới" Cursor="Hand"/>
+                                                            <Button Content="✕" Width="26" Height="26" Margin="2,0" Padding="0" Foreground="#DC2626" Background="#FEE2E2" BorderThickness="0" FontWeight="Bold" Click="QuestionRemove_Click" Tag="{Binding}" ToolTip="Xóa câu này khỏi đề" Cursor="Hand"/>
+                                                        </StackPanel>
+                                                    </DataTemplate>
+                                                </DataGridTemplateColumn.CellTemplate>
+                                            </DataGridTemplateColumn>
+                                        </DataGrid.Columns>
+                                    </DataGrid>
+
+                                    <!-- Section 3: Add Question from Action Library -->
+                                    <Border Background="#F1F5F9" BorderBrush="{StaticResource BorderSubtle}" BorderThickness="1" CornerRadius="6" Padding="12" Margin="0,0,0,12">
+                                        <Grid>
+                                            <Grid.RowDefinitions>
+                                                <RowDefinition Height="Auto"/>
+                                                <RowDefinition Height="Auto"/>
+                                            </Grid.RowDefinitions>
+                                            <Grid Grid.Row="0" Margin="0,0,0,6">
+                                                <TextBlock Text="Thêm câu hỏi từ Thư viện Nghiệp vụ HIS:" FontWeight="SemiBold" VerticalAlignment="Center"/>
+                                                <Button Content="⚙ Quản lý Thư viện / Thêm dạng mới..." Style="{StaticResource SecondaryButton}" HorizontalAlignment="Right" Padding="10,4" FontSize="12" Click="ManageActionLibrary_Click"/>
+                                            </Grid>
+                                            <Grid Grid.Row="1">
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="*"/>
+                                                    <ColumnDefinition Width="Auto"/>
+                                                </Grid.ColumnDefinitions>
+                                                <ComboBox Grid.Column="0" x:Name="ActionLibraryComboBox" DisplayMemberPath="DisplayText" MaxDropDownHeight="320" Margin="0,0,8,0" Padding="8,6"/>
+                                                <Button Grid.Column="1" Content="+ Thêm vào đề" Style="{StaticResource AccentButton}" Padding="14,6" Click="AddActionToTemplate_Click"/>
+                                            </Grid>
+                                        </Grid>
+                                    </Border>
+
+                                    <!-- Section 4: Live Total Score & Validation Summary -->
+                                    <Border Background="#F8FAFC" BorderBrush="{StaticResource BorderSubtle}" BorderThickness="1" CornerRadius="6" Padding="12">
+                                        <Grid>
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="*"/>
+                                                <ColumnDefinition Width="Auto"/>
+                                            </Grid.ColumnDefinitions>
+
+                                            <StackPanel Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center">
+                                                <Border x:Name="TotalScoreBadgeBorder" Background="#DCFCE7" BorderBrush="#86EFAC" BorderThickness="1" CornerRadius="6" Padding="10,6" Margin="0,0,12,0">
+                                                    <TextBlock x:Name="TotalScoreText" Text="Tổng điểm: 10.0 / 10.0 đ" FontWeight="Bold" FontSize="14" Foreground="#166534"/>
+                                                </Border>
+                                                <TextBlock x:Name="TotalScoreStatusText" Text="✓ Đạt chuẩn 10.0 điểm theo quy chế khảo thí BV Thiện Hạnh." Foreground="#166534" FontWeight="Medium" VerticalAlignment="Center"/>
+                                            </StackPanel>
+
+                                            <StackPanel Grid.Column="1" Orientation="Horizontal">
+                                                <Button Content="💾 Lưu Mẫu Đề" Style="{StaticResource PrimaryButton}" Padding="18,8" FontSize="13" Click="SaveTemplate_Click"/>
+                                            </StackPanel>
+                                        </Grid>
                                     </Border>
                                 </StackPanel>
                             </ScrollViewer>
@@ -253,7 +418,7 @@
                         <ScrollViewer VerticalScrollBarVisibility="Auto">
                             <StackPanel>
                                 <TextBlock x:Name="MappingTitleText" Text="Cấu hình Kho thi &amp; Nhóm Dịch vụ" FontSize="18" FontWeight="SemiBold" Foreground="{StaticResource BrandNavy}"/>
-                                <TextBlock Text="Quy tắc chuẩn: Mỗi khoa chỉ được gắn đúng một Kho thi duy nhất để đảm bảo tính nhất quán của đề thi." Foreground="{StaticResource TextSecondary}" Margin="0,2,0,12"/>
+                                <TextBlock Text="Mỗi khoa có thể cấu hình một hoặc nhiều Kho Dược / Tủ trực phục vụ thi. Khi tạo đề thi, người dùng sẽ chọn 1 kho cụ thể cho thí sinh." Foreground="{StaticResource TextSecondary}" Margin="0,2,0,12"/>
 
                                 <Border Background="#F1F5F9" BorderBrush="{StaticResource BorderSubtle}" BorderThickness="1" CornerRadius="6" Padding="12,8" Margin="0,0,0,14">
                                     <CheckBox x:Name="DepartmentActiveCheckBox" Click="DepartmentActive_Click" VerticalAlignment="Center" IsChecked="True">
@@ -261,8 +426,27 @@
                                     </CheckBox>
                                 </Border>
 
-                                <TextBlock Text="Kho Dược / Tủ trực thi duy nhất (Bắt buộc)" FontWeight="SemiBold" Margin="0,0,0,4"/>
-                                <ComboBox x:Name="MappingWarehouseComboBox" IsEditable="True"/>
+                                <TextBlock Text="Danh sách Kho Dược / Tủ trực thi trực thuộc khoa (Chọn ít nhất 1 kho)" FontWeight="SemiBold" Margin="0,0,0,4"/>
+                                <Grid Margin="0,0,0,6">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="Auto"/>
+                                    </Grid.ColumnDefinitions>
+                                    <TextBox x:Name="WarehouseSearchTextBox" TextChanged="WarehouseSearchChanged" Height="32"/>
+                                    <StackPanel Grid.Column="1" Orientation="Horizontal" Margin="8,0,0,0">
+                                        <Button Content="Chọn tất cả" Style="{StaticResource SecondaryButton}" Height="32" Padding="12,0" Margin="0,0,6,0" Click="SelectAllWarehouses_Click"/>
+                                        <Button Content="Bỏ chọn tất cả" Style="{StaticResource SecondaryButton}" Height="32" Padding="12,0" Click="ClearAllWarehouses_Click"/>
+                                    </StackPanel>
+                                </Grid>
+                                <ListBox x:Name="WarehouseMappingsList" Height="160" BorderBrush="{StaticResource BorderSubtle}" ScrollViewer.HorizontalScrollBarVisibility="Disabled">
+                                    <ListBox.ItemTemplate>
+                                        <DataTemplate>
+                                            <CheckBox IsChecked="{Binding IsSelected, Mode=TwoWay}" Margin="2,4" VerticalAlignment="Center">
+                                                <TextBlock Text="{Binding DisplayText}" FontSize="13" Foreground="{StaticResource TextPrimary}" Margin="6,0,0,0"/>
+                                            </CheckBox>
+                                        </DataTemplate>
+                                    </ListBox.ItemTemplate>
+                                </ListBox>
 
                                 <TextBlock Text="Nhóm Dịch vụ Kỹ thuật / CLS được phép chỉ định" FontWeight="SemiBold" Margin="0,14,0,4"/>
                                 <Grid Margin="0,0,0,6">
@@ -496,12 +680,13 @@
                     </Border>
 
                     <Border Grid.Row="1" Style="{StaticResource CardBorder}" Margin="0,10,0,0">
-                        <DataGrid x:Name="HistoryGrid">
+                        <DataGrid x:Name="HistoryGrid" MouseDoubleClick="HistoryGrid_MouseDoubleClick">
                             <DataGrid.Columns>
                                 <DataGridTextColumn Header="Tên đợt thi" Binding="{Binding Batch}" Width="1.5*"/>
-                                <DataGridTextColumn Header="Ngày thi" Binding="{Binding ExamDate}" Width="110"/>
-                                <DataGridTextColumn Header="Đường dẫn tệp tin ZIP" Binding="{Binding FilePath}" Width="3*"/>
-                                <DataGridTextColumn Header="Thời điểm sinh" Binding="{Binding CreatedAt}" Width="1.8*"/>
+                                <DataGridTextColumn Header="Ngày thi" Binding="{Binding FormattedExamDate}" Width="105"/>
+                                <DataGridTextColumn Header="Tệp tin ZIP" Binding="{Binding FileName}" Width="1.8*"/>
+                                <DataGridTextColumn Header="Thời điểm tạo" Binding="{Binding FormattedCreatedAt}" Width="140"/>
+                                <DataGridTextColumn Header="Đường dẫn tệp tin" Binding="{Binding FilePath}" Width="2.5*"/>
                             </DataGrid.Columns>
                         </DataGrid>
                     </Border>

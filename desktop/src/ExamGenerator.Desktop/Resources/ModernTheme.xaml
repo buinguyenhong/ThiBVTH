@@ -6,6 +6,7 @@
     <SolidColorBrush x:Key="BrandSlate" Color="#1E293B"/>
     <SolidColorBrush x:Key="BrandTeal" Color="#0D9488"/>
     <SolidColorBrush x:Key="BrandTealHover" Color="#0F766E"/>
+    <SolidColorBrush x:Key="BrandTealDark" Color="#0F766E"/>
     <SolidColorBrush x:Key="BrandTealSoft" Color="#CCFBF1"/>
     <SolidColorBrush x:Key="BrandCyan" Color="#0284C7"/>
     <SolidColorBrush x:Key="BrandCyanSoft" Color="#E0F2FE"/>
@@ -191,6 +192,27 @@
                 </Style>
             </Setter.Value>
         </Setter>
+    </Style>
+
+    <Style TargetType="DataGridCell">
+        <Setter Property="VerticalContentAlignment" Value="Center"/>
+        <Setter Property="BorderThickness" Value="0"/>
+        <Setter Property="FocusVisualStyle" Value="{x:Null}"/>
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="DataGridCell">
+                    <Border Background="{TemplateBinding Background}" BorderBrush="{TemplateBinding BorderBrush}" BorderThickness="{TemplateBinding BorderThickness}" Padding="4,0" SnapsToDevicePixels="True">
+                        <ContentPresenter VerticalAlignment="Center" SnapsToDevicePixels="True"/>
+                    </Border>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+        <Style.Triggers>
+            <Trigger Property="IsSelected" Value="True">
+                <Setter Property="Background" Value="#E0F2FE"/>
+                <Setter Property="Foreground" Value="{StaticResource TextPrimary}"/>
+            </Trigger>
+        </Style.Triggers>
     </Style>
 
     <!-- Modern TabControl -->

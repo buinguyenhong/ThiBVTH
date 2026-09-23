@@ -10,20 +10,79 @@ public sealed class LocalApplicationStorage
     {
         ApplicationDirectory = applicationDirectory ?? AppContext.BaseDirectory;
         Directory.CreateDirectory(ApplicationDirectory);
+
+        DataDirectory = Path.Combine(ApplicationDirectory, "data");
+        Directory.CreateDirectory(DataDirectory);
+
+        MigrateLegacyFiles();
     }
 
     public string ApplicationDirectory { get; }
+    public string DataDirectory { get; }
 
     public string SqliteDatabasePath(string fileName = "exam-generator.sqlite")
     {
         if (string.IsNullOrWhiteSpace(fileName) || Path.IsPathRooted(fileName))
             throw new ArgumentException("SQLite database phải là tên file tương đối.", nameof(fileName));
 
-        return Path.Combine(ApplicationDirectory, fileName);
+        return Path.Combine(DataDirectory, fileName);
     }
 
-    public string SettingsPath => Path.Combine(ApplicationDirectory, "appsettings.local.json");
-    public string CredentialsPath => Path.Combine(ApplicationDirectory, "credentials.local.bin");
+    public string SettingsPath => Path.Combine(DataDirectory, "appsettings.local.json");
+    public string CredentialsPath => Path.Combine(DataDirectory, "credentials.local.bin");
+    public string OutputDirectory => Path.Combine(DataDirectory, "output");
+
+    private void MigrateLegacyFiles()
+    {
+        try
+        {
+            MigrateFile("exam-generator.sqlite");
+            MigrateFile("exam-generator.sqlite-wal");
+            MigrateFile("exam-generator.sqlite-shm");
+            MigrateFile("appsettings.local.json");
+            MigrateFile("credentials.local.bin");
+
+            var legacyOutput = Path.Combine(ApplicationDirectory, "output");
+            var newOutput = OutputDirectory;
+            if (Directory.Exists(legacyOutput) && !Directory.Exists(newOutput))
+            {
+                try
+                {
+                    Directory.Move(legacyOutput, newOutput);
+                }
+                catch
+                {
+                    Directory.CreateDirectory(newOutput);
+                }
+            }
+            else
+            {
+                Directory.CreateDirectory(newOutput);
+            }
+        }
+        catch
+        {
+            // Do not fail startup if migration encounters locked files
+        }
+    }
+
+    private void MigrateFile(string fileName)
+    {
+        var oldPath = Path.Combine(ApplicationDirectory, fileName);
+        var newPath = Path.Combine(DataDirectory, fileName);
+        if (File.Exists(oldPath) && !File.Exists(newPath))
+        {
+            try
+            {
+                File.Move(oldPath, newPath);
+            }
+            catch
+            {
+                // Fallback copy if move fails
+                try { File.Copy(oldPath, newPath, overwrite: false); } catch { }
+            }
+        }
+    }
 }
 
 [System.Runtime.Versioning.SupportedOSPlatform("windows")]

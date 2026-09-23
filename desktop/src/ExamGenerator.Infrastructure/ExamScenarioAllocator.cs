@@ -2,7 +2,7 @@ using ExamGenerator.Domain;
 
 namespace ExamGenerator.Infrastructure;
 
-public sealed record CandidateInput(string Name, string Id, string Department, string Template, int DurationMinutes = 30);
+public sealed record CandidateInput(string Name, string Id, string Department, string Template, int DurationMinutes = 30, string? WarehouseCode = null, string? WarehouseName = null);
 
 public sealed class ExamScenarioAllocator
 {
@@ -22,8 +22,10 @@ public sealed class ExamScenarioAllocator
         ArgumentNullException.ThrowIfNull(candidates);
         if (candidates.Count == 0) return Array.Empty<ExamScenario>();
 
-        var departmentConfigs = await _database.GetDepartmentConfigurationsAsync(cancellationToken);
-        var configMap = departmentConfigs.ToDictionary(x => x.DepartmentName, x => x, StringComparer.OrdinalIgnoreCase);
+        var allMappings = await _database.GetDepartmentWarehouseMappingsAsync(cancellationToken);
+        var mappingsByDeptName = allMappings
+            .GroupBy(x => x.DepartmentName, StringComparer.OrdinalIgnoreCase)
+            .ToDictionary(g => g.Key, g => g.ToList(), StringComparer.OrdinalIgnoreCase);
 
         var templates = await _database.GetTemplatesAsync(cancellationToken);
         var templateMap = templates.ToDictionary(x => x.Name, x => x, StringComparer.OrdinalIgnoreCase);
@@ -35,6 +37,10 @@ public sealed class ExamScenarioAllocator
             throw new InvalidOperationException("Chưa có hồ sơ Bệnh nhân nào trong CSDL (hoặc toàn bộ bệnh nhân đã thi). Vui lòng vào phân hệ 'Cài đặt & Danh mục HIS' và bấm 'Đồng bộ Catalog HIS'.");
         }
 
+        // Cache warehouse drugs and remaining stock across candidates
+        var warehouseDrugsCache = new Dictionary<string, IReadOnlyList<SnapshotDrugRow>>(StringComparer.OrdinalIgnoreCase);
+        var warehouseStockMap = new Dictionary<string, Dictionary<string, double>>(StringComparer.OrdinalIgnoreCase);
+
         // Group candidates by department to allocate distinct HIS users
         var candidatesByDept = candidates.GroupBy(c => c.Department, StringComparer.OrdinalIgnoreCase);
         var scenarios = new List<ExamScenario>();
@@ -42,10 +48,12 @@ public sealed class ExamScenarioAllocator
         foreach (var group in candidatesByDept)
         {
             var deptName = group.Key;
-            if (!configMap.TryGetValue(deptName, out var deptConfig))
+            if (!mappingsByDeptName.TryGetValue(deptName, out var deptMappings) || deptMappings.Count == 0)
             {
-                throw new InvalidOperationException($"Khoa '{deptName}' chưa được cấu hình một kho thi duy nhất tại phân hệ 'Phân quyền Dịch vụ & Kho'.");
+                throw new InvalidOperationException($"Khoa '{deptName}' chưa được cấu hình kho thi nào tại phân hệ 'Phân quyền Dịch vụ & Kho'.");
             }
+
+            var deptCode = deptMappings[0].DepartmentCode;
 
             // Get available users for this department from SQLite snapshot
             var deptUsers = await _database.GetDepartmentUsersAsync(deptName, cancellationToken);
@@ -56,20 +64,6 @@ public sealed class ExamScenarioAllocator
             if (deptUsers.Count < group.Count())
             {
                 throw new InvalidOperationException($"Khoa '{deptName}' có {group.Count()} thí sinh nhưng chỉ có {deptUsers.Count} tài khoản HIS khả dụng. Vui lòng bổ sung User HIS vào danh mục trước khi sinh đề.");
-            }
-
-            // Get warehouse drugs from SQLite snapshot
-            var warehouseDrugs = await _database.GetWarehouseDrugsAsync(deptConfig.WarehouseCode, cancellationToken);
-            if (warehouseDrugs.Count == 0)
-            {
-                throw new InvalidOperationException($"Kho thi '{deptConfig.WarehouseName}' của khoa '{deptName}' chưa có thuốc/vật tư tồn kho khả dụng được đồng bộ từ HIS.");
-            }
-
-            // Ensure sufficient stock in warehouse for exam
-            var inStockDrugs = warehouseDrugs.Where(d => d.QuantityOnHand >= 1).ToList();
-            if (inStockDrugs.Count == 0)
-            {
-                throw new InvalidOperationException($"Kho thi '{deptConfig.WarehouseName}' của khoa '{deptName}' không có thuốc/vật tư nào còn tồn kho > 0.");
             }
 
             // Get clinical services from SQLite snapshot with group name
@@ -85,23 +79,60 @@ public sealed class ExamScenarioAllocator
             }
 
             // Find target department for Question 7 transfer
-            var otherDept = configMap.Keys.FirstOrDefault(k => !k.Equals(deptName, StringComparison.OrdinalIgnoreCase));
+            var otherDept = mappingsByDeptName.Keys.FirstOrDefault(k => !k.Equals(deptName, StringComparison.OrdinalIgnoreCase));
             var targetTransferDept = otherDept ?? (deptName.Contains("Nội", StringComparison.OrdinalIgnoreCase) ? "Khoa Ngoại tổng hợp" : "Khoa Nội");
 
             // Cutoff date for Q7 & Q8: default 10 days before examDate
             var cutoffDate = examDate.AddDays(-10);
 
-            var userIndex = 0;
-            var seed = Math.Abs(examDate.GetHashCode() ^ deptName.GetHashCode());
-            var rng = new Random(seed);
+            var actionDefs = await _database.GetActionDefinitionsAsync(cancellationToken);
+            var actionDescMap = actionDefs
+                .Where(a => !string.IsNullOrWhiteSpace(a.Description))
+                .ToDictionary(a => a.Code, a => a.Description, StringComparer.OrdinalIgnoreCase);
 
-            // Track cumulative remaining stock per drug across all candidates taking the exam in this department
-            // to ensure total allocated quantity across all candidates NEVER exceeds warehouse QuantityOnHand.
-            var remainingStock = inStockDrugs.ToDictionary(d => d.DrugCode, d => d.QuantityOnHand);
+            var userIndex = 0;
+            var seed = Math.Abs(examDate.DayNumber ^ GetDeterministicHashCode(deptName));
+            var rng = new Random(seed);
 
             foreach (var candidate in group)
             {
                 var assignedUser = deptUsers[userIndex++];
+
+                // Resolve candidate's warehouse
+                (string WarehouseCode, string WarehouseName) targetWh;
+                if (!string.IsNullOrWhiteSpace(candidate.WarehouseCode))
+                {
+                    var matchedWh = deptMappings.FirstOrDefault(m => m.WarehouseCode.Equals(candidate.WarehouseCode, StringComparison.OrdinalIgnoreCase));
+                    targetWh = matchedWh.WarehouseCode != null
+                        ? (matchedWh.WarehouseCode, matchedWh.WarehouseName)
+                        : (candidate.WarehouseCode, candidate.WarehouseName ?? candidate.WarehouseCode);
+                }
+                else
+                {
+                    targetWh = (deptMappings[0].WarehouseCode, deptMappings[0].WarehouseName);
+                }
+
+                // Load drugs for candidate's warehouse if not cached
+                if (!warehouseDrugsCache.TryGetValue(targetWh.WarehouseCode, out var warehouseDrugs))
+                {
+                    var loadedDrugs = await _database.GetWarehouseDrugsAsync(targetWh.WarehouseCode, cancellationToken);
+                    if (loadedDrugs.Count == 0)
+                    {
+                        throw new InvalidOperationException($"Kho thi '{targetWh.WarehouseName}' của khoa '{deptName}' chưa có thuốc/vật tư tồn kho khả dụng được đồng bộ từ HIS.");
+                    }
+                    var inStock = loadedDrugs.Where(d => d.QuantityOnHand >= 1).ToList();
+                    if (inStock.Count == 0)
+                    {
+                        throw new InvalidOperationException($"Kho thi '{targetWh.WarehouseName}' của khoa '{deptName}' không có thuốc/vật tư nào còn tồn kho > 0.");
+                    }
+
+                    warehouseDrugs = loadedDrugs;
+                    warehouseDrugsCache[targetWh.WarehouseCode] = warehouseDrugs;
+                    warehouseStockMap[targetWh.WarehouseCode] = inStock.ToDictionary(d => d.DrugCode, d => d.QuantityOnHand, StringComparer.OrdinalIgnoreCase);
+                }
+
+                var inStockCandidateDrugs = warehouseDrugs.Where(d => d.QuantityOnHand >= 1).ToList();
+                var remainingStock = warehouseStockMap[targetWh.WarehouseCode];
 
                 if (!templateMap.TryGetValue(candidate.Template, out var tpl))
                 {
@@ -151,10 +182,10 @@ public sealed class ExamScenarioAllocator
                 var secondPatient = MapPatientRow(vpRow, examDate, PatientPaymentType.SelfPay);
 
                 // Allocate Clinical Services categorized by modality (Siêu âm, Xquang, CT/MRI, Xét nghiệm)
-                var (orderedServices, q2Instruction, serviceChange) = AllocateClinicalServices(allServicesWithGroup, rng);
+                var (orderedServices, q2Instruction, serviceChange, pickedSieuAm, pickedXquang) = AllocateClinicalServices(allServicesWithGroup, rng);
 
                 // Allocate Drugs: Standard 3 BH (SL: 1, 2, 1) + 2 VP (SL: 2, 2), strictly checking remaining stock
-                var orderedDrugs = AllocateCandidateDrugs(inStockDrugs, remainingStock, deptConfig.WarehouseName, deptName, group.Count(), rng);
+                var orderedDrugs = AllocateCandidateDrugs(inStockCandidateDrugs, remainingStock, targetWh.WarehouseName, deptName, group.Count(), rng);
 
                 ScenarioDrugReturn? drugReturn = null;
                 if (orderedDrugs.Count > 0)
@@ -189,7 +220,10 @@ public sealed class ExamScenarioAllocator
                         targetTransferDept,
                         cutoffDate,
                         examDate,
-                        isDirectReception && aIdx == 0);
+                        isDirectReception && aIdx == 0,
+                        actionDescMap,
+                        pickedSieuAm,
+                        pickedXquang);
 
                     questions.Add(new ScenarioQuestion(aIdx + 1, act.Code, act.Name, instruction, act.Score));
                 }
@@ -200,8 +234,8 @@ public sealed class ExamScenarioAllocator
                     examDate,
                     candidate.Id,
                     candidate.Name,
-                    deptConfig.DepartmentCode,
-                    deptConfig.DepartmentName,
+                    deptCode,
+                    deptName,
                     tpl.Id,
                     tpl.Name,
                     assignedUser.UserName,
@@ -337,7 +371,7 @@ public sealed class ExamScenarioAllocator
         return orderedDrugs;
     }
 
-    private static (List<ScenarioService> OrderedServices, string Q2Instruction, ScenarioServiceChange ServiceChange) AllocateClinicalServices(
+    private static (List<ScenarioService> OrderedServices, string Q2Instruction, ScenarioServiceChange ServiceChange, ScenarioService? PickedSieuAm, ScenarioService? PickedXquang) AllocateClinicalServices(
         IReadOnlyList<(string Code, string Name, string GroupName)> allServices,
         Random rng)
     {
@@ -491,7 +525,7 @@ public sealed class ExamScenarioAllocator
         }
 
         var serviceChange = new ScenarioServiceChange(canceledService, newService, addedService);
-        return (orderedServices, q2Instruction, serviceChange);
+        return (orderedServices, q2Instruction, serviceChange, pickedSieuAm, pickedXquang);
     }
 
     private static ScenarioPatient MapPatientRow(SnapshotPatientRow pRow, DateOnly examDate, PatientPaymentType defaultPayment)
@@ -540,10 +574,18 @@ public sealed class ExamScenarioAllocator
         string targetTransferDept,
         DateOnly cutoffDate,
         DateOnly examDate,
-        bool isDirectReception) => code switch
+        bool isDirectReception,
+        IReadOnlyDictionary<string, string> actionDescMap,
+        ScenarioService? pickedSieuAm = null,
+        ScenarioService? pickedXquang = null) => code switch
     {
-        _ when isDirectReception => "Mở phân hệ Tiếp nhận trên phần mềm HIS, thực hiện nhập đầy đủ thông tin hành chính, số thẻ BHYT và chẩn đoán của người bệnh theo bảng thông tin trên.\nSố điểm đạt được:………(đ)",
+        "TN_TIEP_NHAN" or _ when isDirectReception => BuildDirectReceptionInstruction(patient, examDate),
         "NT_NHAN_BENH_KHOA" => $"* {secondPatient.FullName} ; Mã y tế: {secondPatient.MedicalCode}\n* {patient.FullName} ; Mã y tế: {patient.MedicalCode}\n- SVV Bn VP       : ………………………………\n- SVV Bn BHYT : ……………………………….\nSố điểm đạt được:………(đ)",
+        "NT_CAP_GIUONG" => "Cấp giường cho các bệnh nhân được tiếp nhận ở câu 1.\nSố điểm đạt được:………(đ)",
+        "KB_CHI_DINH_CLS" => BuildKbChiDinhClsInstruction(pickedXquang, pickedSieuAm),
+        "KB_BENH_AN_NGOAI_TRU" => "Chỉ định điều trị ngoại trú và lập bệnh án ngoại trú cho bệnh nhân : ……………………………………, Mã Y tế : …………………… (2 đ)\n- Số bệnh án ngoại trú : …………………………………………………\nSố điểm đạt được:………(đ)",
+        "KB_CHI_DINH_NOI_TRU" => $"Chỉ định nhập viện điều trị nội trú cho bệnh nhân : ……………………………………, Mã y tế : …………………… (1 đ)\n- Nhập khoa : {targetTransferDept}\n- Số bệnh án nội trú : ……………………………………………………\nSố điểm đạt được:………(đ)",
+        "HC_TRA_CUU_THANH_TOAN" => "Kiểm tra thông tin thanh toán cho bệnh nhân : ……………………………………, Mã y tế : ……………………\n- Số bệnh án nội trú : ……………………………………………………\n- Số tiền người bệnh đã thanh toán : ……………………………………………………\n- Số tiền người bệnh đã tạm ứng : ……………………………………………………\n- Số tiền còn phải thu người bệnh : ……………………………………………………\n- Tổng số tiền người bệnh trả : ……………\nSố điểm đạt được:………(đ)",
         "YL_CHI_DINH_CLS" => q2Instruction,
         "YL_CHI_DINH_THUOC_VTYT" => "Lên y lệnh(có D/S Thuốc, VTYT đính kèm)(1.5đ)\nLập  phiếu lĩnh dược(0.5đ)\nNhập nội bộ(0.5đ)\nXuất sử dụng thuốc cho bệnh nhân(0.5đ)\nSố điểm đạt được:………(đ)",
         "YL_TRA_THUOC" => $"Bệnh nhân trả thuốc và tổng hợp phiếu trả.(Chỉ thao tác trên bệnh nhân BHYT có số vào viện ở câu 1), thuốc cần trả {drugReturn?.ReturnedDrug.Name ?? "thuốc"}, số lượng trả : {drugReturn?.ReturnQuantity ?? 1} {drugReturn?.ReturnedDrug.Unit ?? "viên"}.\nSố điểm đạt được:………(đ)",
@@ -551,6 +593,66 @@ public sealed class ExamScenarioAllocator
         "TK_KIEM_TON_KHO" => $"Báo số tồn kho của một loại dược trong kho cơ số (Nguồn {inventoryDrug?.FundingSource ?? "Viện phí"}) từ ngày {examDate.AddMonths(-1).AddDays(1):dd/MM/yyyy} đến ngày {examDate:dd/MM/yyyy} : Tên dược: {inventoryDrug?.Name ?? "Thuốc/VTYT"}  số lượng tồn cuối : …………….\nSố điểm đạt được:………(đ)",
         "CK_CHUYEN_KHOA" => $"Chuyển một bệnh nhân bất kỳ từ khoa {deptName} đến {targetTransferDept}(bệnh nhân nhập viện trước {cutoffDate:dd/MM/yyyy}), Số vào viện của BN: …………………, Mã y tế :…………………., họ tên bệnh nhân:……………………………………\nSố điểm đạt được:………(đ)",
         "RV_CHO_RA_VIEN" => $"Thực hiện thao tác cho bệnh nhân ra viện(bệnh nhân nhập viện trước {cutoffDate:dd/MM/yyyy}) : Số vào viện của BN: ………………………\nSố điểm đạt được:………(đ)",
-        _ => $"Thực hiện nghiệp vụ chuyên môn '{name}' trên phần mềm HIS theo quy định của Bệnh viện Đa khoa Thiện Hạnh.\nSố điểm đạt được:………(đ)"
+        _ => actionDescMap.TryGetValue(code, out var customDesc) && !string.IsNullOrWhiteSpace(customDesc)
+            ? $"{customDesc}\nSố điểm đạt được:………(đ)"
+            : $"Thực hiện nghiệp vụ chuyên môn '{name}' trên phần mềm HIS theo quy định của Bệnh viện Đa khoa Thiện Hạnh.\nSố điểm đạt được:………(đ)"
     };
+
+    private static string BuildDirectReceptionInstruction(ScenarioPatient patient, DateOnly examDate)
+    {
+        var isBhyt = patient.PaymentType == PatientPaymentType.Insurance && !string.IsNullOrWhiteSpace(patient.InsuranceNumber);
+        var dobStr = patient.DateOfBirth.HasValue
+            ? patient.DateOfBirth.Value.ToString("dd/MM/yyyy")
+            : $"Năm sinh: {examDate.Year - patient.Age}";
+
+        var lines = new List<string>
+        {
+            "Mở phân hệ Tiếp nhận trên phần mềm HIS, thực hiện tiếp nhận trực tiếp người bệnh với thông tin sau:",
+            $"+ Họ và tên: {patient.FullName.ToUpperInvariant()}",
+            $"+ Ngày sinh: {dobStr} ({patient.Age} tuổi) - Giới tính: {patient.Gender}",
+            $"+ Địa chỉ: {patient.Address}",
+            $"+ Đối tượng: {(isBhyt ? "BHYT" : "Viện phí")}"
+        };
+
+        if (isBhyt)
+        {
+            lines.Add($"+ Số thẻ BHYT: {patient.InsuranceNumber}");
+            if (patient.InsurancePeriod is not null)
+            {
+                lines.Add($"+ Hạn thẻ BHYT: Từ ngày {patient.InsurancePeriod.From:dd/MM/yyyy} đến ngày {patient.InsurancePeriod.To:dd/MM/yyyy}");
+            }
+            lines.Add($"+ Nơi ĐKKCB ban đầu: {patient.InitialRegistrationCode} - BVĐK Thiện Hạnh");
+        }
+
+        lines.Add($"+ Chẩn đoán ban đầu: {patient.Diagnosis}");
+        lines.Add("- Số vào viện (SVV) / Mã tiếp nhận sau khi lưu: ………………………………");
+        lines.Add("Số điểm đạt được:………(đ)");
+
+        return string.Join("\n", lines);
+    }
+
+    private static string BuildKbChiDinhClsInstruction(ScenarioService? xq, ScenarioService? sa)
+    {
+        var xqName = xq?.Name ?? "Chụp Xquang tim phổi thẳng [Số hóa 1 phim]";
+        var saName = sa?.Name ?? "Siêu âm Doppler màu ổ bụng tổng quát";
+        return $"""
+Trên màn hình khám bệnh Chỉ định CLS – Thủ thuật cho bệnh nhân : ……………………………………, Mã Y tế : ……………………
++ {xqName}
++ {saName}
+Số điểm đạt được:………(đ)
+""";
+    }
+
+    private static int GetDeterministicHashCode(string str)
+    {
+        unchecked
+        {
+            var hash = 23;
+            foreach (var c in str)
+            {
+                hash = hash * 31 + c;
+            }
+            return hash;
+        }
+    }
 }

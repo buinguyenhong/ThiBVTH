@@ -1,0 +1,217 @@
+<Window x:Class="ExamGenerator.Desktop.ManageActionCatalogWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Quản lý Thư viện Dạng Câu hỏi Nghiệp vụ HIS"
+        Height="620" Width="820"
+        WindowStartupLocation="CenterOwner"
+        ResizeMode="CanResize"
+        Background="{StaticResource AppBackground}">
+    <Grid Margin="20">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <!-- Header -->
+        <Border Grid.Row="0" Margin="0,0,0,16" Padding="0,0,0,12" BorderBrush="{StaticResource BorderSubtle}" BorderThickness="0,0,0,1">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
+                <StackPanel Grid.Column="0">
+                    <TextBlock Text="Thư viện Dạng Câu hỏi Nghiệp vụ HIS" FontSize="18" FontWeight="Bold" Foreground="{StaticResource BrandNavy}"/>
+                    <TextBlock Text="Tự định nghĩa các dạng thao tác/câu hỏi và số điểm mẫu để áp dụng linh hoạt cho các bộ đề thi" FontSize="12" Foreground="{StaticResource TextSecondary}" Margin="0,4,0,0"/>
+                </StackPanel>
+                <Border Grid.Column="1" Background="#F1F5F9" CornerRadius="12" Padding="12,6" VerticalAlignment="Center">
+                    <TextBlock x:Name="TotalActionsCountBadge" Text="13 dạng câu hỏi" FontSize="12" FontWeight="SemiBold" Foreground="#334155"/>
+                </Border>
+            </Grid>
+        </Border>
+
+        <!-- Form Thêm Dạng Câu hỏi Mới -->
+        <Border Grid.Row="1" Style="{StaticResource CardBorder}" Padding="16" Margin="0,0,0,16">
+            <StackPanel>
+                <TextBlock Text="Thêm Dạng Câu hỏi / Nghiệp vụ Mới vào Thư viện:" FontWeight="Bold" FontSize="13" Foreground="{StaticResource BrandNavy}" Margin="0,0,0,10"/>
+                
+                <Grid Margin="0,0,0,8">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="180"/>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="110"/>
+                    </Grid.ColumnDefinitions>
+
+                    <StackPanel Grid.Column="0" Margin="0,0,10,0">
+                        <TextBlock Text="Mã hành động (*):" FontSize="12" FontWeight="SemiBold" Margin="0,0,0,4"/>
+                        <TextBox x:Name="ActionCodeTextBox" Text="" FontFamily="Consolas" Height="32" Padding="6,2" VerticalContentAlignment="Center"/>
+                    </StackPanel>
+
+                    <StackPanel Grid.Column="1" Margin="0,0,10,0">
+                        <TextBlock Text="Tên dạng câu hỏi / thao tác (*):" FontSize="12" FontWeight="SemiBold" Margin="0,0,0,4"/>
+                        <TextBox x:Name="ActionNameTextBox" Text="" Height="32" Padding="6,2" VerticalContentAlignment="Center"/>
+                    </StackPanel>
+
+                    <StackPanel Grid.Column="2">
+                        <TextBlock Text="Điểm mẫu (đ) (*):" FontSize="12" FontWeight="SemiBold" Margin="0,0,0,4"/>
+                        <TextBox x:Name="DefaultScoreTextBox" Text="1.0" FontWeight="Bold" Height="32" Padding="6,2" HorizontalContentAlignment="Center" VerticalContentAlignment="Center"/>
+                    </StackPanel>
+                </Grid>
+
+                <Grid Margin="0,0,0,8">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="220"/>
+                        <ColumnDefinition Width="*"/>
+                    </Grid.ColumnDefinitions>
+
+                    <StackPanel Grid.Column="0" Margin="0,0,10,0">
+                        <TextBlock Text="Phân hệ / Nhóm nghiệp vụ:" FontSize="12" FontWeight="SemiBold" Margin="0,0,0,4"/>
+                        <ComboBox x:Name="CategoryComboBox" IsEditable="True" Height="32" VerticalContentAlignment="Center">
+                            <ComboBoxItem Content="Chỉ định &amp; Y lệnh" IsSelected="True"/>
+                            <ComboBoxItem Content="Điều trị Nội trú"/>
+                            <ComboBoxItem Content="Khám bệnh &amp; Ngoại trú"/>
+                            <ComboBoxItem Content="Tiếp đón &amp; Nhập viện"/>
+                            <ComboBoxItem Content="Dược &amp; Vật tư"/>
+                            <ComboBoxItem Content="Viện phí &amp; Thu ngân"/>
+                            <ComboBoxItem Content="Kỹ thuật viên CLS"/>
+                            <ComboBoxItem Content="Hành chính &amp; Tra cứu"/>
+                        </ComboBox>
+                    </StackPanel>
+
+                    <StackPanel Grid.Column="1">
+                        <TextBlock Text="Mô tả / Hướng dẫn mẫu thao tác trên HIS (in vào đề thi):" FontSize="12" FontWeight="SemiBold" Margin="0,0,0,4"/>
+                        <TextBox x:Name="DescriptionTextBox" Height="32" Padding="6,4" VerticalContentAlignment="Center"/>
+                    </StackPanel>
+                </Grid>
+
+                <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,4,0,0">
+                    <Button Content="+ Lưu vào Thư viện" Style="{StaticResource PrimaryButton}" Height="34" Width="160" Click="SaveAction_Click"/>
+                </StackPanel>
+            </StackPanel>
+        </Border>
+
+        <!-- Danh sách Câu hỏi trong Thư viện -->
+        <Border Grid.Row="2" Style="{StaticResource CardBorder}" Padding="12" Margin="0,0,0,16">
+            <DockPanel>
+                <TextBlock DockPanel.Dock="Top" Text="Danh sách Dạng Câu hỏi hiện có trong Thư viện:" FontWeight="SemiBold" FontSize="13" Foreground="#334155" Margin="0,0,0,8"/>
+                
+                <DataGrid x:Name="ActionsGrid"
+                          AutoGenerateColumns="False"
+                          CanUserAddRows="False"
+                          CanUserDeleteRows="False"
+                          HeadersVisibility="Column"
+                          IsReadOnly="True"
+                          RowHeight="36"
+                          BorderThickness="1"
+                          BorderBrush="#E2E8F0">
+                    <DataGrid.Columns>
+                        <DataGridTextColumn Header="Mã hành động" Binding="{Binding Code}" Width="190">
+                            <DataGridTextColumn.ElementStyle>
+                                <Style TargetType="TextBlock">
+                                    <Setter Property="FontFamily" Value="Consolas"/>
+                                    <Setter Property="FontWeight" Value="SemiBold"/>
+                                    <Setter Property="VerticalAlignment" Value="Center"/>
+                                    <Setter Property="Padding" Value="6,0"/>
+                                </Style>
+                            </DataGridTextColumn.ElementStyle>
+                        </DataGridTextColumn>
+
+                        <DataGridTextColumn Header="Tên dạng câu hỏi / Thao tác" Binding="{Binding Name}" Width="*">
+                            <DataGridTextColumn.ElementStyle>
+                                <Style TargetType="TextBlock">
+                                    <Setter Property="VerticalAlignment" Value="Center"/>
+                                    <Setter Property="Padding" Value="6,0"/>
+                                </Style>
+                            </DataGridTextColumn.ElementStyle>
+                        </DataGridTextColumn>
+
+                        <DataGridTextColumn Header="Điểm (đ)" Binding="{Binding DefaultScore, StringFormat={}{0:0.0}đ}" Width="75">
+                            <DataGridTextColumn.ElementStyle>
+                                <Style TargetType="TextBlock">
+                                    <Setter Property="FontWeight" Value="Bold"/>
+                                    <Setter Property="Foreground" Value="{StaticResource BrandTealDark}"/>
+                                    <Setter Property="HorizontalAlignment" Value="Center"/>
+                                    <Setter Property="VerticalAlignment" Value="Center"/>
+                                </Style>
+                            </DataGridTextColumn.ElementStyle>
+                        </DataGridTextColumn>
+
+                        <DataGridTextColumn Header="Nhóm nghiệp vụ" Binding="{Binding Category}" Width="150">
+                            <DataGridTextColumn.ElementStyle>
+                                <Style TargetType="TextBlock">
+                                    <Setter Property="Foreground" Value="{StaticResource TextSecondary}"/>
+                                    <Setter Property="VerticalAlignment" Value="Center"/>
+                                    <Setter Property="Padding" Value="4,0"/>
+                                </Style>
+                            </DataGridTextColumn.ElementStyle>
+                        </DataGridTextColumn>
+
+                        <DataGridTemplateColumn Header="Loại" Width="90">
+                            <DataGridTemplateColumn.CellTemplate>
+                                <DataTemplate>
+                                    <Border CornerRadius="4" Padding="6,2" HorizontalAlignment="Center" VerticalAlignment="Center">
+                                        <Border.Style>
+                                            <Style TargetType="Border">
+                                                <Setter Property="Background" Value="#F1F5F9"/>
+                                                <Style.Triggers>
+                                                    <DataTrigger Binding="{Binding IsBuiltIn}" Value="True">
+                                                        <Setter Property="Background" Value="#E6FFFA"/>
+                                                    </DataTrigger>
+                                                    <DataTrigger Binding="{Binding IsBuiltIn}" Value="False">
+                                                        <Setter Property="Background" Value="#FEF3C7"/>
+                                                    </DataTrigger>
+                                                </Style.Triggers>
+                                            </Style>
+                                        </Border.Style>
+                                        <TextBlock FontSize="11" FontWeight="SemiBold">
+                                            <TextBlock.Style>
+                                                <Style TargetType="TextBlock">
+                                                    <Setter Property="Text" Value="Tự tạo"/>
+                                                    <Setter Property="Foreground" Value="#92400E"/>
+                                                    <Style.Triggers>
+                                                        <DataTrigger Binding="{Binding IsBuiltIn}" Value="True">
+                                                            <Setter Property="Text" Value="Hệ thống"/>
+                                                            <Setter Property="Foreground" Value="#0D9488"/>
+                                                        </DataTrigger>
+                                                    </Style.Triggers>
+                                                </Style>
+                                            </TextBlock.Style>
+                                        </TextBlock>
+                                    </Border>
+                                </DataTemplate>
+                            </DataGridTemplateColumn.CellTemplate>
+                        </DataGridTemplateColumn>
+
+                        <DataGridTemplateColumn Header="Thao tác" Width="70">
+                            <DataGridTemplateColumn.CellTemplate>
+                                <DataTemplate>
+                                    <Button Content="✕" ToolTip="Xóa câu hỏi tự tạo khỏi thư viện" Width="26" Height="26"
+                                            Background="#FEE2E2" Foreground="#DC2626" BorderBrush="#FCA5A5"
+                                            FontWeight="Bold" FontSize="11" Cursor="Hand"
+                                            Click="DeleteAction_Click">
+                                        <Button.Style>
+                                            <Style TargetType="Button">
+                                                <Setter Property="Visibility" Value="Visible"/>
+                                                <Style.Triggers>
+                                                    <DataTrigger Binding="{Binding IsBuiltIn}" Value="True">
+                                                        <Setter Property="Visibility" Value="Collapsed"/>
+                                                    </DataTrigger>
+                                                </Style.Triggers>
+                                            </Style>
+                                        </Button.Style>
+                                    </Button>
+                                </DataTemplate>
+                            </DataGridTemplateColumn.CellTemplate>
+                        </DataGridTemplateColumn>
+                    </DataGrid.Columns>
+                </DataGrid>
+            </DockPanel>
+        </Border>
+
+        <!-- Footer -->
+        <StackPanel Grid.Row="3" Orientation="Horizontal" HorizontalAlignment="Right">
+            <Button Content="Đóng" Style="{StaticResource SecondaryButton}" Click="Close_Click" IsDefault="True" Padding="20,8"/>
+        </StackPanel>
+    </Grid>
+</Window>
