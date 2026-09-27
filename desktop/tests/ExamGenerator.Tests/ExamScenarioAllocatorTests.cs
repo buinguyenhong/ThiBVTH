@@ -62,6 +62,18 @@ public class ExamScenarioAllocatorTests : IDisposable
             new SnapshotUserRow("u5", "his_nhi_2", "ĐD. Hoàng Văn E", "NHI", "Khoa Nhi")
         });
 
+        await _database.SaveDepartmentUserMappingsAsync("NOI", "Khoa Nội", new[]
+        {
+            ("u1", "his_noi_1", "BS. Nguyễn Văn A"),
+            ("u2", "his_noi_2", "ĐD. Trần Thị B"),
+            ("u3", "his_noi_3", "ĐD. Lê Văn C")
+        });
+        await _database.SaveDepartmentUserMappingsAsync("NHI", "Khoa Nhi", new[]
+        {
+            ("u4", "his_nhi_1", "BS. Đỗ Thị D"),
+            ("u5", "his_nhi_2", "ĐD. Hoàng Văn E")
+        });
+
         // 4. Synced Drugs with stock
         await _database.ReplaceSnapshotDrugsAsync(new[]
         {
@@ -137,7 +149,7 @@ public class ExamScenarioAllocatorTests : IDisposable
         var ex = await Assert.ThrowsAsync<InvalidOperationException>(() =>
             allocator.AllocateBatchScenariosAsync("DotThi_Test", new DateOnly(2026, 9, 15), candidates));
 
-        Assert.Contains("tài khoản HIS khả dụng", ex.Message, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("User HIS khả dụng", ex.Message, StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]
@@ -521,13 +533,20 @@ public class ExamScenarioAllocatorTests : IDisposable
         var sc = scenarios[0];
         var q1 = sc.Questions[0];
 
-        // Must contain instruction to open reception module and input patient information
+        // Must contain instruction to open reception module and input both BHYT and VP patient information
         Assert.Contains("Mở phân hệ Tiếp nhận trên phần mềm HIS, thực hiện tiếp nhận trực tiếp người bệnh với thông tin sau:", q1.Instruction);
+        Assert.Contains("1. Bệnh nhân Bảo hiểm y tế (BHYT):", q1.Instruction);
         Assert.Contains(sc.Patient.FullName.ToUpperInvariant(), q1.Instruction);
         Assert.Contains(sc.Patient.Gender, q1.Instruction);
         Assert.Contains(sc.Patient.Address, q1.Instruction);
         Assert.Contains(sc.Patient.Diagnosis, q1.Instruction);
-        Assert.Contains("Số vào viện (SVV) / Mã tiếp nhận sau khi lưu: ………………………………", q1.Instruction);
+
+        Assert.Contains("2. Bệnh nhân Viện phí:", q1.Instruction);
+        Assert.NotNull(sc.SecondPatient);
+        Assert.Contains(sc.SecondPatient.FullName.ToUpperInvariant(), q1.Instruction);
+
+        Assert.Contains("Số vào viện bệnh nhân bảo hiểm: ………………………………", q1.Instruction);
+        Assert.Contains("Số vào viện bệnh nhân viện phí: ………………………………", q1.Instruction);
         Assert.Contains("Số điểm đạt được:………(đ)", q1.Instruction);
     }
 
@@ -600,5 +619,76 @@ public class ExamScenarioAllocatorTests : IDisposable
         Assert.Contains("Số tiền người bệnh đã tạm ứng : ……………………………………………………", qThanhToan.Instruction);
         Assert.Contains("Số tiền còn phải thu người bệnh : ……………………………………………………", qThanhToan.Instruction);
         Assert.Contains("Tổng số tiền người bệnh trả : ……………", qThanhToan.Instruction);
+    }
+
+    [Fact]
+    public async Task Inventory_check_question_uses_fixed_february_2026_date_range()
+    {
+        await SetupSyncedCatalogAsync();
+
+        var allocator = new ExamScenarioAllocator(_database);
+        var candidates = new[]
+        {
+            new CandidateInput("Nguyễn Văn A", "SBD01", "Khoa Nội", "Đề Điều dưỡng nội trú chuẩn (8 câu)")
+        };
+
+        // Exam date in October 2026
+        var scenarios = await allocator.AllocateBatchScenariosAsync("DotThi_Test", new DateOnly(2026, 10, 20), candidates);
+        var sc = scenarios.Single();
+
+        var qInv = sc.Questions.FirstOrDefault(q => q.ActionCode == "TK_KIEM_TON_KHO");
+        Assert.NotNull(qInv);
+        Assert.Contains("từ ngày 01/02/2026 đến ngày 28/02/2026", qInv.Instruction);
+    }
+
+    [Fact]
+    public async Task Template_without_drug_order_action_does_not_allocate_ordered_drugs_or_render_drug_table()
+    {
+        await SetupSyncedCatalogAsync();
+
+        // Template for Kỹ thuật viên Xét nghiệm does not order drugs
+        var allocator = new ExamScenarioAllocator(_database);
+        var candidates = new[]
+        {
+            new CandidateInput("KTV Xét Nghiệm 1", "XN01", "Khoa Nội", "Đề Kỹ thuật viên Xét nghiệm")
+        };
+
+        var scenarios = await allocator.AllocateBatchScenariosAsync("DotThi_TestXN", new DateOnly(2026, 9, 20), candidates);
+        var sc = scenarios.Single();
+
+        Assert.Empty(sc.OrderedDrugs);
+        Assert.Null(sc.DrugReturn);
+
+        // Render Word and verify no drug table
+        var tempDocx = Path.Combine(Path.GetTempPath(), $"Test_NoDrug_{Guid.NewGuid():N}.docx");
+        var writer = new WordExamWriter();
+        writer.Create(tempDocx, sc);
+
+        Assert.True(File.Exists(tempDocx));
+        using var wordDoc = DocumentFormat.OpenXml.Packaging.WordprocessingDocument.Open(tempDocx, false);
+        var xmlContent = wordDoc.MainDocumentPart!.Document.InnerXml;
+        Assert.DoesNotContain("Danh sách thuốc, VTYT cần lên y lệnh cho bệnh nhân:", xmlContent);
+
+        try { File.Delete(tempDocx); } catch { }
+    }
+
+    [Fact]
+    public async Task Throws_preflight_when_department_has_no_mapped_users_in_tab3()
+    {
+        await SetupSyncedCatalogAsync();
+
+        // Clear mapped users for Khoa Nội
+        await _database.SaveDepartmentUserMappingsAsync("NOI", "Khoa Nội", Array.Empty<(string, string, string)>());
+
+        var allocator = new ExamScenarioAllocator(_database);
+        var candidates = new[]
+        {
+            new CandidateInput("Nguyễn Văn A", "SBD01", "Khoa Nội", "Đề Điều dưỡng nội trú chuẩn (8 câu)")
+        };
+
+        var ex = await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            allocator.AllocateBatchScenariosAsync("DotThi_Test", new DateOnly(2026, 9, 15), candidates));
+
+        Assert.Contains("chưa được cấu hình danh sách User HIS thi trong Tab 3", ex.Message);
     }
 }

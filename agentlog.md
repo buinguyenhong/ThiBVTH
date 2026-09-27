@@ -620,3 +620,109 @@ Nhật ký ghi lại các thay đổi, quyết định thiết kế và tiến t
         *   `desktop/publish/ExamOperationsDesktop/ExamGenerator.Desktop.exe`
         *   `desktop/publish/ExamOperationsDesktop-Standalone/ExamGenerator.Desktop.exe` (Standalone win-x64).
 
+
+
+---
+
+## [2026-09-23] Chuẩn hóa Bộ sinh Script SQL HIS: Stored Procedures Chuẩn, Tra cứu BHYT Đa tầng & Tái sử dụng Hồ sơ Bệnh nhân
+
+### 1. Bối cảnh & Vấn đề:
+* Khi chạy kịch bản nạp bệnh nhân vào hàng chờ tiếp nhận nội trú bằng file SQL tổng hợp (`SQL_TongHop_TatCaThiSinh_20260924.sql`), hệ thống gặp các lỗi dừng nghiệp vụ (`THROW 51000`):
+  1. `Msg 51000: BHYT cần loại, hạn thẻ, tuyến và nơi đăng ký KCB.` (dòng 561): Do truy vấn tra cứu ID tuyến khám (`@TuyenKhamBenh_Id`) và nơi ĐKKCB ban đầu (`@BenhVien_KCB_Id`) lọc cứng theo chuỗi mã không khớp với thực tế dữ liệu trong `Lst_Dictionary` và `DM_BenhVien`.
+  2. `Msg 51000: Số thẻ BHYT đã thuộc một bệnh nhân đang hoạt động; không tạo bệnh nhân mới trùng thẻ.` (dòng 704): Do các ca bệnh thi tuyển trích xuất từ dữ liệu thực tế/test (`patients.xlsx`) đã có sẵn thông tin thẻ trong `DM_BenhNhan_BHYT`, trong khi script mẫu cũ áp đặt quy tắc chặn cứng không cho phép trùng thẻ.
+
+### 2. Các thay đổi và giải pháp đã thực hiện:
+* **Chuẩn hóa quy trình Stored Procedure eHospital:**
+  * Thay thế toàn bộ các câu lệnh `INSERT` bảng trực tiếp cũ bằng luồng gọi thủ tục lưu trữ chuẩn của HIS Thiện Hạnh:
+    * `sp_DM_BENHNHAN @Action = 'AddNew'`
+    * `sp_LST_KEYDATA` để cấp mã tiếp nhận và số thứ tự tự động
+    * `sp_DM_BENHNHAN_BHYT @Action = 'AddNew'`
+    * `sp_TIEPNHAN @Action = 'AddNew'`
+    * `sp_NOITRU_NHAPVIEN @Action = 'AddNew'`
+  * Đảm bảo không gọi `AddNewAndCreateBenhAn`, không sinh `BenhAn_Id` trước để thí sinh tự nhận bệnh vào khoa.
+* **Cơ chế Phân giải Danh mục BHYT Đa tầng (Multi-tier Fallback):**
+  * `@TuyenKhamBenh_Id`: Khớp mã `TuyenKhamChuaBenh_TrongTuyen` -> Khớp mã `TrongTuyen` / `DungTuyen` / `DT` / `TT` / `1` -> Khớp tên tiếng Việt `đúng tuyến` / `trong tuyến` -> Lấy giá trị từ lần tiếp nhận gần nhất trong `TiepNhan`.
+  * `@BenhVien_KCB_Id`: Khớp chuẩn hóa bỏ dấu gạch/chấm (`REPLACE`) giữa `MaBenhVien` và `66232` -> Khớp `TenBenhVien_En` -> Khớp tên chứa `Thiện Hạnh` -> Lấy từ cấu hình hệ thống `Sys_AppSettings` (`MaNoiKCBBanDau`, `MaCSKCB`) -> Lấy từ lượt tiếp nhận gần nhất -> Lấy bệnh viện hoạt động đầu tiên.
+  * `@LoaiBHYT`: Tra cứu qua `TiepNhanLoaiBHYT`, `LoaiBHYT`, `Dictionary_Type_Id = 101`, lịch sử tiếp nhận; cho phép linh hoạt không bắt buộc dừng script.
+* **Cơ chế Tái tiếp nhận Bệnh nhân cũ (Re-admission):**
+  * Nếu thẻ BHYT đã tồn tại trong `DM_BenhNhan_BHYT`: Hệ thống tự động tái sử dụng `BenhNhan_Id` và `BenhNhan_BHYT_Id` có sẵn, bỏ qua việc tạo mới bệnh nhân trùng lặp.
+  * Tự động sinh `TiepNhan` mới và chỉ định `NoiTru_NhapVien` mới ở trạng thái `ChoTiepNhan`, đúng với thực tế tiếp nhận tái khám/nhập viện lại của bệnh viện.
+* **Đồng bộ toàn diện Codebase:**
+  * File tài liệu T-SQL nguồn: `Scripts/02_tao_benh_nhan_tiep_nhan_chi_dinh_vao_khoa.sql`
+  * Bộ sinh Backend Python: `backend/sql_generator.py`
+  * Bộ sinh Desktop C#: `desktop/src/ExamGenerator.Infrastructure/SqlScriptGenerator.cs`
+
+### 3. Kết quả Kiểm thử & Phát hành:
+* Toàn bộ **34/34 tests** đơn vị trong `desktop/tests/ExamGenerator.Tests` đạt **100% Passed**.
+* Biên dịch và đóng gói thành công cả 2 bản phát hành:
+  * `desktop/publish/ExamOperationsDesktop` (Framework-dependent)
+  * `desktop/publish/ExamOperationsDesktop-Standalone` (Self-contained win-x64)
+* Đã cập nhật và sinh lại toàn bộ 8 file cá nhân và file gộp:
+  `desktop/publish/DeThi_TuyenDung_2026_20260923_171935/SQL_TongHop_TatCaThiSinh_20260924.sql`
+* Đã chạy kiểm thử thành công trên CSDL eHospital_ThienHanh với `@Commit = 0` (Rollback an toàn, không còn lỗi `Msg 51000`).
+
+---
+
+## [2026-09-23] Cáº­p nháº­t Báº£n quyá»n Giao diá»‡n NgÆ°á»i dÃ¹ng
+
+### 1. CÃ´ng viá»‡c Ä‘Ã£ thá»±c hiá»‡n:
+* **Giao diá»‡n Desktop WPF (MainWindow.xaml):**
+  * TiÃªu Ä‘á» phá»¥ (Header): Äá»•i tá»« "Há»™i Äá»“ng Thi Tuyá»ƒn Dá»¥ng Â· Exam Operations Desktop (HIS eHospital)" thÃ nh "Copyright Â© 2026 BÃ¹i NguyÃªn Há»“ng - CNTT - Thiá»‡n Háº¡nh . All rights reserved.".
+  * ChÃ¢n trang (Footer): Cáº­p nháº­t thÃ nh "PhiÃªn báº£n 2026.09 Â· Copyright Â© 2026 BÃ¹i NguyÃªn Há»“ng - CNTT - Thiá»‡n Háº¡nh . All rights reserved.".
+* **Giao diá»‡n Web cÅ© (frontend/index.html):**
+  * Äá»“ng bá»™ tiÃªu Ä‘á» phá»¥ thÃ nh "Copyright Â© 2026 BÃ¹i NguyÃªn Há»“ng - CNTT - Thiá»‡n Háº¡nh . All rights reserved.".
+
+### 2. Kiá»ƒm thá»­ & ÄÃ³ng gÃ³i:
+* ToÃ n bá»™ **34/34 Unit Tests PASSED (100%)**.
+* ÄÃ³ng gÃ³i láº¡i thÃ nh cÃ´ng cáº£ 2 báº£n phÃ¡t hÃ nh:
+  * `desktop/publish/ExamOperationsDesktop/`
+  * `desktop/publish/ExamOperationsDesktop-Standalone/`
+
+
+---
+
+## [2026-09-27] Triá»ƒn khai Mapping User HIS theo Khoa, Tá»‘i Æ°u Báº£ng DÆ°á»£c vÃ  Cá»‘ Ä‘á»‹nh Thá»i gian Tá»“n kho
+
+### 1. CÃ´ng viá»‡c Ä‘Ã£ thá»±c hiá»‡n:
+* **Mapping User HIS theo Khoa (Tab 3 & SQLite):**
+  * Bá»• sung báº£ng `DepartmentUserMapping` (DepartmentCode, DepartmentName, UserId, UserName, FullName, UpdatedAt) trong SQLite.
+  * Cung cáº¥p cÃ¡c phÆ°Æ¡ng thá»©c `SaveDepartmentUserMappingsAsync`, `GetDepartmentUserMappingsAsync`, `GetMappedUsersForDepartmentAsync` trong `SqliteDatabase.cs`.
+  * Bá»• sung giao diá»‡n trong Tab 3 (`MainWindow.xaml`): Danh sÃ¡ch CheckBox User HIS cá»§a khoa, Ã´ tÃ¬m kiáº¿m debounce theo Username/FullName, nÃºt "Chá»n táº¥t cáº£" / "Bá» chá»n táº¥t cáº£", vÃ  hiá»ƒn thá»‹ tá»•ng sá»‘ user Ä‘Ã£ chá»n.
+  * Khi báº¥m "LÆ°u Cáº¥u HÃ¬nh Khoa NÃ y", há»‡ thá»‘ng lÆ°u Ä‘á»“ng thá»i Kho thi, NhÃ³m dá»‹ch vá»¥ vÃ  Danh sÃ¡ch User HIS kháº£o thÃ­ Ä‘Ã£ chá»n.
+* **Preflight Check & PhÃ¢n bá»• Random User (`ExamScenarioAllocator.cs`):**
+  * Cháº·n táº¡o Ä‘á» (Fail-fast) náº¿u khoa cÃ³ thÃ­ sinh Ä‘Äƒng kÃ½ nhÆ°ng chÆ°a Ä‘Æ°á»£c chá»n User HIS nÃ o trong Tab 3 (`Khoa '{deptName}' chÆ°a Ä‘Æ°á»£c cáº¥u hÃ¬nh danh sÃ¡ch User HIS thi trong Tab 3. Vui lÃ²ng vÃ o Tab 3 Ä‘á»ƒ chá»n user.`).
+  * Cháº·n táº¡o Ä‘á» (Fail-fast) náº¿u sá»‘ thÃ­ sinh > sá»‘ user Ä‘Ã£ map cá»§a khoa (`Khoa '{deptName}' cÃ³ {group.Count()} thÃ­ sinh nhÆ°ng chá»‰ cáº¥u hÃ¬nh {deptUsers.Count} User HIS kháº£ dá»¥ng. KhÃ´ng Ä‘á»§ sá»‘ lÆ°á»£ng user Ä‘á»ƒ táº¡o Ä‘á».`).
+  * XÃ¡o trá»™n ngáº«u nhiÃªn (random shuffle) cÃ¡c user Ä‘Ã£ mapping cá»§a khoa vÃ  cáº¥p cho tá»«ng thÃ­ sinh, Ä‘áº£m báº£o khÃ´ng trÃ¹ng láº·p user trong cÃ¹ng khoa.
+* **Tá»‘i Æ°u Báº£ng DÆ°á»£c / VTYT ÄÃ­nh kÃ¨m (`ExamScenarioAllocator.cs`, `WordExamWriter.cs`):**
+  * Äá» chá»‰ phÃ¢n bá»• dÆ°á»£c vÃ  in báº£ng DÆ°á»£c/VTYT khi máº«u Ä‘á» cÃ³ cÃ¢u lÃªn y lá»‡nh thuá»‘c (`YL_CHI_DINH_THUOC_VTYT`).
+  * Vá»›i cÃ¡c Ä‘á» khÃ´ng cÃ³ cÃ¢u nÃ y (KTV XÃ©t nghiá»‡m, CÄHA, Lá»… tÃ¢n, Thu ngÃ¢n...), há»‡ thá»‘ng khÃ´ng phÃ¢n bá»• dÆ°á»£c, khÃ´ng trá»« tá»“n kho lÅ©y káº¿ cá»§a kho thi vÃ  áº©n hoÃ n toÃ n báº£ng DÆ°á»£c Ä‘Ã­nh kÃ¨m trong file Word.
+* **Cá»‘ Ä‘á»‹nh Khoáº£ng Thá»i gian CÃ¢u há»i Tá»“n kho (`ExamScenarioAllocator.cs`):**
+  * CÃ¢u há»i kiá»ƒm tra tá»“n kho (`TK_KIEM_TON_KHO`) Ä‘Æ°á»£c cá»‘ Ä‘á»‹nh khoáº£ng thá»i gian 1 thÃ¡ng: `tá»« ngÃ y 01/02/2026 Ä‘áº¿n ngÃ y 28/02/2026`.
+
+### 2. Kiá»ƒm thá»­ & ÄÃ³ng gÃ³i:
+* Bá»• sung 3 bÃ i unit tests má»›i, nÃ¢ng tá»•ng sá»‘ test lÃªn **37/37 Tests PASSED (100%)**.
+* ÄÃ³ng gÃ³i thÃ nh cÃ´ng cáº£ 2 báº£n Release:
+  * `desktop/publish/ExamOperationsDesktop/` (Báº£n tiÃªu chuáº©n)
+  * `desktop/publish/ExamOperationsDesktop-Standalone/` (Báº£n Standalone win-x64)
+
+
+---
+
+## [2026-09-27] NÃ¢ng cáº¥p CÃ¢u Tiáº¿p Nháº­n Trá»±c Tiáº¿p: Äáº§y Ä‘á»§ 2 Bá»‡nh NhÃ¢n (BHYT & Viá»‡n PhÃ­)
+
+### 1. CÃ´ng viá»‡c Ä‘Ã£ thá»±c hiá»‡n:
+* **Má»Ÿ rá»™ng ná»™i dung CÃ¢u há»i Tiáº¿p nháº­n trá»±c tiáº¿p (`BuildDirectReceptionInstruction` trong `ExamScenarioAllocator.cs`):**
+  * Hiá»ƒn thá»‹ Ä‘áº§y Ä‘á»§ thÃ´ng tin hÃ nh chÃ­nh cá»§a cáº£ 2 bá»‡nh nhÃ¢n:
+    * **1. Bá»‡nh nhÃ¢n Báº£o hiá»ƒm y táº¿ (BHYT):** Há» tÃªn, NgÃ y sinh, Giá»›i tÃ­nh, Äá»‹a chá»‰, Äá»‘i tÆ°á»£ng BHYT, Sá»‘ tháº» BHYT, Háº¡n tháº», NÆ¡i ÄKKCB ban Ä‘áº§u, Cháº©n Ä‘oÃ¡n ban Ä‘áº§u.
+    * **2. Bá»‡nh nhÃ¢n Viá»‡n phÃ­:** Há» tÃªn, NgÃ y sinh, Giá»›i tÃ­nh, Äá»‹a chá»‰, Äá»‘i tÆ°á»£ng Viá»‡n phÃ­, Cháº©n Ä‘oÃ¡n ban Ä‘áº§u.
+  * Bá»• sung rÃµ 2 dÃ²ng trá»‘ng cÃ³ cháº¥m Ä‘iá»n káº¿t quáº£ riÃªng biá»‡t cho tá»«ng bá»‡nh nhÃ¢n:
+    * `- Sá»‘ vÃ o viá»‡n bá»‡nh nhÃ¢n báº£o hiá»ƒm: â€¦â€¦â€¦â€¦â€¦â€¦â€¦â€¦â€¦â€¦â€¦â€¦`
+    * `- Sá»‘ vÃ o viá»‡n bá»‡nh nhÃ¢n viá»‡n phÃ­: â€¦â€¦â€¦â€¦â€¦â€¦â€¦â€¦â€¦â€¦â€¦â€¦`
+
+### 2. Kiá»ƒm thá»­ & ÄÃ³ng gÃ³i:
+* Cáº­p nháº­t unit test `Direct_reception_instruction_includes_full_patient_demographics_and_insurance` kiá»ƒm tra sá»± hiá»‡n diá»‡n cá»§a cáº£ 2 bá»‡nh nhÃ¢n vÃ  2 dÃ²ng Ä‘iá»n SVV.
+* ToÃ n bá»™ **37/37 Unit Tests PASSED (100%)**.
+* ÄÃ³ng gÃ³i láº¡i thÃ nh cÃ´ng cáº£ 2 báº£n phÃ¡t hÃ nh:
+  * `desktop/publish/ExamOperationsDesktop/` (Báº£n tiÃªu chuáº©n)
+  * `desktop/publish/ExamOperationsDesktop-Standalone/` (Báº£n Standalone win-x64)
+

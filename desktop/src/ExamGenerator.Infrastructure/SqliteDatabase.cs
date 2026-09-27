@@ -33,6 +33,15 @@ public sealed class SqliteDatabase
                 UpdatedAt TEXT NOT NULL,
                 PRIMARY KEY(DepartmentCode, WarehouseCode)
             );
+            CREATE TABLE IF NOT EXISTS DepartmentUserMapping (
+                DepartmentCode TEXT NOT NULL,
+                DepartmentName TEXT NOT NULL,
+                UserId TEXT NOT NULL,
+                UserName TEXT NOT NULL,
+                FullName TEXT NOT NULL,
+                UpdatedAt TEXT NOT NULL,
+                PRIMARY KEY(DepartmentCode, UserId)
+            );
             CREATE TABLE IF NOT EXISTS ExamBatch (
                 BatchId TEXT PRIMARY KEY NOT NULL,
                 BatchName TEXT NOT NULL,
@@ -905,6 +914,64 @@ public sealed class SqliteDatabase
         var command = connection.CreateCommand();
         command.CommandText = "SELECT UserId, UserName, FullName, DepartmentCode, DepartmentName FROM SnapshotUser WHERE DepartmentName = $dept OR DepartmentCode = $dept ORDER BY UserName";
         command.Parameters.AddWithValue("$dept", departmentName);
+        await using var reader = await command.ExecuteReaderAsync(cancellationToken);
+        while (await reader.ReadAsync(cancellationToken))
+            rows.Add(new SnapshotUserRow(reader.GetString(0), reader.GetString(1), reader.GetString(2), reader.GetString(3), reader.GetString(4)));
+        return rows;
+    }
+
+    public async Task SaveDepartmentUserMappingsAsync(string deptCode, string deptName, IReadOnlyList<(string UserId, string UserName, string FullName)> users, CancellationToken cancellationToken = default)
+    {
+        await using var connection = new SqliteConnection($"Data Source={DatabasePath}");
+        await connection.OpenAsync(cancellationToken);
+        await using var transaction = connection.BeginTransaction();
+
+        var clear = connection.CreateCommand();
+        clear.Transaction = transaction;
+        clear.CommandText = "DELETE FROM DepartmentUserMapping WHERE DepartmentCode = $deptCode";
+        clear.Parameters.AddWithValue("$deptCode", deptCode.Trim());
+        await clear.ExecuteNonQueryAsync(cancellationToken);
+
+        var now = DateTimeOffset.Now.ToString("O");
+        foreach (var u in users)
+        {
+            var ins = connection.CreateCommand();
+            ins.Transaction = transaction;
+            ins.CommandText = "INSERT INTO DepartmentUserMapping (DepartmentCode, DepartmentName, UserId, UserName, FullName, UpdatedAt) VALUES ($deptCode, $deptName, $userId, $userName, $fullName, $updatedAt)";
+            ins.Parameters.AddWithValue("$deptCode", deptCode.Trim());
+            ins.Parameters.AddWithValue("$deptName", deptName.Trim());
+            ins.Parameters.AddWithValue("$userId", u.UserId.Trim());
+            ins.Parameters.AddWithValue("$userName", u.UserName.Trim());
+            ins.Parameters.AddWithValue("$fullName", u.FullName.Trim());
+            ins.Parameters.AddWithValue("$updatedAt", now);
+            await ins.ExecuteNonQueryAsync(cancellationToken);
+        }
+
+        await transaction.CommitAsync(cancellationToken);
+    }
+
+    public async Task<IReadOnlyList<SnapshotUserRow>> GetDepartmentUserMappingsAsync(string deptCode, CancellationToken cancellationToken = default)
+    {
+        var rows = new List<SnapshotUserRow>();
+        await using var connection = new SqliteConnection($"Data Source={DatabasePath}");
+        await connection.OpenAsync(cancellationToken);
+        var command = connection.CreateCommand();
+        command.CommandText = "SELECT UserId, UserName, FullName, DepartmentCode, DepartmentName FROM DepartmentUserMapping WHERE DepartmentCode = $deptCode ORDER BY UserName";
+        command.Parameters.AddWithValue("$deptCode", deptCode.Trim());
+        await using var reader = await command.ExecuteReaderAsync(cancellationToken);
+        while (await reader.ReadAsync(cancellationToken))
+            rows.Add(new SnapshotUserRow(reader.GetString(0), reader.GetString(1), reader.GetString(2), reader.GetString(3), reader.GetString(4)));
+        return rows;
+    }
+
+    public async Task<IReadOnlyList<SnapshotUserRow>> GetMappedUsersForDepartmentAsync(string departmentCodeOrName, CancellationToken cancellationToken = default)
+    {
+        var rows = new List<SnapshotUserRow>();
+        await using var connection = new SqliteConnection($"Data Source={DatabasePath}");
+        await connection.OpenAsync(cancellationToken);
+        var command = connection.CreateCommand();
+        command.CommandText = "SELECT UserId, UserName, FullName, DepartmentCode, DepartmentName FROM DepartmentUserMapping WHERE DepartmentCode = $dept OR DepartmentName = $dept ORDER BY UserName";
+        command.Parameters.AddWithValue("$dept", departmentCodeOrName.Trim());
         await using var reader = await command.ExecuteReaderAsync(cancellationToken);
         while (await reader.ReadAsync(cancellationToken))
             rows.Add(new SnapshotUserRow(reader.GetString(0), reader.GetString(1), reader.GetString(2), reader.GetString(3), reader.GetString(4)));

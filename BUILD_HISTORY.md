@@ -128,3 +128,51 @@
   - Tieu chuan: `desktop/publish/ExamOperationsDesktop/ExamGenerator.Desktop.exe` (148.5 KB)
   - Standalone: `desktop/publish/ExamOperationsDesktop-Standalone/ExamGenerator.Desktop.exe` (148.5 KB)
 - **Ghi chu thay doi:** Add question HC_TRA_CUU_THANH_TOAN (Tra cuu thong tin thanh toan) to system library
+
+### Build [2026-09-23 20:05:38] - Commit [2e915cf]
+- **Trang thai:** Thanh cong (34/34 Tests Passed)
+- **Cau hinh:** .NET 8 LTS (Release) + Standalone (Self-Contained win-x64)
+- **Duong dan chay:**
+  - Tieu chuan: `desktop/publish/ExamOperationsDesktop/ExamGenerator.Desktop.exe` (148.5 KB)
+  - Standalone: `desktop/publish/ExamOperationsDesktop-Standalone/ExamGenerator.Desktop.exe` (148.5 KB)
+- **Ghi chu thay doi:** Cap nhat SqlScriptGenerator sinh script chuan eHospital BVTH
+
+### Build [2026-09-23 20:39:20] - Commit [2e915cf]
+- **Trang thai:** Thanh cong (34/34 Tests Passed)
+- **Cau hinh:** .NET 8 LTS (Release) + Standalone (Self-Contained win-x64)
+- **Duong dan chay:**
+  - Tieu chuan: `desktop/publish/ExamOperationsDesktop/ExamGenerator.Desktop.exe` (148.5 KB)
+  - Standalone: `desktop/publish/ExamOperationsDesktop-Standalone/ExamGenerator.Desktop.exe` (148.5 KB)
+- **Ghi chu thay doi:** Chuan hoa Stored Procedure eHospital va co che tra cuu phan giai BHYT da tang (Multi-tier Fallback)
+
+### Build [2026-09-23 20:45:22] - Commit [2e915cf]
+- **Trang thai:** Thanh cong (34/34 Tests Passed)
+- **Cau hinh:** .NET 8 LTS (Release) + Standalone (Self-Contained win-x64)
+- **Duong dan chay:**
+  - Tieu chuan: `desktop/publish/ExamOperationsDesktop/ExamGenerator.Desktop.exe` (148.5 KB)
+  - Standalone: `desktop/publish/ExamOperationsDesktop-Standalone/ExamGenerator.Desktop.exe` (148.5 KB)
+- **Ghi chu thay doi:** Ho tro co che tai tiep nhan benh nhan da co ho so/the BHYT trong CSDL eHospital
+
+### Build [2026-09-23 21:18:23] - Commit [2e915cf]
+- **Trang thai:** Thanh cong (34/34 Tests Passed)
+- **Cau hinh:** .NET 8 LTS (Release) + Standalone (Self-Contained win-x64)
+- **Duong dan chay:**
+  - Tieu chuan: `desktop/publish/ExamOperationsDesktop/ExamGenerator.Desktop.exe` (148.5 KB)
+  - Standalone: `desktop/publish/ExamOperationsDesktop-Standalone/ExamGenerator.Desktop.exe` (148.5 KB)
+- **Ghi chu thay doi:** Cap nhat thong tin ban quyen giao dien nguoi dung
+
+### Build [2026-09-27 10:36:54] - Commit [2e915cf]
+- **Trang thai:** Thanh cong (34/34 Tests Passed)
+- **Cau hinh:** .NET 8 LTS (Release) + Standalone (Self-Contained win-x64)
+- **Duong dan chay:**
+  - Tieu chuan: `desktop/publish/ExamOperationsDesktop/ExamGenerator.Desktop.exe` (148.5 KB)
+  - Standalone: `desktop/publish/ExamOperationsDesktop-Standalone/ExamGenerator.Desktop.exe` (148.5 KB)
+- **Ghi chu thay doi:** Mapping User HIS theo khoa Tab 3, chi in bang Duoc khi co y lenh va co dinh ngay kiem ton kho 01-02/2026
+
+### Build [2026-09-27 10:42:41] - Commit [2e915cf]
+- **Trang thai:** Thanh cong (34/34 Tests Passed)
+- **Cau hinh:** .NET 8 LTS (Release) + Standalone (Self-Contained win-x64)
+- **Duong dan chay:**
+  - Tieu chuan: `desktop/publish/ExamOperationsDesktop/ExamGenerator.Desktop.exe` (148.5 KB)
+  - Standalone: `desktop/publish/ExamOperationsDesktop-Standalone/ExamGenerator.Desktop.exe` (148.5 KB)
+- **Ghi chu thay doi:** Bo sung day du thong tin benh nhan BHYT va Vien phi vao cau tiep nhan truc tiep kem cho dien SVV tung loai

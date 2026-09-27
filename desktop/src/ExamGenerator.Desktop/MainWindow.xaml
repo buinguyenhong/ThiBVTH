@@ -18,7 +18,7 @@
                     </Border>
                     <StackPanel VerticalAlignment="Center">
                         <TextBlock Text="BỆNH VIỆN ĐA KHOA THIỆN HẠNH" Foreground="White" FontSize="18" FontWeight="Bold"/>
-                        <TextBlock Text="Hội Đồng Thi Tuyển Dụng · Exam Operations Desktop (HIS eHospital)" Foreground="{StaticResource BrandTealSoft}" FontSize="13"/>
+                        <TextBlock Text="Copyright © 2026 Bùi Nguyên Hồng - CNTT - Thiện Hạnh . All rights reserved." Foreground="{StaticResource BrandTealSoft}" FontSize="13"/>
                     </StackPanel>
                 </StackPanel>
                 <StackPanel Grid.Column="1" HorizontalAlignment="Right" VerticalAlignment="Center">
@@ -39,7 +39,7 @@
         <Border DockPanel.Dock="Bottom" Background="#F1F5F9" BorderBrush="{StaticResource BorderSubtle}" BorderThickness="0,1,0,0" Padding="16,8">
             <Grid>
                 <TextBlock x:Name="FooterStatusText" Text="Sẵn sàng." Foreground="{StaticResource TextSecondary}" FontSize="12"/>
-                <TextBlock Text="Phiên bản 2026.09 · Hội đồng tuyển dụng BVĐK Thiện Hạnh" HorizontalAlignment="Right" Foreground="{StaticResource TextMuted}" FontSize="12"/>
+                <TextBlock Text="Phiên bản 2026.09 · Copyright © 2026 Bùi Nguyên Hồng - CNTT - Thiện Hạnh . All rights reserved." HorizontalAlignment="Right" Foreground="{StaticResource TextMuted}" FontSize="12"/>
             </Grid>
         </Border>
 
@@ -469,6 +469,29 @@
                                         </DataTemplate>
                                     </ListBox.ItemTemplate>
                                 </ListBox>
+
+                                <TextBlock Text="Danh sách Tài khoản User HIS thi (Chọn các user dùng cho khảo thí)" FontWeight="SemiBold" Margin="0,14,0,4"/>
+                                <Grid Margin="0,0,0,6">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="Auto"/>
+                                    </Grid.ColumnDefinitions>
+                                    <TextBox x:Name="UserSearchTextBox" TextChanged="UserSearchChanged" Height="32"/>
+                                    <StackPanel Grid.Column="1" Orientation="Horizontal" Margin="8,0,0,0">
+                                        <Button Content="Chọn tất cả" Style="{StaticResource SecondaryButton}" Height="32" Padding="12,0" Margin="0,0,6,0" Click="SelectAllUsers_Click"/>
+                                        <Button Content="Bỏ chọn tất cả" Style="{StaticResource SecondaryButton}" Height="32" Padding="12,0" Click="ClearAllUsers_Click"/>
+                                    </StackPanel>
+                                </Grid>
+                                <ListBox x:Name="DepartmentUsersList" Height="180" BorderBrush="{StaticResource BorderSubtle}" ScrollViewer.HorizontalScrollBarVisibility="Disabled">
+                                    <ListBox.ItemTemplate>
+                                        <DataTemplate>
+                                            <CheckBox IsChecked="{Binding IsSelected, Mode=TwoWay}" Margin="2,4" VerticalAlignment="Center" Click="UserCheckBox_Click">
+                                                <TextBlock Text="{Binding DisplayText}" FontSize="13" Foreground="{StaticResource TextPrimary}" Margin="6,0,0,0"/>
+                                            </CheckBox>
+                                        </DataTemplate>
+                                    </ListBox.ItemTemplate>
+                                </ListBox>
+                                <TextBlock x:Name="UserCountStatusText" Text="Đã chọn: 0 user HIS" Foreground="#0D9488" FontWeight="SemiBold" FontSize="12" Margin="0,4,0,0"/>
 
                                 <Grid Margin="0,16,0,0">
                                     <TextBlock x:Name="MappingStatusText" Text="Sẵn sàng lưu cấu hình." Foreground="{StaticResource TextSecondary}" VerticalAlignment="Center"/>

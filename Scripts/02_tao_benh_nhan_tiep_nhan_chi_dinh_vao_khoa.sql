@@ -331,9 +331,8 @@ BEGIN
 
     SET @SoBHYT = LTRIM(RTRIM(@SoBHYT));
 
-    IF @LoaiBHYT IS NULL OR @BHYTTuNgay IS NULL OR @BHYTDenNgay IS NULL
-       OR @TuyenKhamBenh_Id IS NULL OR @BenhVien_KCB_Id IS NULL
-        THROW 51000, N'BHYT cần loại, hạn thẻ, tuyến và nơi đăng ký KCB.', 1;
+    IF @BHYTTuNgay IS NULL OR @BHYTDenNgay IS NULL
+        THROW 51000, N'Thẻ BHYT phải có ngày hiệu lực và ngày hết hạn.', 1;
 
     IF @BHYTTuNgay >= @BHYTDenNgay
         THROW 51000, N'Ngày hết hạn BHYT phải sau ngày hiệu lực.', 1;
@@ -342,23 +341,18 @@ BEGIN
        OR CAST(@NgayGioNghiepVu AS date) > CAST(@BHYTDenNgay AS date)
         THROW 51000, N'Thẻ BHYT không có hiệu lực tại ngày tiếp nhận.', 1;
 
-    IF NOT EXISTS (
-        SELECT 1
-        FROM dbo.Lst_Dictionary
-        WHERE Dictionary_Id = @LoaiBHYT
-          AND Dictionary_Type_Code = 'TiepNhanLoaiBHYT'
-          AND ISNULL(Enabled, 1) = 1
-    )
-        THROW 51000, N'@LoaiBHYT không thuộc TiepNhanLoaiBHYT.', 1;
+    IF @TuyenKhamBenh_Id IS NULL
+        THROW 51000, N'Không phân giải được tuyến khám chữa bệnh (@TuyenKhamBenh_Id trong Lst_Dictionary).', 1;
 
     IF NOT EXISTS (
         SELECT 1
         FROM dbo.Lst_Dictionary
         WHERE Dictionary_Id = @TuyenKhamBenh_Id
-          AND Dictionary_Type_Code = 'TuyenKhamChuaBenh'
-          AND ISNULL(Enabled, 1) = 1
     )
-        THROW 51000, N'@TuyenKhamBenh_Id không thuộc TuyenKhamChuaBenh.', 1;
+        THROW 51000, N'@TuyenKhamBenh_Id không tồn tại trong Lst_Dictionary.', 1;
+
+    IF @BenhVien_KCB_Id IS NULL
+        THROW 51000, N'Không phân giải được nơi đăng ký KCB ban đầu (@BenhVien_KCB_Id trong DM_BenhVien).', 1;
 
     IF NOT EXISTS (
         SELECT 1
@@ -366,7 +360,15 @@ BEGIN
         WHERE BenhVien_Id = @BenhVien_KCB_Id
           AND ISNULL(TamNgung, 0) = 0
     )
-        THROW 51000, N'@BenhVien_KCB_Id không tồn tại hoặc đang tạm ngưng.', 1;
+        THROW 51000, N'@BenhVien_KCB_Id không tồn tại hoặc đang tạm ngưng trong DM_BenhVien.', 1;
+
+    IF @LoaiBHYT IS NOT NULL AND @LoaiBHYT > 0
+       AND NOT EXISTS (
+           SELECT 1
+           FROM dbo.Lst_Dictionary
+           WHERE Dictionary_Id = @LoaiBHYT
+       )
+        THROW 51000, N'@LoaiBHYT không tồn tại trong Lst_Dictionary.', 1;
 
     IF @NoiSinhSong_Id IS NOT NULL
        AND NOT EXISTS (
@@ -378,13 +380,22 @@ BEGIN
        )
         THROW 51000, N'@NoiSinhSong_Id không thuộc DoiTuong_NoiSinhSong.', 1;
 
+    /* Nếu thẻ BHYT đã tồn tại trong DM_BenhNhan_BHYT: lấy BenhNhan_Id và BenhNhan_BHYT_Id có sẵn để tiếp nhận lại */
     IF EXISTS (
         SELECT 1
         FROM dbo.DM_BenhNhan_BHYT
         WHERE SoThe = @SoBHYT
           AND ISNULL(TamNgung, 0) = 0
     )
-        THROW 51000, N'Số thẻ BHYT đã thuộc một bệnh nhân đang hoạt động; không tạo bệnh nhân mới trùng thẻ.', 1;
+    BEGIN
+        SELECT TOP (1)
+            @BenhNhan_Id = BenhNhan_Id,
+            @BenhNhan_BHYT_Id = BenhNhan_BHYT_Id
+        FROM dbo.DM_BenhNhan_BHYT
+        WHERE SoThe = @SoBHYT
+          AND ISNULL(TamNgung, 0) = 0
+        ORDER BY BenhNhan_BHYT_Id DESC;
+    END;
 
     /*
         Màn hình tiếp nhận dùng 3 ký tự đầu thẻ + tuyến để suy ra
@@ -406,6 +417,26 @@ BEGIN
       AND ISNULL(TamNgung, 0) = 0
     ORDER BY DoiTuong_Id;
 
+    IF @DoiTuong_Id IS NULL AND @BenhNhan_Id IS NOT NULL
+    BEGIN
+        SELECT TOP (1) @DoiTuong_Id = tn.DoiTuong_Id
+        FROM dbo.TiepNhan AS tn
+        JOIN dbo.DM_DoiTuong AS dt ON dt.DoiTuong_Id = tn.DoiTuong_Id
+        WHERE tn.BenhNhan_Id = @BenhNhan_Id
+          AND tn.SoBHYT = @SoBHYT
+        ORDER BY tn.TiepNhan_Id DESC;
+    END;
+
+    IF @DoiTuong_Id IS NULL
+    BEGIN
+        SELECT TOP (1) @DoiTuong_Id = dt.DoiTuong_Id
+        FROM dbo.DM_DoiTuong AS dt
+        JOIN dbo.Lst_Dictionary AS ndt ON ndt.Dictionary_Id = dt.NhomDoiTuong_Id
+        WHERE ndt.Dictionary_Code = 'BHYT'
+          AND ISNULL(dt.TamNgung, 0) = 0
+        ORDER BY dt.DoiTuong_Id;
+    END;
+
     IF @DoiTuong_Id IS NULL
         THROW 51000, N'Không suy ra được DM_DoiTuong từ mã thẻ BHYT và tuyến khám.', 1;
 
@@ -426,41 +457,44 @@ END;
 BEGIN TRY
     BEGIN TRANSACTION;
 
-    /* 4.1 Tạo bệnh nhân mới; MaYTe được procedure tự sinh. */
-    SET @FreePara = N'1'; -- họ đứng trước tên theo cách lưu của màn hình
-
-    EXEC dbo.sp_DM_BENHNHAN
-        @Action = N'AddNew',
-        @LanguageID = N'VI',
-        @UserID = @User_Id,
-        @FreePara = @FreePara OUTPUT,
-        @BenhNhan_Id = @BenhNhan_Id OUTPUT,
-        @MaYTe = NULL,
-        @TenBenhNhan = @TenBenhNhan,
-        @GioiTinh = @GioiTinh,
-        @NgaySinh = @NgaySinh,
-        @NamSinh = @NamSinh,
-        @SoNha = @SoNha,
-        @QuocTich_Id = @QuocTich_Id,
-        @TinhThanh_Id = @TinhThanh_Id,
-        @QuanHuyen_Id = @QuanHuyen_Id,
-        @XaPhuong_Id = @XaPhuong_Id,
-        @DanToc_Id = @DanToc_Id,
-        @NgheNghiep_Id = @NgheNghiep_Id,
-        @VietKieu = 0,
-        @NguoiNuocNgoai = 0,
-        @NgayTao = @NgayGioNghiepVu,
-        @NguoiTao_Id = @User_Id,
-        @SoDienThoai = @SoDienThoai,
-        @DiaChiThuongTru = @DiaChiThuongTru,
-        @TuVong = 0,
-        @TamNgung = 0;
-
+    /* 4.1 Tạo bệnh nhân mới nếu chưa có; MaYTe được procedure tự sinh. */
     IF @BenhNhan_Id IS NULL
-        THROW 51000, N'Không tạo được DM_BenhNhan.', 1;
+    BEGIN
+        SET @FreePara = N'1'; -- họ đứng trước tên theo cách lưu của màn hình
 
-    /* 4.2 Lưu thẻ bệnh nhân nếu là hồ sơ BHYT. */
-    IF @LoaiHoSo = 'BHYT'
+        EXEC dbo.sp_DM_BENHNHAN
+            @Action = N'AddNew',
+            @LanguageID = N'VI',
+            @UserID = @User_Id,
+            @FreePara = @FreePara OUTPUT,
+            @BenhNhan_Id = @BenhNhan_Id OUTPUT,
+            @MaYTe = NULL,
+            @TenBenhNhan = @TenBenhNhan,
+            @GioiTinh = @GioiTinh,
+            @NgaySinh = @NgaySinh,
+            @NamSinh = @NamSinh,
+            @SoNha = @SoNha,
+            @QuocTich_Id = @QuocTich_Id,
+            @TinhThanh_Id = @TinhThanh_Id,
+            @QuanHuyen_Id = @QuanHuyen_Id,
+            @XaPhuong_Id = @XaPhuong_Id,
+            @DanToc_Id = @DanToc_Id,
+            @NgheNghiep_Id = @NgheNghiep_Id,
+            @VietKieu = 0,
+            @NguoiNuocNgoai = 0,
+            @NgayTao = @NgayGioNghiepVu,
+            @NguoiTao_Id = @User_Id,
+            @SoDienThoai = @SoDienThoai,
+            @DiaChiThuongTru = @DiaChiThuongTru,
+            @TuVong = 0,
+            @TamNgung = 0;
+
+        IF @BenhNhan_Id IS NULL
+            THROW 51000, N'Không tạo được DM_BenhNhan.', 1;
+    END;
+
+    /* 4.2 Lưu thẻ bệnh nhân nếu là hồ sơ BHYT và chưa có trong DM_BenhNhan_BHYT. */
+    IF @LoaiHoSo = 'BHYT' AND @BenhNhan_BHYT_Id IS NULL
     BEGIN
         SET @FreePara = NULL;
 

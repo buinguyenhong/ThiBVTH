@@ -313,3 +313,15 @@ Hệ thống **Exam Operations Desktop (C# .NET 8 LTS / WPF / SQLite / OpenXML)*
    * Đóng gói bản Release hoàn thiện sẵn sàng vận hành tại:
      `desktop/publish/ExamOperationsDesktop-final/ExamGenerator.Desktop.exe`
 
+
+
+8. **Chuẩn hóa Bộ Sinh SQL Khảo thí theo Stored Procedures eHospital & Cơ chế Tra cứu Đa tầng:**
+   * **Sử dụng Stored Procedures chính thức:** Thay vì `INSERT` trực tiếp vào bảng HIS (dễ gây sai lệch trigger, sinh khóa không chuẩn), hệ thống gọi trực tiếp:
+     * `sp_DM_BENHNHAN @Action = 'AddNew'`
+     * `sp_LST_KEYDATA` để sinh `MaTiepNhan` và `SoThuTuTiepNhan`
+     * `sp_DM_BENHNHAN_BHYT @Action = 'AddNew'`
+     * `sp_TIEPNHAN @Action = 'AddNew'`
+     * `sp_NOITRU_NHAPVIEN @Action = 'AddNew'`
+   * **Cơ chế Phân giải Đa tầng (Multi-tier Fallback):** Tự động nhận diện ID danh mục tuyến (`TuyenKhamBenh_Id`), bệnh viện ĐKKCB ban đầu (`BenhVien_KCB_Id`), loại BHYT (`LoaiBHYT`), nghề nghiệp, dân tộc mà không phụ thuộc vào biến thể mã danh mục trên từng môi trường CSDL test.
+   * **Hỗ trợ Tái tiếp nhận (Re-admission):** Tự động nhận diện nếu bệnh nhân/thẻ BHYT đã có sẵn trong hệ thống để tái sử dụng `BenhNhan_Id`, tạo tiếp nhận mới và chỉ định vào khoa mà không bị lỗi trùng thẻ.
+   * **Bảo vệ toàn vẹn kỳ thi:** Mặc định chạy thử nghiệm với `@Commit = 0` (tự động ROLLBACK, trả về bảng đối soát dữ liệu). Chỉ khi chuyển `@Commit = 1` mới thực sự nạp vào CSDL.

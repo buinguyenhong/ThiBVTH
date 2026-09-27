@@ -106,8 +106,9 @@ public sealed class WordExamWriter
             AddEmptyParagraph(body, 30);
         }
 
-        // 5. Table of Drugs & Medical Supplies (if ordered drugs exist)
-        if (scenario.OrderedDrugs.Count > 0)
+        // 5. Table of Drugs & Medical Supplies (only if exam has drug ordering question and ordered drugs exist)
+        var hasDrugOrder = scenario.Questions.Any(q => q.ActionCode.Equals("YL_CHI_DINH_THUOC_VTYT", StringComparison.OrdinalIgnoreCase));
+        if (hasDrugOrder && scenario.OrderedDrugs.Count > 0)
         {
             AddSectionTitle(body, "Danh sách thuốc, VTYT cần lên y lệnh cho bệnh nhân:");
             var drugTable = CreateDrugsTable(scenario.OrderedDrugs);

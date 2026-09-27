@@ -24,6 +24,7 @@ public partial class MainWindow : Window
     private readonly List<WarehouseRow> _warehouses = [];
     private readonly List<WarehouseItemViewModel> _allWarehouseItems = [];
     private readonly List<ServiceGroupItemViewModel> _allServiceGroups = [];
+    private readonly List<UserItemViewModel> _allDepartmentUserItems = [];
     private List<(string Code, string Name, string? DepartmentId)> _allWarehousesWithDept = [];
 
     private readonly ObservableCollection<TemplateQuestionItemViewModel> _currentQuestions = [];
@@ -470,10 +471,13 @@ public partial class MainWindow : Window
         await _database.SaveDepartmentWarehouseMappingsAsync(department.Code, department.Name, selectedWarehouses);
         var selectedGroups = _allServiceGroups.Where(x => x.IsSelected).Select(x => (x.Code, x.Name)).ToList();
         await _database.ReplaceDepartmentServiceGroupsAsync(department.Code, selectedGroups);
-        MappingStatusText.Text = $"Đã lưu cấu hình: {department.Name} -> {selectedWarehouses.Count} kho thi ({selectedGroups.Count} nhóm dịch vụ).";
+        var selectedUsers = _allDepartmentUserItems.Where(x => x.IsSelected).Select(x => (x.UserId, x.UserName, x.FullName)).ToList();
+        await _database.SaveDepartmentUserMappingsAsync(department.Code, department.Name, selectedUsers);
+
+        MappingStatusText.Text = $"Đã lưu cấu hình: {department.Name} -> {selectedWarehouses.Count} kho thi ({selectedGroups.Count} nhóm dịch vụ, {selectedUsers.Count} user thi).";
         await LoadMappingsAsync();
         await RefreshDashboardCardsAsync();
-        MessageBox.Show($"Đã lưu thành công cấu hình cho {department.Name}:\n• Số lượng kho thi: {selectedWarehouses.Count} kho ({string.Join(", ", selectedWarehouses.Select(w => w.Name))})\n• Số nhóm dịch vụ CLS được phép: {selectedGroups.Count}", "Lưu Thành Công", MessageBoxButton.OK, MessageBoxImage.Information);
+        MessageBox.Show($"Đã lưu thành công cấu hình cho {department.Name}:\n• Số lượng kho thi: {selectedWarehouses.Count} kho ({string.Join(", ", selectedWarehouses.Select(w => w.Name))})\n• Số nhóm dịch vụ CLS được phép: {selectedGroups.Count}\n• Số User HIS thi được chọn: {selectedUsers.Count} user", "Lưu Thành Công", MessageBoxButton.OK, MessageBoxImage.Information);
     }
 
     private async void MappingDepartmentChanged(object sender, SelectionChangedEventArgs e)
@@ -512,6 +516,78 @@ public partial class MainWindow : Window
             group.IsSelected = codeSet.Contains(group.Code);
         }
         RefreshServiceGroupsList();
+
+        // Load users belonging to this department from SnapshotUser and match with mapped users
+        var allDeptUsers = await _database.GetDepartmentUsersAsync(d.Code);
+        if (allDeptUsers.Count == 0 && !string.IsNullOrWhiteSpace(d.Name))
+        {
+            allDeptUsers = await _database.GetDepartmentUsersAsync(d.Name);
+        }
+
+        var mappedUsers = await _database.GetDepartmentUserMappingsAsync(d.Code);
+        if (mappedUsers.Count == 0 && !string.IsNullOrWhiteSpace(d.Name))
+        {
+            mappedUsers = await _database.GetDepartmentUserMappingsAsync(d.Name);
+        }
+        var mappedUserIds = mappedUsers.Select(u => u.UserId).ToHashSet(StringComparer.OrdinalIgnoreCase);
+
+        _allDepartmentUserItems.Clear();
+        foreach (var u in allDeptUsers)
+        {
+            _allDepartmentUserItems.Add(new UserItemViewModel(u.UserId, u.UserName, u.FullName, d.Code, d.Name, mappedUserIds.Contains(u.UserId)));
+        }
+        UserSearchTextBox.Text = string.Empty;
+        RefreshDepartmentUsersList();
+    }
+
+    private void RefreshDepartmentUsersList()
+    {
+        var kw = UserSearchTextBox.Text?.Trim() ?? string.Empty;
+        DepartmentUsersList.ItemsSource = null;
+        DepartmentUsersList.ItemsSource = _allDepartmentUserItems
+            .Where(x => string.IsNullOrWhiteSpace(kw) || x.UserName.Contains(kw, StringComparison.OrdinalIgnoreCase) || x.FullName.Contains(kw, StringComparison.OrdinalIgnoreCase))
+            .ToList();
+        UpdateUserCountStatus();
+    }
+
+    private void UpdateUserCountStatus()
+    {
+        var selectedCount = _allDepartmentUserItems.Count(x => x.IsSelected);
+        UserCountStatusText.Text = $"Đã chọn: {selectedCount}/{_allDepartmentUserItems.Count} user HIS cho khoa này";
+    }
+
+    private void UserSearchChanged(object sender, TextChangedEventArgs e)
+    {
+        RefreshDepartmentUsersList();
+    }
+
+    private void SelectAllUsers_Click(object sender, RoutedEventArgs e)
+    {
+        var kw = UserSearchTextBox.Text?.Trim() ?? string.Empty;
+        var targetList = _allDepartmentUserItems
+            .Where(x => string.IsNullOrWhiteSpace(kw) || x.UserName.Contains(kw, StringComparison.OrdinalIgnoreCase) || x.FullName.Contains(kw, StringComparison.OrdinalIgnoreCase));
+        foreach (var u in targetList)
+        {
+            u.IsSelected = true;
+        }
+        UpdateUserCountStatus();
+    }
+
+    private void ClearAllUsers_Click(object sender, RoutedEventArgs e)
+    {
+        var kw = UserSearchTextBox.Text?.Trim() ?? string.Empty;
+        var targetList = _allDepartmentUserItems
+            .Where(x => string.IsNullOrWhiteSpace(kw) || x.UserName.Contains(kw, StringComparison.OrdinalIgnoreCase) || x.FullName.Contains(kw, StringComparison.OrdinalIgnoreCase));
+        foreach (var u in targetList)
+        {
+            u.IsSelected = false;
+        }
+        UpdateUserCountStatus();
+    }
+
+    private void UserCheckBox_Click(object sender, RoutedEventArgs e)
+    {
+        UpdateUserCountStatus();
     }
 
     private void RefreshWarehouseMappingsList()
@@ -1510,5 +1586,41 @@ public sealed class TemplateQuestionItemViewModel : System.ComponentModel.INotif
     public event EventHandler? ScoreChanged;
     public event System.ComponentModel.PropertyChangedEventHandler? PropertyChanged;
     private void OnPropertyChanged(string prop) => PropertyChanged?.Invoke(this, new System.ComponentModel.PropertyChangedEventArgs(prop));
+}
+
+public sealed class UserItemViewModel : System.ComponentModel.INotifyPropertyChanged
+{
+    private bool _isSelected;
+    public string UserId { get; }
+    public string UserName { get; }
+    public string FullName { get; }
+    public string DepartmentCode { get; }
+    public string DepartmentName { get; }
+    public string DisplayText => string.IsNullOrWhiteSpace(FullName) ? UserName : $"{UserName} - {FullName}";
+
+    public bool IsSelected
+    {
+        get => _isSelected;
+        set
+        {
+            if (_isSelected != value)
+            {
+                _isSelected = value;
+                PropertyChanged?.Invoke(this, new System.ComponentModel.PropertyChangedEventArgs(nameof(IsSelected)));
+            }
+        }
+    }
+
+    public UserItemViewModel(string userId, string userName, string fullName, string deptCode, string deptName, bool isSelected = false)
+    {
+        UserId = userId;
+        UserName = userName;
+        FullName = fullName;
+        DepartmentCode = deptCode;
+        DepartmentName = deptName;
+        _isSelected = isSelected;
+    }
+
+    public event System.ComponentModel.PropertyChangedEventHandler? PropertyChanged;
 }
 

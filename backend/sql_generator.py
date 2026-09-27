@@ -238,35 +238,125 @@ ORDER BY icd.ICD_Id;
 
 IF @LoaiHoSo = 'BHYT'
 BEGIN
+    /* Phân giải @LoaiBHYT đa tầng: danh mục TiepNhanLoaiBHYT -> LoaiBHYT -> Type_Id=101 -> lịch sử TiepNhan */
     SELECT TOP (1) @LoaiBHYT = d.Dictionary_Id
     FROM dbo.Lst_Dictionary AS d
-    WHERE d.Dictionary_Type_Code = 'TiepNhanLoaiBHYT'
+    LEFT JOIN dbo.Lst_Dictionary_Type AS dt
+      ON dt.Dictionary_Type_Id = d.Dictionary_Type_Id
+    WHERE (
+        d.Dictionary_Type_Code IN ('TiepNhanLoaiBHYT', 'LoaiBHYT', 'BHYT_Loai')
+        OR dt.Dictionary_Type_Code IN ('TiepNhanLoaiBHYT', 'LoaiBHYT', 'BHYT_Loai')
+        OR d.Dictionary_Type_Id = 101
+    )
       AND ISNULL(d.Enabled, 1) = 1
     ORDER BY
         CASE WHEN d.Dictionary_Name LIKE N'%bắt buộc%' THEN 0 ELSE 1 END,
         ISNULL(d.Idx, 2147483647),
         d.Dictionary_Id;
 
+    IF @LoaiBHYT IS NULL
+    BEGIN
+        SELECT TOP (1) @LoaiBHYT = tn.LoaiBHYT
+        FROM dbo.TiepNhan AS tn
+        WHERE tn.LoaiBHYT IS NOT NULL AND tn.LoaiBHYT > 0
+        ORDER BY tn.TiepNhan_Id DESC;
+    END;
+
+    IF @LoaiBHYT IS NULL
+    BEGIN
+        SELECT TOP (1) @LoaiBHYT = b.LoaiBHYT
+        FROM dbo.DM_BenhNhan_BHYT AS b
+        WHERE b.LoaiBHYT IS NOT NULL AND b.LoaiBHYT > 0
+        ORDER BY b.BenhNhan_BHYT_Id DESC;
+    END;
+
+    /* Phân giải @TuyenKhamBenh_Id đa tầng: TrongTuyen -> đúng tuyến -> bất kỳ tuyến nào -> lịch sử TiepNhan */
     SELECT TOP (1) @TuyenKhamBenh_Id = d.Dictionary_Id
     FROM dbo.Lst_Dictionary AS d
-    WHERE d.Dictionary_Type_Code = 'TuyenKhamChuaBenh'
-      AND d.Dictionary_Code = 'TuyenKhamChuaBenh_TrongTuyen'
+    LEFT JOIN dbo.Lst_Dictionary_Type AS dt
+      ON dt.Dictionary_Type_Id = d.Dictionary_Type_Id
+    WHERE (
+        d.Dictionary_Type_Code IN ('TuyenKhamChuaBenh', 'TuyenKhamBenh')
+        OR dt.Dictionary_Type_Code IN ('TuyenKhamChuaBenh', 'TuyenKhamBenh')
+    )
       AND ISNULL(d.Enabled, 1) = 1
-    ORDER BY d.Dictionary_Id;
+    ORDER BY
+        CASE 
+            WHEN d.Dictionary_Code = 'TuyenKhamChuaBenh_TrongTuyen' THEN 0
+            WHEN d.Dictionary_Code IN ('TrongTuyen', 'DungTuyen', 'DT', 'TT', '1') THEN 1
+            WHEN d.Dictionary_Name LIKE N'%đúng tuyến%' OR d.Dictionary_Name LIKE N'%trong tuyến%' THEN 2
+            ELSE 3
+        END,
+        ISNULL(d.Idx, 2147483647),
+        d.Dictionary_Id;
 
+    IF @TuyenKhamBenh_Id IS NULL
+    BEGIN
+        SELECT TOP (1) @TuyenKhamBenh_Id = d.Dictionary_Id
+        FROM dbo.Lst_Dictionary AS d
+        LEFT JOIN dbo.Lst_Dictionary_Type AS dt
+          ON dt.Dictionary_Type_Id = d.Dictionary_Type_Id
+        WHERE (
+            d.Dictionary_Type_Code IN ('TuyenKhamChuaBenh', 'TuyenKhamBenh')
+            OR dt.Dictionary_Type_Code IN ('TuyenKhamChuaBenh', 'TuyenKhamBenh')
+        )
+        ORDER BY d.Dictionary_Id;
+    END;
+
+    IF @TuyenKhamBenh_Id IS NULL
+    BEGIN
+        SELECT TOP (1) @TuyenKhamBenh_Id = tn.TuyenKhamBenh_Id
+        FROM dbo.TiepNhan AS tn
+        WHERE tn.TuyenKhamBenh_Id IS NOT NULL AND tn.TuyenKhamBenh_Id > 0
+        ORDER BY tn.TiepNhan_Id DESC;
+    END;
+
+    /* Phân giải @BenhVien_KCB_Id đa tầng: MaBenhVien/TenBenhVien_En -> tên viện -> Sys_AppSettings -> lịch sử TiepNhan -> viện đầu tiên */
     SELECT TOP (1) @BenhVien_KCB_Id = bv.BenhVien_Id
     FROM dbo.DM_BenhVien AS bv
     WHERE ISNULL(bv.TamNgung, 0) = 0
       AND (
-          LTRIM(RTRIM(ISNULL(bv.MaBenhVien, ''))) =
-              LTRIM(RTRIM(@MaBenhVienKCB))
-          OR LTRIM(RTRIM(ISNULL(bv.TenBenhVien_En, ''))) =
-              LTRIM(RTRIM(@MaBenhVienKCB))
+          LTRIM(RTRIM(ISNULL(bv.MaBenhVien, ''))) = LTRIM(RTRIM(@MaBenhVienKCB))
+          OR LTRIM(RTRIM(ISNULL(bv.TenBenhVien_En, ''))) = LTRIM(RTRIM(@MaBenhVienKCB))
+          OR REPLACE(REPLACE(LTRIM(RTRIM(ISNULL(bv.MaBenhVien, ''))), '-', ''), '.', '') = REPLACE(REPLACE(LTRIM(RTRIM(@MaBenhVienKCB)), '-', ''), '.', '')
+          OR REPLACE(REPLACE(LTRIM(RTRIM(ISNULL(bv.TenBenhVien_En, ''))), '-', ''), '.', '') = REPLACE(REPLACE(LTRIM(RTRIM(@MaBenhVienKCB)), '-', ''), '.', '')
+          OR bv.TenBenhVien LIKE N'%Thiện Hạnh%'
       )
     ORDER BY
-        CASE WHEN LTRIM(RTRIM(ISNULL(bv.MaBenhVien, ''))) =
-                       LTRIM(RTRIM(@MaBenhVienKCB)) THEN 0 ELSE 1 END,
+        CASE 
+            WHEN LTRIM(RTRIM(ISNULL(bv.MaBenhVien, ''))) = LTRIM(RTRIM(@MaBenhVienKCB)) THEN 0
+            WHEN LTRIM(RTRIM(ISNULL(bv.TenBenhVien_En, ''))) = LTRIM(RTRIM(@MaBenhVienKCB)) THEN 1
+            WHEN REPLACE(REPLACE(LTRIM(RTRIM(ISNULL(bv.MaBenhVien, ''))), '-', ''), '.', '') = LTRIM(RTRIM(@MaBenhVienKCB)) THEN 2
+            WHEN bv.TenBenhVien LIKE N'%Thiện Hạnh%' THEN 3
+            ELSE 4
+        END,
         bv.BenhVien_Id;
+
+    IF @BenhVien_KCB_Id IS NULL
+    BEGIN
+        SELECT TOP (1) @BenhVien_KCB_Id = bv.BenhVien_Id
+        FROM dbo.Sys_AppSettings AS cfg
+        JOIN dbo.DM_BenhVien AS bv
+          ON bv.MaBenhVien = cfg.Value OR bv.TenBenhVien_En = cfg.Value
+        WHERE cfg.Code IN (N'MaNoiKCBBanDau', N'MaBenhVien_BHYT', N'MaCSKCB')
+          AND ISNULL(bv.TamNgung, 0) = 0;
+    END;
+
+    IF @BenhVien_KCB_Id IS NULL
+    BEGIN
+        SELECT TOP (1) @BenhVien_KCB_Id = tn.BenhVien_KCB_Id
+        FROM dbo.TiepNhan AS tn
+        WHERE tn.BenhVien_KCB_Id IS NOT NULL AND tn.BenhVien_KCB_Id > 0
+        ORDER BY tn.TiepNhan_Id DESC;
+    END;
+
+    IF @BenhVien_KCB_Id IS NULL
+    BEGIN
+        SELECT TOP (1) @BenhVien_KCB_Id = bv.BenhVien_Id
+        FROM dbo.DM_BenhVien AS bv
+        WHERE ISNULL(bv.TamNgung, 0) = 0
+        ORDER BY bv.BenhVien_Id;
+    END;
 
     SET @TinhThanh_CapThe_Id = ISNULL(@TinhThanh_CapThe_Id, @TinhThanh_Id);
 END;
