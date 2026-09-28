@@ -176,3 +176,11 @@
   - Tieu chuan: `desktop/publish/ExamOperationsDesktop/ExamGenerator.Desktop.exe` (148.5 KB)
   - Standalone: `desktop/publish/ExamOperationsDesktop-Standalone/ExamGenerator.Desktop.exe` (148.5 KB)
 - **Ghi chu thay doi:** Bo sung day du thong tin benh nhan BHYT va Vien phi vao cau tiep nhan truc tiep kem cho dien SVV tung loai
+
+### Build [2026-09-28 12:17:19] - Commit [98ce8ba]
+- **Trang thai:** Thanh cong (34/34 Tests Passed)
+- **Cau hinh:** .NET 8 LTS (Release) + Standalone (Self-Contained win-x64)
+- **Duong dan chay:**
+  - Tieu chuan: `desktop/publish/ExamOperationsDesktop/ExamGenerator.Desktop.exe` (148.5 KB)
+  - Standalone: `desktop/publish/ExamOperationsDesktop-Standalone/ExamGenerator.Desktop.exe` (148.5 KB)
+- **Ghi chu thay doi:** Fix loi GO tach batch SQL lam mat du lieu thuc va ghi de gia tri mau cua template

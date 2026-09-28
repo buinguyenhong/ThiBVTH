@@ -726,3 +726,39 @@ Nhật ký ghi lại các thay đổi, quyết định thiết kế và tiến t
   * `desktop/publish/ExamOperationsDesktop/` (Báº£n tiÃªu chuáº©n)
   * `desktop/publish/ExamOperationsDesktop-Standalone/` (Báº£n Standalone win-x64)
 
+
+---
+
+## [2026-09-28] Khắc phục Lỗi Tách Batch SQL do Lệnh `GO` và Khớp Biến Regex CRLF
+
+### 1. Phân tích Nguyên nhân Gốc rễ:
+* **Lỗi Regex trên tệp định dạng Windows (CRLF):**
+  * Trong `SqlScriptGenerator.cs` (và `backend/sql_generator.py`), hàm `SetSqlVariable` dùng regex `(?m)^DECLARE\s+@{Regex.Escape(variableName)}\b[^\r\n]*$`.
+  * Trên Windows, dòng kết thúc bằng `\r\n`. Toán tử `[^\r\n]*` dừng lại trước ký tự `\r`, trong khi ký hiệu `$` trong .NET Regex chỉ khớp trước `\n` hoặc cuối chuỗi, không khớp trước `\r`.
+  * Do đó, `Regex.IsMatch` trả về `false` đối với **tất cả** các dòng khai báo trong tệp template!
+* **Hậu quả tách Batch do lệnh `GO`:**
+  * Do regex không match được dòng khai báo cũ để thay thế tại chỗ, `SetSqlVariable` chuyển sang cơ chế fallback: nối chuỗi `DECLARE @var ...` lên **đầu tệp tin** (trước cả khối `USE [eHospital_ThienHanh]; GO`).
+  * Khi thực thi trên SQL Server Management Studio:
+    1. **Batch 1 (trước `GO`):** Khai báo các biến với thông tin thật của thí sinh và bệnh nhân. Gặp lệnh `GO`, Batch 1 kết thúc -> **toàn bộ các biến trong Batch 1 bị hủy sạch khỏi bộ nhớ**.
+    2. **Batch 2 (sau `GO`):** Bắt đầu thực thi và gặp lại toàn bộ các dòng `DECLARE` nguyên bản của template mẫu: `@TenBenhNhan = N'TEST TIEP NHAN VAO KHOA'`, `@LoaiHoSo = 'VIEN_PHI'`, `@NgayGioNghiepVu = GETDATE()`, `@TenDangNhap = N'ANHPH'`.
+    3. Hậu quả: Dữ liệu thật không bao giờ được ghi nhận; hệ thống ghi nhận toàn bộ thông tin mẫu.
+    4. Validation không phát hiện được vì các giá trị mẫu đều tồn tại trong danh mục CSDL thật (User ANHPH, tỉnh Đắk Lắk, ICD R69...).
+
+### 2. Các Thay đổi & Giải pháp đã Thực hiện:
+1. **Sửa biểu thức Regex hỗ trợ triệt để CRLF:**
+   * Cập nhật pattern trong `SqlScriptGenerator.cs` và `backend/sql_generator.py` thành:
+     `(?m)^DECLARE\s+@{Regex.Escape(variableName)}\b[^\r\n]*\r?$`
+   * Đảm bảo thay thế chính xác 100% tại chỗ từng dòng `DECLARE` nằm trong phần `1. THAM SỐ CẦN ĐIỀN` sau lệnh `GO`.
+2. **Bảo vệ Vị trí Fallback khi biến chưa tồn tại trong Template:**
+   * Trong trường hợp một biến chưa có sẵn trong template, `SetSqlVariable` sẽ chèn biến vào ngay sau tiêu đề `/* 1. THAM SỐ CẦN ĐIỀN */` (sau `USE ... GO`), **tuyệt đối không chèn lên đầu tệp tin** trước lệnh `GO`.
+3. **Bổ sung Unit Test Khảo sát & Chặn Tái diễn:**
+   * Trong `ExamScenarioAllocatorTests.cs`, thêm kiểm tra khẳng định mã SQL sinh ra **không được phép chứa bất kỳ chuỗi giá trị mẫu nào**:
+     * `Assert.DoesNotContain("TEST TIEP NHAN VAO KHOA", sql);`
+     * `Assert.DoesNotContain("TEST CHỈ ĐỊNH VÀO KHOA", sql);`
+
+### 3. Kết quả Kiểm thử & Đóng gói:
+* Toàn bộ **37/37 Unit Tests PASSED (100%)**.
+* Đóng gói lại thành công cả 2 bản Release (Framework-dependent và Standalone) tại:
+  * `desktop/publish/ExamOperationsDesktop/`
+  * `desktop/publish/ExamOperationsDesktop-Standalone/`
+* Lịch sử build tự động cập nhật trong `BUILD_HISTORY.md`.

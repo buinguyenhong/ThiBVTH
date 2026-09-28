@@ -92,7 +92,7 @@ def _province_and_house(address: Any) -> tuple[str, str]:
 
 
 def _set_declaration(script: str, variable: str, sql_type: str, expression: str) -> str:
-    pattern = rf"(?m)^DECLARE @{re.escape(variable)}\b[^\r\n]*$"
+    pattern = rf"(?m)^DECLARE @{re.escape(variable)}\b[^\r\n]*\r?$"
     replacement = f"DECLARE @{variable} {sql_type} = {expression};"
     updated, count = re.subn(pattern, lambda m: replacement, script, count=1)
     if count != 1:

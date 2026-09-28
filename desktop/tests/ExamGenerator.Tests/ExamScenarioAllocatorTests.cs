@@ -203,6 +203,8 @@ public class ExamScenarioAllocatorTests : IDisposable
         Assert.Contains("SERVER THI", sql);
         Assert.Contains("66232", sql);
         Assert.Contains(scenario.SecondPatient.FullName, sql);
+        Assert.DoesNotContain("TEST TIEP NHAN VAO KHOA", sql);
+        Assert.DoesNotContain("TEST CHỈ ĐỊNH VÀO KHOA", sql);
 
         // 3. Test Word generation
         var wordGen = new WordExamWriter();

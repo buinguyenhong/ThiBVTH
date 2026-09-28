@@ -122,12 +122,24 @@ public sealed class SqlScriptGenerator
 
     private static string SetSqlVariable(string script, string variableName, string dataType, string valueExpression)
     {
-        var pattern = $@"(?m)^DECLARE\s+@{Regex.Escape(variableName)}\b[^\r\n]*$";
+        var pattern = $@"(?m)^DECLARE\s+@{Regex.Escape(variableName)}\b[^\r\n]*\r?$";
         var replacement = $"DECLARE @{variableName} {dataType} = {valueExpression};";
         if (Regex.IsMatch(script, pattern))
         {
             return Regex.Replace(script, pattern, replacement, RegexOptions.None);
         }
+
+        const string marker = "/* =========================================================================\r\n   1. THAM SỐ CẦN ĐIỀN\r\n   ========================================================================= */";
+        const string markerAlt = "/* =========================================================================\n   1. THAM SỐ CẦN ĐIỀN\n   ========================================================================= */";
+        if (script.Contains(marker))
+        {
+            return script.Replace(marker, marker + "\r\n" + replacement);
+        }
+        if (script.Contains(markerAlt))
+        {
+            return script.Replace(markerAlt, markerAlt + "\n" + replacement);
+        }
+
         return $"DECLARE @{variableName} {dataType} = {valueExpression};\r\n" + script;
     }
 
