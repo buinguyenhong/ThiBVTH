@@ -2,6 +2,54 @@
 
 Nhật ký ghi lại các thay đổi, quyết định thiết kế và tiến trình thực thi của Antigravity Coding Assistant trong suốt phiên làm việc.
 
+## [2026-10-16] Tích hợp Danh mục Ca bệnh nội trú, Bệnh án ngoại trú & Mẫu đề Lễ tân - Thu phí (7 câu, 10.0đ)
+
+### 1. Nhu cầu & Thiết kế nghiệp vụ (Dựa trên tài liệu đề thực tế `LeTan_TP_11.doc`):
+* **Tích hợp 2 Danh mục Ca bệnh mới từ eHospital:**
+  - **Ca bệnh nội trú đang nằm viện (`SnapshotInpatientCase`):** Bốc tự động bằng query chuẩn `sp_VIENPHINOITRU` (lọc `ba.NgayRaVien IS NULL`, kết hợp subquery lấy buồng/giường/phòng mới nhất từ `NoiTru_LuuTruChiTiet` + `DM_GiuongBenh` + `DM_PhongBan`).
+  - **Bệnh án ngoại trú đang điều trị (`SnapshotOutpatientCase`):** Bốc tự động bằng query chuẩn `sp_HOADON` từ bảng `BenhAnNgoaiTru` (lọc `bant.NgayRaVien IS NULL`, không áp bộ lọc ngày để bao quát toàn bộ ~3.164 hồ sơ ngoại trú điều trị dài ngày).
+* **Quyển hóa đơn `THI` & `VAT_THI`:**
+  - Thể hiện rõ trong nội dung văn bản đề bài câu hỏi và ghi chú chân trang, không tạo thêm cấu hình phức tạp.
+* **7 nghiệp vụ khảo thí Lễ tân - Thu phí (`SystemActionCatalog`):**
+  1. `LT_BAN_PHIEU_KHAM` (1.0đ): Tiếp nhận & bán phiếu khám bệnh (01 BN viện phí, 01 BN BHYT).
+  2. `LT_THU_PHI_VA_CLS` (2.0đ): Thu phí khám, tạo chỉ định và thu tiền CLS, in hoá đơn quyển THI/VAT_THI.
+  3. `LT_THU_TAM_UNG_NOI_TRU` (2.0đ): Thu tạm ứng bệnh nhân nội trú đang nằm viện (bốc tự động từ snapshot).
+  4. `LT_DOI_DICH_VU_CLS` (1.0đ): Hủy và đổi dịch vụ cận lâm sàng.
+  5. `LT_TRA_CUU_THONG_TIN` (2.0đ): Tra cứu thông tin buồng giường bệnh nhân nội trú đang nằm viện hoặc ngoại trú (buồng, giường, ngày vào, tạm ứng đã nộp...).
+  6. `LT_THANH_TOAN_RA_VIEN` (1.0đ): Thu tiền thanh toán ra viện cho ca nội trú.
+  7. `LT_TAO_THE_TAM_BHYT` (1.0đ): Tạo mã thẻ BHYT tạm cho trẻ em / người chưa có thẻ.
+* **Mẫu đề mặc định mới:** `tpl-lt-thuphi` ("Đề Lễ tân - Thu phí phòng khám (7 câu)"), tổng điểm chuẩn 10.0đ.
+
+### 2. Cải tiến Xuất Đề thi & Bảng Đáp án Chấm thi:
+* **Tự động xuất tệp Bảng Đáp án & Dữ liệu đối soát chấm thi:**
+  - Định dạng: `_DapAn_CoiThi_ChamThi_{batchName}_{date}.docx` (A4 ngang, bảng biểu chi tiết từng thí sinh, User HIS, chi tiết dữ liệu kiểm tra từng câu hỏi).
+  - Giúp hội đồng thi/giám khảo kiểm tra nhanh chóng trên hệ thống eHospital mà không cần mở từng đề thi riêng lẻ.
+* **Hỗ trợ định dạng đề thi Word chuẩn:**
+  - Hỗ trợ ký hiệu mục `©` thụt lề chuẩn.
+  - Ghi chú chân trang nhắc nhở thí sinh về quyển hoá đơn `THI` / `VAT_THI`.
+* **Đánh dấu bệnh nhân đã thi (`MarkPatientUsedAsync`):**
+  - Áp dụng cho cả ca bệnh nội trú và ngoại trú được phân bổ vào các câu tạm ứng, tra cứu, thanh toán ra viện.
+
+### 3. Tinh chỉnh Đề thi Lễ tân - Thu phí & Nâng cấp Đồng bộ Dữ liệu:
+* **Câu 1 (Bán phiếu khám / Tiếp nhận):**
+  - Cung cấp đầy đủ thông tin hành chính cho cả 2 bệnh nhân (1 BN Viện phí, 1 BN BHYT: Họ tên, Giới tính, Năm sinh, Địa chỉ, Số thẻ BHYT...).
+* **Câu 3 (Thu tạm ứng):**
+  - Phân bổ chuẩn xác 2 ca bệnh: 1 ca **Nội trú** (từ `allInpatients`, số BA eHospital như `21.004865`, 1.500.000đ) và 1 ca **Bệnh án Ngoại trú** (từ `allOutpatients`, số BA eHospital như `21001726/NG`, 500.000đ).
+  - Bổ sung trường `AdvancePaymentOutpatientCase` vào `ExamScenario`, `ExamScenarioAllocator`, `WordExamWriter` và `MainWindow.xaml.cs` (đánh dấu đã sử dụng).
+* **Câu 7 (Tạo mã thẻ tạm BHYT):**
+  - Ngày sinh của bệnh nhân tự động lùi đúng 1 tháng so với ngày thi (ví dụ thi 16/10 thì ngày sinh thẻ tạm là 16/09).
+* **Gỡ bỏ giới hạn số lượng bệnh nhân (Bỏ TOP 500):**
+  - Gỡ bỏ hoàn toàn `TOP (500)` ở truy vấn `inpatientsQuery` và `outpatientsQuery` để nạp trọn vẹn toàn bộ bệnh nhân đang nằm viện/điều trị thực tế (`NgayRaVien IS NULL`).
+  - Tăng giới hạn `patientsQuery` từ `TOP (300)` lên `TOP (2500)` cho mỗi nhóm (BHYT & Viện phí, tổng 5.000 bệnh nhân dự trữ cho tiếp nhận).
+
+### 4. Giao diện WPF & Kiểm thử:
+* Thêm 2 Dashboard Card tại Tab 4: Ca bệnh nội trú và Bệnh án ngoại trú.
+* Tự động làm mới số lượng snapshot và báo cáo sau khi đồng bộ HIS.
+* Toàn bộ **38/38 unit tests PASSED 100%**.
+* Đóng gói bản phát hành thành công cả 2 bản: Bản Tiêu chuẩn (`ExamOperationsDesktop`) và Bản Standalone win-x64 (`ExamOperationsDesktop-Standalone`).
+
+---
+
 ## [2026-09-23] Khắc phục Lịch sử Sinh Đề, Cách ly Thư mục data/ & Bổ sung Câu hỏi Tra cứu Thanh toán
 
 ### 1. Khắc phục Lỗi "Lịch sử tạo đề chưa được lưu":

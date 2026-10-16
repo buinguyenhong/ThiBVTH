@@ -134,6 +134,54 @@ public sealed class SqliteDatabase
                 IsBuiltIn INTEGER NOT NULL DEFAULT 0,
                 CreatedAt TEXT NOT NULL
             );
+            CREATE TABLE IF NOT EXISTS SnapshotInpatientCase (
+                BenhAnId TEXT PRIMARY KEY NOT NULL,
+                SoBenhAn TEXT NOT NULL,
+                MedicalCode TEXT NOT NULL,
+                FullName TEXT NOT NULL,
+                Gender TEXT NOT NULL,
+                DateOfBirth TEXT NOT NULL,
+                Address TEXT NULL,
+                DepartmentCode TEXT NOT NULL,
+                DepartmentName TEXT NOT NULL,
+                RoomCode TEXT NULL,
+                RoomName TEXT NULL,
+                BedCode TEXT NULL,
+                Floor TEXT NULL,
+                AdmissionDate TEXT NOT NULL,
+                AdmissionTime TEXT NULL,
+                BedInTime TEXT NULL,
+                DepartmentInDate TEXT NULL,
+                DaysInHospital INTEGER NOT NULL,
+                InsuranceNumber TEXT NULL,
+                Diagnosis TEXT NULL,
+                DoctorName TEXT NULL
+            );
+            CREATE INDEX IF NOT EXISTS IX_Inpatient_Dept ON SnapshotInpatientCase(DepartmentCode, DepartmentName);
+
+            CREATE TABLE IF NOT EXISTS SnapshotOutpatientCase (
+                BenhAnNgoaiTruId TEXT PRIMARY KEY NOT NULL,
+                SoBenhAn TEXT NOT NULL,
+                SoLuuTru TEXT NULL,
+                MedicalCode TEXT NOT NULL,
+                FullName TEXT NOT NULL,
+                Gender TEXT NOT NULL,
+                DateOfBirth TEXT NOT NULL,
+                Address TEXT NULL,
+                DepartmentCode TEXT NOT NULL,
+                DepartmentName TEXT NOT NULL,
+                RoomCode TEXT NULL,
+                RoomName TEXT NULL,
+                BedCode TEXT NULL,
+                TreatmentFromDate TEXT NULL,
+                TreatmentToDate TEXT NULL,
+                AdmissionDate TEXT NOT NULL,
+                DaysInTreatment INTEGER NOT NULL,
+                InsuranceNumber TEXT NULL,
+                Diagnosis TEXT NULL,
+                DoctorName TEXT NULL
+            );
+            CREATE INDEX IF NOT EXISTS IX_Outpatient_Dept ON SnapshotOutpatientCase(DepartmentCode, DepartmentName);
             """;
         await command.ExecuteNonQueryAsync(cancellationToken);
 
@@ -226,7 +274,8 @@ public sealed class SqliteDatabase
             "('tpl-kkb','Đề Lễ tân phòng khám / Tiếp đón','Khoa Khám bệnh','Lễ tân',5,10,'DirectReception',$at), " +
             "('tpl-ktv-xn','Đề Kỹ thuật viên Xét nghiệm','Khoa Xét Nghiệm','Kỹ thuật viên',2,10,'WardAdmissionPreparation',$at), " +
             "('tpl-ktv-cdha','Đề Kỹ thuật viên Chẩn đoán hình ảnh','Khoa Chẩn đoán hình ảnh','Kỹ thuật viên',2,10,'WardAdmissionPreparation',$at), " +
-            "('tpl-thu-ngan','Đề Thu ngân Quầy viện phí','Phòng Tài chính kế toán','Thu ngân',3,10,'DirectReception',$at)";
+            "('tpl-thu-ngan','Đề Thu ngân Quầy viện phí','Phòng Tài chính kế toán','Thu ngân',3,10,'DirectReception',$at), " +
+            "('tpl-lt-thuphi','Đề Lễ tân - Thu phí phòng khám (7 câu)','Khoa Khám bệnh','Lễ tân',7,10,'DirectReception',$at)";
         command.Parameters.AddWithValue("$at", DateTimeOffset.Now.ToString("O"));
         await command.ExecuteNonQueryAsync(cancellationToken);
 
@@ -300,7 +349,14 @@ public sealed class SqliteDatabase
             ('tpl-ktv-cdha','TK_KIEM_TON_KHO','Kiểm tra tồn phim/vật tư',3),
             ('tpl-thu-ngan','TC_THU_TAM_UNG','Thu tạm ứng viện phí',4),
             ('tpl-thu-ngan','TC_THANH_TOAN_RA_VIEN','Thanh toán ra viện',4),
-            ('tpl-thu-ngan','TK_KIEM_TON_KHO','Kiểm tra biên lai/ấn chỉ',2);
+            ('tpl-thu-ngan','TK_KIEM_TON_KHO','Kiểm tra biên lai/ấn chỉ',2),
+            ('tpl-lt-thuphi','LT_BAN_PHIEU_KHAM','Tiếp nhận & bán phiếu khám',1),
+            ('tpl-lt-thuphi','LT_THU_PHI_VA_CLS','Thu phí khám & tạo/thu phí CLS',2),
+            ('tpl-lt-thuphi','LT_THU_TAM_UNG_NOI_TRU','Thu tạm ứng nội trú',2),
+            ('tpl-lt-thuphi','LT_DOI_DICH_VU_CLS','Hủy và đổi dịch vụ CLS',1),
+            ('tpl-lt-thuphi','LT_TRA_CUU_THONG_TIN','Tra cứu buồng giường & lịch sử KCB',2),
+            ('tpl-lt-thuphi','LT_THANH_TOAN_RA_VIEN','Thu thanh toán ra viện',1),
+            ('tpl-lt-thuphi','LT_TAO_THE_TAM_BHYT','Tạo mã thẻ BHYT tạm trẻ em',1);
             """;
         await actions.ExecuteNonQueryAsync(cancellationToken);
     }
@@ -791,6 +847,14 @@ public sealed class SqliteDatabase
         var uCount = Convert.ToInt32(await uCmd.ExecuteScalarAsync(cancellationToken) ?? 0);
         result.Add(("Users", uCount));
 
+        var inpCmd = connection.CreateCommand(); inpCmd.CommandText = "SELECT COUNT(*) FROM SnapshotInpatientCase";
+        var inpCount = Convert.ToInt32(await inpCmd.ExecuteScalarAsync(cancellationToken) ?? 0);
+        result.Add(("Inpatients", inpCount));
+
+        var outCmd = connection.CreateCommand(); outCmd.CommandText = "SELECT COUNT(*) FROM SnapshotOutpatientCase";
+        var outCount = Convert.ToInt32(await outCmd.ExecuteScalarAsync(cancellationToken) ?? 0);
+        result.Add(("Outpatients", outCount));
+
         return result;
     }
 
@@ -1124,8 +1188,299 @@ public sealed class SqliteDatabase
         await file.ExecuteNonQueryAsync(cancellationToken);
         await transaction.CommitAsync(cancellationToken);
     }
+
+    public async Task ReplaceSnapshotInpatientsAsync(IReadOnlyList<SnapshotInpatientRow> inpatients, CancellationToken cancellationToken = default)
+    {
+        await using var connection = new SqliteConnection($"Data Source={DatabasePath}");
+        await connection.OpenAsync(cancellationToken);
+        await using var transaction = connection.BeginTransaction();
+        var clear = connection.CreateCommand();
+        clear.Transaction = transaction;
+        clear.CommandText = "DELETE FROM SnapshotInpatientCase";
+        await clear.ExecuteNonQueryAsync(cancellationToken);
+
+        foreach (var p in inpatients)
+        {
+            var insert = connection.CreateCommand();
+            insert.Transaction = transaction;
+            insert.CommandText = """
+                INSERT OR REPLACE INTO SnapshotInpatientCase (
+                    BenhAnId, SoBenhAn, MedicalCode, FullName, Gender, DateOfBirth, Address,
+                    DepartmentCode, DepartmentName, RoomCode, RoomName, BedCode, Floor,
+                    AdmissionDate, AdmissionTime, BedInTime, DepartmentInDate, DaysInHospital,
+                    InsuranceNumber, Diagnosis, DoctorName
+                ) VALUES (
+                    $baId, $soBa, $med, $name, $gender, $dob, $addr,
+                    $deptCode, $deptName, $roomCode, $roomName, $bedCode, $floor,
+                    $admDate, $admTime, $bedTime, $deptDate, $days,
+                    $ins, $diag, $doc
+                )
+            """;
+            insert.Parameters.AddWithValue("$baId", p.BenhAnId);
+            insert.Parameters.AddWithValue("$soBa", p.SoBenhAn);
+            insert.Parameters.AddWithValue("$med", p.MedicalCode);
+            insert.Parameters.AddWithValue("$name", p.FullName);
+            insert.Parameters.AddWithValue("$gender", p.Gender);
+            insert.Parameters.AddWithValue("$dob", p.DateOfBirth);
+            insert.Parameters.AddWithValue("$addr", (object?)p.Address ?? DBNull.Value);
+            insert.Parameters.AddWithValue("$deptCode", p.DepartmentCode);
+            insert.Parameters.AddWithValue("$deptName", p.DepartmentName);
+            insert.Parameters.AddWithValue("$roomCode", (object?)p.RoomCode ?? DBNull.Value);
+            insert.Parameters.AddWithValue("$roomName", (object?)p.RoomName ?? DBNull.Value);
+            insert.Parameters.AddWithValue("$bedCode", (object?)p.BedCode ?? DBNull.Value);
+            insert.Parameters.AddWithValue("$floor", (object?)p.Floor ?? DBNull.Value);
+            insert.Parameters.AddWithValue("$admDate", p.AdmissionDate);
+            insert.Parameters.AddWithValue("$admTime", (object?)p.AdmissionTime ?? DBNull.Value);
+            insert.Parameters.AddWithValue("$bedTime", (object?)p.BedInTime ?? DBNull.Value);
+            insert.Parameters.AddWithValue("$deptDate", (object?)p.DepartmentInDate ?? DBNull.Value);
+            insert.Parameters.AddWithValue("$days", p.DaysInHospital);
+            insert.Parameters.AddWithValue("$ins", (object?)p.InsuranceNumber ?? DBNull.Value);
+            insert.Parameters.AddWithValue("$diag", (object?)p.Diagnosis ?? DBNull.Value);
+            insert.Parameters.AddWithValue("$doc", (object?)p.DoctorName ?? DBNull.Value);
+            await insert.ExecuteNonQueryAsync(cancellationToken);
+        }
+        await transaction.CommitAsync(cancellationToken);
+    }
+
+    public async Task ReplaceSnapshotOutpatientsAsync(IReadOnlyList<SnapshotOutpatientRow> outpatients, CancellationToken cancellationToken = default)
+    {
+        await using var connection = new SqliteConnection($"Data Source={DatabasePath}");
+        await connection.OpenAsync(cancellationToken);
+        await using var transaction = connection.BeginTransaction();
+        var clear = connection.CreateCommand();
+        clear.Transaction = transaction;
+        clear.CommandText = "DELETE FROM SnapshotOutpatientCase";
+        await clear.ExecuteNonQueryAsync(cancellationToken);
+
+        foreach (var p in outpatients)
+        {
+            var insert = connection.CreateCommand();
+            insert.Transaction = transaction;
+            insert.CommandText = """
+                INSERT OR REPLACE INTO SnapshotOutpatientCase (
+                    BenhAnNgoaiTruId, SoBenhAn, SoLuuTru, MedicalCode, FullName, Gender, DateOfBirth, Address,
+                    DepartmentCode, DepartmentName, RoomCode, RoomName, BedCode,
+                    TreatmentFromDate, TreatmentToDate, AdmissionDate, DaysInTreatment,
+                    InsuranceNumber, Diagnosis, DoctorName
+                ) VALUES (
+                    $baId, $soBa, $soLt, $med, $name, $gender, $dob, $addr,
+                    $deptCode, $deptName, $roomCode, $roomName, $bedCode,
+                    $fromD, $toD, $admDate, $days,
+                    $ins, $diag, $doc
+                )
+            """;
+            insert.Parameters.AddWithValue("$baId", p.BenhAnNgoaiTruId);
+            insert.Parameters.AddWithValue("$soBa", p.SoBenhAn);
+            insert.Parameters.AddWithValue("$soLt", (object?)p.SoLuuTru ?? DBNull.Value);
+            insert.Parameters.AddWithValue("$med", p.MedicalCode);
+            insert.Parameters.AddWithValue("$name", p.FullName);
+            insert.Parameters.AddWithValue("$gender", p.Gender);
+            insert.Parameters.AddWithValue("$dob", p.DateOfBirth);
+            insert.Parameters.AddWithValue("$addr", (object?)p.Address ?? DBNull.Value);
+            insert.Parameters.AddWithValue("$deptCode", p.DepartmentCode);
+            insert.Parameters.AddWithValue("$deptName", p.DepartmentName);
+            insert.Parameters.AddWithValue("$roomCode", (object?)p.RoomCode ?? DBNull.Value);
+            insert.Parameters.AddWithValue("$roomName", (object?)p.RoomName ?? DBNull.Value);
+            insert.Parameters.AddWithValue("$bedCode", (object?)p.BedCode ?? DBNull.Value);
+            insert.Parameters.AddWithValue("$fromD", (object?)p.TreatmentFromDate ?? DBNull.Value);
+            insert.Parameters.AddWithValue("$toD", (object?)p.TreatmentToDate ?? DBNull.Value);
+            insert.Parameters.AddWithValue("$admDate", p.AdmissionDate);
+            insert.Parameters.AddWithValue("$days", p.DaysInTreatment);
+            insert.Parameters.AddWithValue("$ins", (object?)p.InsuranceNumber ?? DBNull.Value);
+            insert.Parameters.AddWithValue("$diag", (object?)p.Diagnosis ?? DBNull.Value);
+            insert.Parameters.AddWithValue("$doc", (object?)p.DoctorName ?? DBNull.Value);
+            await insert.ExecuteNonQueryAsync(cancellationToken);
+        }
+        await transaction.CommitAsync(cancellationToken);
+    }
+
+    public async Task<IReadOnlyList<SnapshotInpatientRow>> GetAvailableInpatientsAsync(string? departmentName = null, CancellationToken cancellationToken = default)
+    {
+        var rows = new List<SnapshotInpatientRow>();
+        await using var connection = new SqliteConnection($"Data Source={DatabasePath}");
+        await connection.OpenAsync(cancellationToken);
+        var command = connection.CreateCommand();
+        if (string.IsNullOrWhiteSpace(departmentName))
+        {
+            command.CommandText = """
+                SELECT BenhAnId, SoBenhAn, MedicalCode, FullName, Gender, DateOfBirth, Address,
+                       DepartmentCode, DepartmentName, RoomCode, RoomName, BedCode, Floor,
+                       AdmissionDate, AdmissionTime, BedInTime, DepartmentInDate, DaysInHospital,
+                       InsuranceNumber, Diagnosis, DoctorName
+                FROM SnapshotInpatientCase
+                ORDER BY AdmissionDate DESC, BenhAnId DESC
+            """;
+        }
+        else
+        {
+            command.CommandText = """
+                SELECT BenhAnId, SoBenhAn, MedicalCode, FullName, Gender, DateOfBirth, Address,
+                       DepartmentCode, DepartmentName, RoomCode, RoomName, BedCode, Floor,
+                       AdmissionDate, AdmissionTime, BedInTime, DepartmentInDate, DaysInHospital,
+                       InsuranceNumber, Diagnosis, DoctorName
+                FROM SnapshotInpatientCase
+                WHERE DepartmentName LIKE $deptName
+                ORDER BY AdmissionDate DESC, BenhAnId DESC
+            """;
+            command.Parameters.AddWithValue("$deptName", "%" + departmentName.Trim() + "%");
+        }
+
+        await using var reader = await command.ExecuteReaderAsync(cancellationToken);
+        while (await reader.ReadAsync(cancellationToken))
+        {
+            rows.Add(new SnapshotInpatientRow(
+                reader.GetString(0),
+                reader.GetString(1),
+                reader.GetString(2),
+                reader.GetString(3),
+                reader.GetString(4),
+                reader.GetString(5),
+                reader.IsDBNull(6) ? null : reader.GetString(6),
+                reader.GetString(7),
+                reader.GetString(8),
+                reader.IsDBNull(9) ? null : reader.GetString(9),
+                reader.IsDBNull(10) ? null : reader.GetString(10),
+                reader.IsDBNull(11) ? null : reader.GetString(11),
+                reader.IsDBNull(12) ? null : reader.GetString(12),
+                reader.GetString(13),
+                reader.IsDBNull(14) ? null : reader.GetString(14),
+                reader.IsDBNull(15) ? null : reader.GetString(15),
+                reader.IsDBNull(16) ? null : reader.GetString(16),
+                reader.GetInt32(17),
+                reader.IsDBNull(18) ? null : reader.GetString(18),
+                reader.IsDBNull(19) ? null : reader.GetString(19),
+                reader.IsDBNull(20) ? null : reader.GetString(20)
+            ));
+        }
+        return rows;
+    }
+
+    public async Task<IReadOnlyList<SnapshotOutpatientRow>> GetAvailableOutpatientsAsync(string? departmentName = null, CancellationToken cancellationToken = default)
+    {
+        var rows = new List<SnapshotOutpatientRow>();
+        await using var connection = new SqliteConnection($"Data Source={DatabasePath}");
+        await connection.OpenAsync(cancellationToken);
+        var command = connection.CreateCommand();
+        if (string.IsNullOrWhiteSpace(departmentName))
+        {
+            command.CommandText = """
+                SELECT BenhAnNgoaiTruId, SoBenhAn, SoLuuTru, MedicalCode, FullName, Gender, DateOfBirth, Address,
+                       DepartmentCode, DepartmentName, RoomCode, RoomName, BedCode,
+                       TreatmentFromDate, TreatmentToDate, AdmissionDate, DaysInTreatment,
+                       InsuranceNumber, Diagnosis, DoctorName
+                FROM SnapshotOutpatientCase
+                ORDER BY AdmissionDate DESC, BenhAnNgoaiTruId DESC
+            """;
+        }
+        else
+        {
+            command.CommandText = """
+                SELECT BenhAnNgoaiTruId, SoBenhAn, SoLuuTru, MedicalCode, FullName, Gender, DateOfBirth, Address,
+                       DepartmentCode, DepartmentName, RoomCode, RoomName, BedCode,
+                       TreatmentFromDate, TreatmentToDate, AdmissionDate, DaysInTreatment,
+                       InsuranceNumber, Diagnosis, DoctorName
+                FROM SnapshotOutpatientCase
+                WHERE DepartmentName LIKE $deptName
+                ORDER BY AdmissionDate DESC, BenhAnNgoaiTruId DESC
+            """;
+            command.Parameters.AddWithValue("$deptName", "%" + departmentName.Trim() + "%");
+        }
+
+        await using var reader = await command.ExecuteReaderAsync(cancellationToken);
+        while (await reader.ReadAsync(cancellationToken))
+        {
+            rows.Add(new SnapshotOutpatientRow(
+                reader.GetString(0),
+                reader.GetString(1),
+                reader.IsDBNull(2) ? null : reader.GetString(2),
+                reader.GetString(3),
+                reader.GetString(4),
+                reader.GetString(5),
+                reader.GetString(6),
+                reader.IsDBNull(7) ? null : reader.GetString(7),
+                reader.GetString(8),
+                reader.GetString(9),
+                reader.IsDBNull(10) ? null : reader.GetString(10),
+                reader.IsDBNull(11) ? null : reader.GetString(11),
+                reader.IsDBNull(12) ? null : reader.GetString(12),
+                reader.IsDBNull(13) ? null : reader.GetString(13),
+                reader.IsDBNull(14) ? null : reader.GetString(14),
+                reader.GetString(15),
+                reader.GetInt32(16),
+                reader.IsDBNull(17) ? null : reader.GetString(17),
+                reader.IsDBNull(18) ? null : reader.GetString(18),
+                reader.IsDBNull(19) ? null : reader.GetString(19)
+            ));
+        }
+        return rows;
+    }
+
+    public async Task<int> GetInpatientCountAsync(CancellationToken cancellationToken = default)
+    {
+        await using var connection = new SqliteConnection($"Data Source={DatabasePath}");
+        await connection.OpenAsync(cancellationToken);
+        var command = connection.CreateCommand();
+        command.CommandText = "SELECT COUNT(*) FROM SnapshotInpatientCase";
+        var val = await command.ExecuteScalarAsync(cancellationToken);
+        return Convert.ToInt32(val);
+    }
+
+    public async Task<int> GetOutpatientCountAsync(CancellationToken cancellationToken = default)
+    {
+        await using var connection = new SqliteConnection($"Data Source={DatabasePath}");
+        await connection.OpenAsync(cancellationToken);
+        var command = connection.CreateCommand();
+        command.CommandText = "SELECT COUNT(*) FROM SnapshotOutpatientCase";
+        var val = await command.ExecuteScalarAsync(cancellationToken);
+        return Convert.ToInt32(val);
+    }
 }
 
 public sealed record SnapshotUserRow(string UserId, string UserName, string FullName, string DepartmentCode, string DepartmentName);
 public sealed record SnapshotDrugRow(string DrugId, string DrugCode, string DrugName, string Unit, string WarehouseCode, string WarehouseName, string FundingSource, double QuantityOnHand, string? DepartmentCode = null, string? DepartmentName = null);
 public sealed record SnapshotPatientRow(string PatientId, string MedicalCode, string FullName, string DateOfBirth, string Gender, string Address, string? InsuranceNumber, string Diagnosis, string PaymentType);
+
+public sealed record SnapshotInpatientRow(
+    string BenhAnId,
+    string SoBenhAn,
+    string MedicalCode,
+    string FullName,
+    string Gender,
+    string DateOfBirth,
+    string? Address,
+    string DepartmentCode,
+    string DepartmentName,
+    string? RoomCode,
+    string? RoomName,
+    string? BedCode,
+    string? Floor,
+    string AdmissionDate,
+    string? AdmissionTime,
+    string? BedInTime,
+    string? DepartmentInDate,
+    int DaysInHospital,
+    string? InsuranceNumber,
+    string? Diagnosis,
+    string? DoctorName);
+
+public sealed record SnapshotOutpatientRow(
+    string BenhAnNgoaiTruId,
+    string SoBenhAn,
+    string? SoLuuTru,
+    string MedicalCode,
+    string FullName,
+    string Gender,
+    string DateOfBirth,
+    string? Address,
+    string DepartmentCode,
+    string DepartmentName,
+    string? RoomCode,
+    string? RoomName,
+    string? BedCode,
+    string? TreatmentFromDate,
+    string? TreatmentToDate,
+    string AdmissionDate,
+    int DaysInTreatment,
+    string? InsuranceNumber,
+    string? Diagnosis,
+    string? DoctorName);

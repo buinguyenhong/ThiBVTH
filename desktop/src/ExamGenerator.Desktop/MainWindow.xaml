@@ -518,37 +518,55 @@
                                 <ColumnDefinition Width="*"/>
                                 <ColumnDefinition Width="*"/>
                                 <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="*"/>
                             </Grid.ColumnDefinitions>
                             <!-- Card 1 -->
-                            <Border Style="{StaticResource CardBorder}" Margin="0,0,6,0">
+                            <Border Style="{StaticResource CardBorder}" Margin="0,0,4,0">
                                 <StackPanel>
                                     <TextBlock Text="Khoa / Phòng" Foreground="{StaticResource TextSecondary}" FontSize="12"/>
-                                    <TextBlock x:Name="CardDeptCount" Text="6" FontSize="22" FontWeight="Bold" Foreground="{StaticResource BrandTeal}"/>
-                                    <TextBlock Text="Snapshot đầy đủ" Foreground="{StaticResource SuccessGreen}" FontSize="11"/>
+                                    <TextBlock x:Name="CardDeptCount" Text="6" FontSize="20" FontWeight="Bold" Foreground="{StaticResource BrandTeal}"/>
+                                    <TextBlock Text="Snapshot đầy đủ" Foreground="{StaticResource SuccessGreen}" FontSize="10"/>
                                 </StackPanel>
                             </Border>
                             <!-- Card 2 -->
-                            <Border Grid.Column="1" Style="{StaticResource CardBorder}" Margin="6,0">
+                            <Border Grid.Column="1" Style="{StaticResource CardBorder}" Margin="4,0">
                                 <StackPanel>
                                     <TextBlock Text="Kho Dược / Tủ trực" Foreground="{StaticResource TextSecondary}" FontSize="12"/>
-                                    <TextBlock x:Name="CardWhCount" Text="6" FontSize="22" FontWeight="Bold" Foreground="{StaticResource BrandCyan}"/>
-                                    <TextBlock Text="Đã map 1:1" Foreground="{StaticResource SuccessGreen}" FontSize="11"/>
+                                    <TextBlock x:Name="CardWhCount" Text="6" FontSize="20" FontWeight="Bold" Foreground="{StaticResource BrandCyan}"/>
+                                    <TextBlock Text="Đã map 1:1" Foreground="{StaticResource SuccessGreen}" FontSize="10"/>
                                 </StackPanel>
                             </Border>
                             <!-- Card 3 -->
-                            <Border Grid.Column="2" Style="{StaticResource CardBorder}" Margin="6,0">
+                            <Border Grid.Column="2" Style="{StaticResource CardBorder}" Margin="4,0">
                                 <StackPanel>
-                                    <TextBlock Text="Thuốc &amp; VTYT có tồn" Foreground="{StaticResource TextSecondary}" FontSize="12"/>
-                                    <TextBlock x:Name="CardDrugCount" Text="16" FontSize="22" FontWeight="Bold" Foreground="{StaticResource BrandTeal}"/>
-                                    <TextBlock Text="Tồn kho dương" Foreground="{StaticResource SuccessGreen}" FontSize="11"/>
+                                    <TextBlock Text="Thuốc &amp; VTYT" Foreground="{StaticResource TextSecondary}" FontSize="12"/>
+                                    <TextBlock x:Name="CardDrugCount" Text="16" FontSize="20" FontWeight="Bold" Foreground="{StaticResource BrandTeal}"/>
+                                    <TextBlock Text="Tồn kho dương" Foreground="{StaticResource SuccessGreen}" FontSize="10"/>
                                 </StackPanel>
                             </Border>
                             <!-- Card 4 -->
-                            <Border Grid.Column="3" Style="{StaticResource CardBorder}" Margin="6,0,0,0">
+                            <Border Grid.Column="3" Style="{StaticResource CardBorder}" Margin="4,0">
                                 <StackPanel>
                                     <TextBlock Text="User HIS Khảo thí" Foreground="{StaticResource TextSecondary}" FontSize="12"/>
-                                    <TextBlock x:Name="CardUserCount" Text="16" FontSize="22" FontWeight="Bold" Foreground="{StaticResource BrandNavy}"/>
-                                    <TextBlock Text="Đủ phân bổ đợt thi" Foreground="{StaticResource SuccessGreen}" FontSize="11"/>
+                                    <TextBlock x:Name="CardUserCount" Text="16" FontSize="20" FontWeight="Bold" Foreground="{StaticResource BrandNavy}"/>
+                                    <TextBlock Text="Đủ phân bổ đợt thi" Foreground="{StaticResource SuccessGreen}" FontSize="10"/>
+                                </StackPanel>
+                            </Border>
+                            <!-- Card 5 -->
+                            <Border Grid.Column="4" Style="{StaticResource CardBorder}" Margin="4,0">
+                                <StackPanel>
+                                    <TextBlock Text="Ca bệnh nội trú" Foreground="{StaticResource TextSecondary}" FontSize="12"/>
+                                    <TextBlock x:Name="CardInpatientCount" Text="0" FontSize="20" FontWeight="Bold" Foreground="{StaticResource BrandCyan}"/>
+                                    <TextBlock Text="Đang nằm viện" Foreground="{StaticResource SuccessGreen}" FontSize="10"/>
+                                </StackPanel>
+                            </Border>
+                            <!-- Card 6 -->
+                            <Border Grid.Column="5" Style="{StaticResource CardBorder}" Margin="4,0,0,0">
+                                <StackPanel>
+                                    <TextBlock Text="Bệnh án ngoại trú" Foreground="{StaticResource TextSecondary}" FontSize="12"/>
+                                    <TextBlock x:Name="CardOutpatientCount" Text="0" FontSize="20" FontWeight="Bold" Foreground="{StaticResource BrandTeal}"/>
+                                    <TextBlock Text="Đang điều trị" Foreground="{StaticResource SuccessGreen}" FontSize="10"/>
                                 </StackPanel>
                             </Border>
                         </Grid>

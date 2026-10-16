@@ -67,6 +67,51 @@ public sealed record PatientSource(
     string? InsuranceNumber,
     bool IsActive = true);
 
+public sealed record InpatientCase(
+    string BenhAnId,
+    string SoBenhAn,
+    string MedicalCode,
+    string FullName,
+    string Gender,
+    string DateOfBirth,
+    string? Address,
+    string DepartmentCode,
+    string DepartmentName,
+    string? RoomCode,
+    string? RoomName,
+    string? BedCode,
+    string? Floor,
+    string AdmissionDate,
+    string? AdmissionTime,
+    string? BedInTime,
+    string? DepartmentInDate,
+    int DaysInHospital,
+    string? InsuranceNumber,
+    string? Diagnosis,
+    string? DoctorName);
+
+public sealed record OutpatientCase(
+    string BenhAnNgoaiTruId,
+    string SoBenhAn,
+    string? SoLuuTru,
+    string MedicalCode,
+    string FullName,
+    string Gender,
+    string DateOfBirth,
+    string? Address,
+    string DepartmentCode,
+    string DepartmentName,
+    string? RoomCode,
+    string? RoomName,
+    string? BedCode,
+    string? TreatmentFromDate,
+    string? TreatmentToDate,
+    string AdmissionDate,
+    int DaysInTreatment,
+    string? InsuranceNumber,
+    string? Diagnosis,
+    string? DoctorName);
+
 public sealed record CatalogSnapshot(
     string Id,
     DateTimeOffset ImportedAt,

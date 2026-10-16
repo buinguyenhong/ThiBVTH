@@ -28,7 +28,12 @@ public sealed class ExamScenarioAllocator
             .ToDictionary(g => g.Key, g => g.ToList(), StringComparer.OrdinalIgnoreCase);
 
         var templates = await _database.GetTemplatesAsync(cancellationToken);
-        var templateMap = templates.ToDictionary(x => x.Name, x => x, StringComparer.OrdinalIgnoreCase);
+        var templateMap = new Dictionary<string, (string Id, string Name, string Department, string Position, int QuestionCount, double TotalScore, string ReceptionMode)>(StringComparer.OrdinalIgnoreCase);
+        foreach (var t in templates)
+        {
+            templateMap[t.Id] = t;
+            templateMap[t.Name] = t;
+        }
 
         // Pre-fetch available patients from SQLite snapshot
         var availablePatients = (await _database.GetAvailablePatientsAsync(cancellationToken)).ToList();
@@ -36,6 +41,9 @@ public sealed class ExamScenarioAllocator
         {
             throw new InvalidOperationException("Chưa có hồ sơ Bệnh nhân nào trong CSDL (hoặc toàn bộ bệnh nhân đã thi). Vui lòng vào phân hệ 'Cài đặt & Danh mục HIS' và bấm 'Đồng bộ Catalog HIS'.");
         }
+
+        var allInpatients = (await _database.GetAvailableInpatientsAsync(cancellationToken: cancellationToken)).ToList();
+        var allOutpatients = (await _database.GetAvailableOutpatientsAsync(cancellationToken: cancellationToken)).ToList();
 
         // Cache warehouse drugs and remaining stock across candidates
         var warehouseDrugsCache = new Dictionary<string, IReadOnlyList<SnapshotDrugRow>>(StringComparer.OrdinalIgnoreCase);
@@ -221,6 +229,45 @@ public sealed class ExamScenarioAllocator
                 var invDrugRow = invPool[rng.Next(invPool.Count)];
                 var inventoryCheckDrug = new ScenarioDrug(invDrugRow.DrugCode, invDrugRow.DrugName, invDrugRow.Unit, 0, "", invDrugRow.WarehouseCode, invDrugRow.WarehouseName, invDrugRow.FundingSource);
 
+                // Inpatient and outpatient cases for lookup / advance payment / discharge
+                InpatientCase? advanceCase1 = null;
+                InpatientCase? advanceCase2 = null;
+                InpatientCase? inLookupCase = null;
+                InpatientCase? dischargeCase = null;
+                OutpatientCase? outLookupCase = null;
+                OutpatientCase? advanceOutpatientCase = null;
+
+                if (allInpatients.Count > 0)
+                {
+                    var inPool = allInpatients.OrderBy(_ => rng.Next()).ToList();
+                    advanceCase1 = MapInpatientRow(inPool[0 % inPool.Count]);
+                    advanceCase2 = inPool.Count > 1 ? MapInpatientRow(inPool[1 % inPool.Count]) : advanceCase1;
+                    var withBed = inPool.FirstOrDefault(c => !string.IsNullOrWhiteSpace(c.BedCode) && !string.IsNullOrWhiteSpace(c.RoomName));
+                    inLookupCase = MapInpatientRow(withBed ?? inPool[2 % inPool.Count]);
+                    dischargeCase = MapInpatientRow(inPool[3 % inPool.Count]);
+                }
+                else
+                {
+                    advanceCase1 = new InpatientCase("mock_ba1", "21.004865", "21004865", "Bệnh nhân Tạm Ứng 1", "Nam", "1980", "Buôn Ma Thuột", deptCode, deptName, "P101", "Phòng 101", "G01", "Tầng 1", $"{examDate.Year}-01-10", null, null, null, 5, null, "Điều trị nội trú", null);
+                    advanceCase2 = new InpatientCase("mock_ba2", "21001726/NG", "21001726", "Bệnh nhân Tạm Ứng 2", "Nữ", "1985", "Buôn Ma Thuột", deptCode, deptName, "P102", "Phòng 102", "G02", "Tầng 1", $"{examDate.Year}-01-12", null, null, null, 3, null, "Điều trị ngoại trú", null);
+                    inLookupCase = new InpatientCase("mock_ba3", "21.001989", "21001989", "Lê Văn Dũng", "Nam", "1989", "Buôn Ma Thuột", deptCode, deptName, "P204", "Phòng 204", "G08", "Tầng 2", $"{examDate.Year}-02-01", null, null, null, 10, null, "Viêm ruột thừa", null);
+                    dischargeCase = new InpatientCase("mock_ba5", "21.004266", "21004266", "Bệnh nhân Ra Viện", "Nam", "1975", "Buôn Ma Thuột", deptCode, deptName, "P103", "Phòng 103", "G03", "Tầng 1", $"{examDate.Year}-01-05", null, null, null, 15, null, "Khỏi bệnh", null);
+                }
+
+                if (allOutpatients.Count > 0)
+                {
+                    var outPool = allOutpatients.OrderBy(_ => rng.Next()).ToList();
+                    outLookupCase = MapOutpatientRow(outPool[0 % outPool.Count]);
+                    advanceOutpatientCase = outPool.Count > 1
+                        ? MapOutpatientRow(outPool[1 % outPool.Count])
+                        : outLookupCase;
+                }
+                else
+                {
+                    outLookupCase = new OutpatientCase("mock_ba4", "21.001973", "21.0012", "21001973", "Đỗ Phúc Huy", "Nam", "1973", "23 Trần Phú , P.Thắng Lợi, Tp.BMT, Đắk Lắk", deptCode, deptName, null, null, null, "10/01/2026", "15/02/2026", "10/01/2026", 35, null, "Viêm phế quản mãn", null);
+                    advanceOutpatientCase = new OutpatientCase("mock_bant_adv", "21001726/NG", "21001726", "21001726", "Bệnh nhân Tạm Ứng Ngoại Trú", "Nữ", "1985", "Buôn Ma Thuột", deptCode, deptName, null, null, null, "12/01/2026", "20/01/2026", "12/01/2026", 3, null, "Điều trị ngoại trú", null);
+                }
+
                 // Build Questions with detailed instructions and dotted lines
                 var questions = new List<ScenarioQuestion>();
                 for (var aIdx = 0; aIdx < actions.Count; aIdx++)
@@ -244,7 +291,15 @@ public sealed class ExamScenarioAllocator
                         isDirectReception && aIdx == 0,
                         actionDescMap,
                         pickedSieuAm,
-                        pickedXquang);
+                        pickedXquang,
+                        advanceCase1,
+                        advanceCase2,
+                        inLookupCase,
+                        dischargeCase,
+                        outLookupCase,
+                        advanceOutpatientCase,
+                        allServicesWithGroup,
+                        rng);
 
                     questions.Add(new ScenarioQuestion(aIdx + 1, act.Code, act.Name, instruction, act.Score));
                 }
@@ -273,7 +328,13 @@ public sealed class ExamScenarioAllocator
                     secondPatient,
                     cutoffDate,
                     inventoryCheckDrug,
-                    targetTransferDept
+                    targetTransferDept,
+                    inLookupCase,
+                    outLookupCase,
+                    advanceCase1,
+                    advanceCase2,
+                    dischargeCase,
+                    advanceOutpatientCase
                 );
 
                 scenarios.Add(scenario);
@@ -598,15 +659,33 @@ public sealed class ExamScenarioAllocator
         bool isDirectReception,
         IReadOnlyDictionary<string, string> actionDescMap,
         ScenarioService? pickedSieuAm = null,
-        ScenarioService? pickedXquang = null) => code switch
+        ScenarioService? pickedXquang = null,
+        InpatientCase? advanceCase1 = null,
+        InpatientCase? advanceCase2 = null,
+        InpatientCase? inLookupCase = null,
+        InpatientCase? dischargeCase = null,
+        OutpatientCase? outLookupCase = null,
+        OutpatientCase? advanceOutpatientCase = null,
+        IReadOnlyList<(string Code, string Name, string GroupName)>? allServices = null,
+        Random? rng = null) => code switch
     {
+        "LT_BAN_PHIEU_KHAM" => BuildLtBanPhieuKhamInstruction(patient, secondPatient, examDate),
+        "LT_THU_PHI_VA_CLS" => BuildLtThuPhiClsInstruction(pickedSieuAm, allServices),
+        "LT_THU_TAM_UNG_NOI_TRU" => $"Thu tạm ứng cho các bệnh nhân sau:\n© Bệnh nhân nội trú có số bệnh án : {advanceCase1?.SoBenhAn ?? "21.004865"}, Số tiền tạm ứng : 1.500.000 đồng (1đ)\n© Bệnh nhân bệnh án ngoại trú có số bệnh án : {advanceOutpatientCase?.SoBenhAn ?? "21001726/NG"}, Số tiền tạm ứng : 500.000 đồng (1đ)\nSố điểm đạt được : ………",
+        "LT_DOI_DICH_VU_CLS" => $"Chọn quyển hóa đơn ký hiệu:  THI để thu\n© Huỷ và đổi dịch vụ {pickedSieuAm?.Name ?? "Siêu âm ổ bụng"} thành dịch vụ : {(pickedXquang?.Name ?? "Chụp Xquang cột sống cổ chếch hai bên [Số hoá 2 phim]")} và thu tiền lại (1đ)\nSố điểm đạt được : ………",
+        "LT_TRA_CUU_THONG_TIN" => $"Tìm thông tin của bệnh nhân\n© Đang điều trị nội trú có họ và tên : {inLookupCase?.FullName ?? "Lê Văn Dũng"} sinh năm {GetBirthYear(inLookupCase?.DateOfBirth ?? "1989")} (1đ)\nKhoa điều trị : ………………………………………………………………………...\nPhòng bệnh   : ………………………………………………………………………...\nSố giường      : ………………………………………………………………………..;\n© Tìm bệnh nhân có thông tin như sau: {outLookupCase?.FullName ?? "Đỗ Phúc Huy"}, Năm sinh: {GetBirthYear(outLookupCase?.DateOfBirth ?? "1973")} {outLookupCase?.Address ?? "23 Trần Phú , P.Thắng Lợi, Tp.BMT, Đắk Lắk"} và ghi lại các thông tin sau :(1đ)\nSố lượt khám (nếu có):………………………………………………………………………\nNgày điều trị Nội trú gần nhất(nếu có):……………………………………………\nNgày điều trị Ngoại trú gần nhất (nếu có):………………………………………...........\nSố điểm đạt được : ………",
+        "LT_THANH_TOAN_RA_VIEN" => $"Thu Thanh Toán Ra viện cho bệnh nhân nội trú có số bệnh án: {dischargeCase?.SoBenhAn ?? "21.004266"} (1đ)\n(Dùng quyển hóa đơn VAT_THI)\nSố điểm đạt được : ………",
+        "LT_TAO_THE_TAM_BHYT" => BuildLtTaoTheTamInstruction(examDate, rng),
+        "TC_THU_TAM_UNG" => $"Thu tạm ứng viện phí cho bệnh nhân có số bệnh án nội trú : {advanceCase1?.SoBenhAn ?? "21.004865"}, số tiền tạm ứng : 1.500.000 đồng.\nSố điểm đạt được:………(đ)",
+        "TC_THANH_TOAN_RA_VIEN" => $"Thực hiện quyết toán và in hóa đơn thanh toán viện phí ra viện cho bệnh nhân nội trú có số bệnh án: {dischargeCase?.SoBenhAn ?? "21.004266"} (Dùng quyển hóa đơn VAT_THI).\nSố điểm đạt được:………(đ)",
+        "TC_TRA_CUU_BENH_SU" => $"Tra cứu lịch sử khám chữa bệnh của bệnh nhân: {outLookupCase?.FullName ?? "Đỗ Phúc Huy"}, Mã y tế : {outLookupCase?.MedicalCode ?? "23000059"}.\n- Tổng số lượt khám : …………………………………\n- Ngày điều trị nội trú gần nhất : …………………………………\n- Ngày khám ngoại trú gần nhất : …………………………………\nSố điểm đạt được:………(đ)",
         "TN_TIEP_NHAN" or _ when isDirectReception => BuildDirectReceptionInstruction(patient, secondPatient, examDate),
         "NT_NHAN_BENH_KHOA" => $"* {secondPatient.FullName} ; Mã y tế: {secondPatient.MedicalCode}\n* {patient.FullName} ; Mã y tế: {patient.MedicalCode}\n- SVV Bn VP       : ………………………………\n- SVV Bn BHYT : ……………………………….\nSố điểm đạt được:………(đ)",
         "NT_CAP_GIUONG" => "Cấp giường cho các bệnh nhân được tiếp nhận ở câu 1.\nSố điểm đạt được:………(đ)",
         "KB_CHI_DINH_CLS" => BuildKbChiDinhClsInstruction(pickedXquang, pickedSieuAm),
         "KB_BENH_AN_NGOAI_TRU" => "Chỉ định điều trị ngoại trú và lập bệnh án ngoại trú cho bệnh nhân : ……………………………………, Mã Y tế : …………………… (2 đ)\n- Số bệnh án ngoại trú : …………………………………………………\nSố điểm đạt được:………(đ)",
         "KB_CHI_DINH_NOI_TRU" => $"Chỉ định nhập viện điều trị nội trú cho bệnh nhân : ……………………………………, Mã y tế : …………………… (1 đ)\n- Nhập khoa : {targetTransferDept}\n- Số bệnh án nội trú : ……………………………………………………\nSố điểm đạt được:………(đ)",
-        "HC_TRA_CUU_THANH_TOAN" => "Kiểm tra thông tin thanh toán cho bệnh nhân : ……………………………………, Mã y tế : ……………………\n- Số bệnh án nội trú : ……………………………………………………\n- Số tiền người bệnh đã thanh toán : ……………………………………………………\n- Số tiền người bệnh đã tạm ứng : ……………………………………………………\n- Số tiền còn phải thu người bệnh : ……………………………………………………\n- Tổng số tiền người bệnh trả : ……………\nSố điểm đạt được:………(đ)",
+        "HC_TRA_CUU_THANH_TOAN" => $"Kiểm tra thông tin thanh toán cho bệnh nhân : {inLookupCase?.FullName ?? "................"}, Mã y tế : {inLookupCase?.MedicalCode ?? "................"}\n- Số bệnh án nội trú : {inLookupCase?.SoBenhAn ?? "…………………………………………"}\n- Số tiền người bệnh đã thanh toán : ……………………………………………………\n- Số tiền người bệnh đã tạm ứng : ……………………………………………………\n- Số tiền còn phải thu người bệnh : ……………………………………………………\n- Tổng số tiền người bệnh trả : ……………\nSố điểm đạt được:………(đ)",
         "YL_CHI_DINH_CLS" => q2Instruction,
         "YL_CHI_DINH_THUOC_VTYT" => "Lên y lệnh(có D/S Thuốc, VTYT đính kèm)(1.5đ)\nLập  phiếu lĩnh dược(0.5đ)\nNhập nội bộ(0.5đ)\nXuất sử dụng thuốc cho bệnh nhân(0.5đ)\nSố điểm đạt được:………(đ)",
         "YL_TRA_THUOC" => $"Bệnh nhân trả thuốc và tổng hợp phiếu trả.(Chỉ thao tác trên bệnh nhân BHYT có số vào viện ở câu 1), thuốc cần trả {drugReturn?.ReturnedDrug.Name ?? "thuốc"}, số lượng trả : {drugReturn?.ReturnQuantity ?? 1} {drugReturn?.ReturnedDrug.Unit ?? "viên"}.\nSố điểm đạt được:………(đ)",
@@ -618,6 +697,159 @@ public sealed class ExamScenarioAllocator
             ? $"{customDesc}\nSố điểm đạt được:………(đ)"
             : $"Thực hiện nghiệp vụ chuyên môn '{name}' trên phần mềm HIS theo quy định của Bệnh viện Đa khoa Thiện Hạnh.\nSố điểm đạt được:………(đ)"
     };
+
+    private static InpatientCase MapInpatientRow(SnapshotInpatientRow r) => new(
+        r.BenhAnId,
+        r.SoBenhAn,
+        r.MedicalCode,
+        r.FullName,
+        r.Gender,
+        r.DateOfBirth,
+        r.Address,
+        r.DepartmentCode,
+        r.DepartmentName,
+        r.RoomCode,
+        r.RoomName,
+        r.BedCode,
+        r.Floor,
+        r.AdmissionDate,
+        r.AdmissionTime,
+        r.BedInTime,
+        r.DepartmentInDate,
+        r.DaysInHospital,
+        r.InsuranceNumber,
+        r.Diagnosis,
+        r.DoctorName
+    );
+
+    private static OutpatientCase MapOutpatientRow(SnapshotOutpatientRow r) => new(
+        r.BenhAnNgoaiTruId,
+        r.SoBenhAn,
+        r.SoLuuTru,
+        r.MedicalCode,
+        r.FullName,
+        r.Gender,
+        r.DateOfBirth,
+        r.Address,
+        r.DepartmentCode,
+        r.DepartmentName,
+        r.RoomCode,
+        r.RoomName,
+        r.BedCode,
+        r.TreatmentFromDate,
+        r.TreatmentToDate,
+        r.AdmissionDate,
+        r.DaysInTreatment,
+        r.InsuranceNumber,
+        r.Diagnosis,
+        r.DoctorName
+    );
+
+    private static string GetBirthYear(string dobOrYear)
+    {
+        if (string.IsNullOrWhiteSpace(dobOrYear)) return "1980";
+        var trimmed = dobOrYear.Trim();
+        if (trimmed.Length == 4 && int.TryParse(trimmed, out _)) return trimmed;
+        if (trimmed.Contains('/'))
+        {
+            var parts = trimmed.Split('/');
+            return parts[^1].Trim();
+        }
+        if (trimmed.Contains('-'))
+        {
+            var parts = trimmed.Split('-');
+            return parts[0].Length == 4 ? parts[0].Trim() : parts[^1].Trim();
+        }
+        return trimmed;
+    }
+
+    private static string BuildLtBanPhieuKhamInstruction(ScenarioPatient patient, ScenarioPatient secondPatient, DateOnly examDate)
+    {
+        var dobStrBh = patient.DateOfBirth.HasValue
+            ? patient.DateOfBirth.Value.ToString("dd/MM/yyyy")
+            : $"Năm sinh: {examDate.Year - patient.Age}";
+
+        var dobStrVp = secondPatient.DateOfBirth.HasValue
+            ? secondPatient.DateOfBirth.Value.ToString("dd/MM/yyyy")
+            : $"Năm sinh: {examDate.Year - secondPatient.Age}";
+
+        var lines = new List<string>
+        {
+            "Tiếp nhận bệnh nhân và cho chỉ định khám bệnh (01 bệnh nhân viện phí, 01 bệnh nhân BHYT).(1đ)",
+            "© 1. Bệnh nhân Viện phí:",
+            $"+ Họ và tên: {secondPatient.FullName.ToUpperInvariant()}",
+            $"+ Ngày sinh: {dobStrVp} ({secondPatient.Age} tuổi) - Giới tính: {secondPatient.Gender}",
+            $"+ Địa chỉ: {secondPatient.Address}",
+            $"+ Đối tượng: Viện phí",
+            $"+ Phòng khám / Bán phiếu: Khám nội VP",
+            "",
+            "© 2. Bệnh nhân Bảo hiểm y tế (BHYT):",
+            $"+ Họ và tên: {patient.FullName.ToUpperInvariant()}",
+            $"+ Ngày sinh: {dobStrBh} ({patient.Age} tuổi) - Giới tính: {patient.Gender}",
+            $"+ Địa chỉ: {patient.Address}",
+            $"+ Đối tượng: BHYT"
+        };
+
+        if (!string.IsNullOrWhiteSpace(patient.InsuranceNumber))
+        {
+            lines.Add($"+ Số thẻ BHYT: {patient.InsuranceNumber}");
+            if (patient.InsurancePeriod is not null)
+            {
+                lines.Add($"+ Hạn thẻ: Từ ngày {patient.InsurancePeriod.From:dd/MM/yyyy} đến ngày {patient.InsurancePeriod.To:dd/MM/yyyy}");
+            }
+            lines.Add($"+ Nơi ĐKKCB: {patient.InitialRegistrationCode} - BVĐK Thiện Hạnh");
+        }
+
+        lines.Add("+ Phòng khám / Bán phiếu: Khám ngoại tổng hợp BHYT");
+        lines.Add("");
+        lines.Add("- Mã y tế Bn VP       : ……………………………………; - Bán phiếu :  Khám nội VP");
+        lines.Add("- Mã y tế  Bn BHYT : ……………………………………; - Bán phiếu :  Khám ngoại tổng hợp BHYT");
+        lines.Add("Số điểm đạt được : ………");
+
+        return string.Join("\n", lines);
+    }
+
+    private static string BuildLtTaoTheTamInstruction(DateOnly examDate, Random? rng)
+    {
+        var motherNames = new[] { "Lê Thị Thảo", "Trần Thị Hạnh", "Nguyễn Thị Mai", "Phạm Thị Loan", "Hoàng Thị Cúc" };
+        var mother = rng is not null ? motherNames[rng.Next(motherNames.Length)] : "Lê Thị Thảo";
+        var birthDate = examDate.AddMonths(-1);
+        return $"""
+Truy cập cổng giám định BHYT và tạo mã thẻ tạm cho:
+Họ tên: Bé gái mẹ {mother}
+Ngày sinh: {birthDate:dd/MM/yyyy}
+Các thông tin khác tự nhập
+Sau đó điền các thông tin sau:
+Mã số thẻ BHYT:…………………………………….
+Hạn sử dụng thẻ:……………………………………..
+(Dùng quyển hóa đơn VAT_THI) (1đ)
+Số điểm đạt được : ………
+""";
+    }
+
+    private static string BuildLtThuPhiClsInstruction(
+        ScenarioService? pickedSieuAm,
+        IReadOnlyList<(string Code, string Name, string GroupName)>? allServices)
+    {
+        var sa = pickedSieuAm?.Name ?? "Siêu âm ổ bụng";
+        var xn1 = "Định lượng Vitamin B12 [Máu]";
+        var xn2 = "Tìm ký sinh trùng sốt rét trong máu (bằng phương pháp thủ công)";
+        if (allServices is not null && allServices.Count > 0)
+        {
+            var match1 = allServices.FirstOrDefault(s => s.Name.Contains("Vitamin", StringComparison.OrdinalIgnoreCase));
+            if (match1.Name != null) xn1 = match1.Name;
+            var match2 = allServices.FirstOrDefault(s => s.Name.Contains("sốt rét", StringComparison.OrdinalIgnoreCase) || s.Name.Contains("Ký sinh trùng", StringComparison.OrdinalIgnoreCase));
+            if (match2.Name != null) xn2 = match2.Name;
+        }
+
+        return $"""
+Chọn quyển hóa đơn ký hiệu:  THI để thu
+© Thu phí khám bệnh cho 2 bệnh nhân trên (1đ)
+© Tạo các CLS sau (Bệnh nhân VP có phiếu khám nội):
+{sa}, {xn1}, {xn2}. Thu phí cho các CLS vừa tạo (1đ)
+Số điểm đạt được : ………
+""";
+    }
 
     private static string BuildDirectReceptionInstruction(ScenarioPatient patient, ScenarioPatient secondPatient, DateOnly examDate)
     {

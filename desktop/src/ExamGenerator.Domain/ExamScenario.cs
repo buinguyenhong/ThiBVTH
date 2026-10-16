@@ -70,7 +70,13 @@ public sealed record ExamScenario(
     ScenarioPatient? SecondPatient = null,
     DateOnly? CutoffDate = null,
     ScenarioDrug? InventoryCheckDrug = null,
-    string? TargetTransferDepartment = null)
+    string? TargetTransferDepartment = null,
+    InpatientCase? InpatientLookupCase = null,
+    OutpatientCase? OutpatientLookupCase = null,
+    InpatientCase? AdvancePaymentCase1 = null,
+    InpatientCase? AdvancePaymentCase2 = null,
+    InpatientCase? DischargeCase = null,
+    OutpatientCase? AdvancePaymentOutpatientCase = null)
 {
     public double TotalScore => Questions.Sum(q => q.Score);
 }

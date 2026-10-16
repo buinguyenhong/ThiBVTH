@@ -184,3 +184,35 @@
   - Tieu chuan: `desktop/publish/ExamOperationsDesktop/ExamGenerator.Desktop.exe` (148.5 KB)
   - Standalone: `desktop/publish/ExamOperationsDesktop-Standalone/ExamGenerator.Desktop.exe` (148.5 KB)
 - **Ghi chu thay doi:** Fix loi GO tach batch SQL lam mat du lieu thuc va ghi de gia tri mau cua template
+
+### Build [2026-10-16 10:46:17] - Commit [f561894]
+- **Trang thai:** Thanh cong (34/34 Tests Passed)
+- **Cau hinh:** .NET 8 LTS (Release) + Standalone (Self-Contained win-x64)
+- **Duong dan chay:**
+  - Tieu chuan: `desktop/publish/ExamOperationsDesktop/ExamGenerator.Desktop.exe` (148.5 KB)
+  - Standalone: `desktop/publish/ExamOperationsDesktop-Standalone/ExamGenerator.Desktop.exe` (148.5 KB)
+- **Ghi chu thay doi:** Tich hop danh muc Ca noi tru, Benh an ngoai tru va mau de Le tan - Thu phi phong kham (7 cau)
+
+### Build [2026-10-16 11:03:41] - Commit [f561894]
+- **Trang thai:** Thanh cong (34/34 Tests Passed)
+- **Cau hinh:** .NET 8 LTS (Release) + Standalone (Self-Contained win-x64)
+- **Duong dan chay:**
+  - Tieu chuan: `desktop/publish/ExamOperationsDesktop/ExamGenerator.Desktop.exe` (148.5 KB)
+  - Standalone: `desktop/publish/ExamOperationsDesktop-Standalone/ExamGenerator.Desktop.exe` (148.5 KB)
+- **Ghi chu thay doi:** Fix type cast System.Int16 to String in SafeGetString va Tang, fix BenhAnNgoaiTru_Id column index
+
+### Build [2026-10-16 11:29:45] - Commit [f561894]
+- **Trang thai:** Thanh cong (34/34 Tests Passed)
+- **Cau hinh:** .NET 8 LTS (Release) + Standalone (Self-Contained win-x64)
+- **Duong dan chay:**
+  - Tieu chuan: `desktop/publish/ExamOperationsDesktop/ExamGenerator.Desktop.exe` (148.5 KB)
+  - Standalone: `desktop/publish/ExamOperationsDesktop-Standalone/ExamGenerator.Desktop.exe` (148.5 KB)
+- **Ghi chu thay doi:** Bo sung thong tin 2 benh nhan tiep nhan o cau 1 va dat ngay sinh the tam truoc ngay thi 1 thang
+
+### Build [2026-10-16 13:59:13] - Commit [f561894]
+- **Trang thai:** Thanh cong (34/34 Tests Passed)
+- **Cau hinh:** .NET 8 LTS (Release) + Standalone (Self-Contained win-x64)
+- **Duong dan chay:**
+  - Tieu chuan: `desktop/publish/ExamOperationsDesktop/ExamGenerator.Desktop.exe` (148.5 KB)
+  - Standalone: `desktop/publish/ExamOperationsDesktop-Standalone/ExamGenerator.Desktop.exe` (148.5 KB)
+- **Ghi chu thay doi:** Automated release build

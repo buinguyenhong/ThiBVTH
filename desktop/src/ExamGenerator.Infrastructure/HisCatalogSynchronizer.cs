@@ -7,7 +7,27 @@ public sealed class HisCatalogSynchronizer
 {
     private static string SafeGetString(SqlDataReader reader, int index, string defaultValue = "")
     {
-        return reader.IsDBNull(index) ? defaultValue : reader.GetString(index);
+        if (reader.IsDBNull(index)) return defaultValue;
+        var val = reader.GetValue(index);
+        return val switch
+        {
+            null => defaultValue,
+            string s => s,
+            _ => val.ToString() ?? defaultValue
+        };
+    }
+
+    private static int SafeGetInt32(SqlDataReader reader, int index, int defaultValue = 0)
+    {
+        if (reader.IsDBNull(index)) return defaultValue;
+        try
+        {
+            return Convert.ToInt32(reader.GetValue(index));
+        }
+        catch
+        {
+            return defaultValue;
+        }
     }
 
     private static double SafeGetDouble(SqlDataReader reader, int index, double defaultValue = 0.0)
@@ -221,7 +241,7 @@ public sealed class HisCatalogSynchronizer
         var patientsQuery = """
             ;WITH BhytRecent AS
             (
-                SELECT TOP (300)
+                SELECT TOP (2500)
                     the.BenhNhan_Id,
                     SoThe = ISNULL(the.SoThe, '')
                 FROM dbo.DM_BenhNhan_BHYT the WITH (NOLOCK)
@@ -248,7 +268,7 @@ public sealed class HisCatalogSynchronizer
 
                 UNION ALL
 
-                SELECT TOP (300)
+                SELECT TOP (2500)
                     PatientId = CAST(bn.BenhNhan_Id AS varchar(50)),
                     MedicalCode = ISNULL(bn.MaYTe, CAST(bn.BenhNhan_Id AS varchar(50))),
                     FullName = LTRIM(RTRIM(bn.TenBenhNhan)),
@@ -288,6 +308,194 @@ public sealed class HisCatalogSynchronizer
         }
         await sqlite.ReplaceSnapshotPatientsAsync(patientRows, cancellationToken);
         counts["Patients"] = patientRows.Count;
+
+        // 5. Synchronize Active Inpatient Cases (BenhAn with NgayRaVien IS NULL + LuuTru + Giuong/Phong)
+        onProgress?.Invoke("Đang trích xuất danh sách Bệnh nhân Nội trú đang nằm viện...");
+        var inpatientsQuery = """
+            ;WITH ViTriManHinh AS (
+                SELECT
+                    ct.LuuTru_Id,
+                    ct.LuuTruChiTiet_Id,
+                    ct.GiuongBenh_Id,
+                    ct.PhongBenh_Id,
+                    ct.ThoiGianVao,
+                    ct.BaoPhong,
+                    ROW_NUMBER() OVER (
+                        PARTITION BY ct.LuuTru_Id
+                        ORDER BY ct.LuuTruChiTiet_Id DESC
+                    ) AS rn
+                FROM dbo.NoiTru_LuuTruChiTiet AS ct WITH (NOLOCK)
+            ),
+            LuuTruCuoi AS (
+                SELECT
+                    lt.LuuTru_Id,
+                    lt.BenhAn_Id,
+                    lt.PhongBan_Id,
+                    lt.NgayVao,
+                    lt.BacSiDieuTriChinh_Id,
+                    ROW_NUMBER() OVER (
+                        PARTITION BY lt.BenhAn_Id
+                        ORDER BY lt.LuuTru_Id DESC
+                    ) AS rn
+                FROM dbo.NoiTru_LuuTru AS lt WITH (NOLOCK)
+            )
+            SELECT
+                SoBenhAn = ISNULL(ba.SoBenhAn, ''),
+                MaYTe = ISNULL(bn.MaYTe, ''),
+                TenBenhNhan = ISNULL(bn.TenBenhNhan, ''),
+                GioiTinh = CASE bn.GioiTinh WHEN 'T' THEN N'Nam' WHEN 'G' THEN N'Nữ' ELSE N'' END,
+                NgaySinh = COALESCE(CONVERT(varchar(10), bn.NgaySinh, 103), CAST(bn.NamSinh AS varchar(4)), '1990'),
+                DiaChi = ISNULL(bn.DiaChi, ''),
+                Khoa = ISNULL(pbKhoa.TenPhongBan, ''),
+                MaKhoa = ISNULL(pbKhoa.MaPhongBan, ''),
+                Phong = ISNULL(pbPhong.TenPhongBan, ''),
+                MaPhong = ISNULL(pbPhong.MaPhongBan, ''),
+                Giuong = ISNULL(gb.MaGiuong, ''),
+                Tang = ISNULL(CAST(gb.Tang AS varchar(20)), ''),
+                NgayVaoVien = CONVERT(varchar(10), ba.NgayVaoVien, 103),
+                ThoiGianVaoVien = CONVERT(varchar(19), ba.ThoiGianVaoVien, 120),
+                VaoGiuongLuc = CONVERT(varchar(19), vt.ThoiGianVao, 120),
+                NgayVaoKhoa = CONVERT(varchar(10), lt.NgayVao, 103),
+                SoNgayNam = DATEDIFF(DAY, ba.ThoiGianVaoVien, GETDATE()),
+                SoBHYT = ISNULL(tn.SoBHYT, ''),
+                TenICD = ISNULL(icd.TenICD, ''),
+                BacSiDieuTriChinh = ISNULL(nv.TenNhanVien, ''),
+                BenhAn_Id = CAST(ba.BenhAn_Id AS varchar(50))
+            FROM LuuTruCuoi AS lt
+            INNER JOIN dbo.BenhAn AS ba WITH (NOLOCK) ON ba.BenhAn_Id = lt.BenhAn_Id
+            LEFT JOIN dbo.DM_BenhNhan AS bn WITH (NOLOCK) ON bn.BenhNhan_Id = ba.BenhNhan_Id
+            LEFT JOIN ViTriManHinh AS vt ON vt.LuuTru_Id = lt.LuuTru_Id AND vt.rn = 1
+            LEFT JOIN dbo.DM_PhongBan AS pbKhoa WITH (NOLOCK) ON pbKhoa.PhongBan_Id = lt.PhongBan_Id
+            LEFT JOIN dbo.DM_GiuongBenh AS gb WITH (NOLOCK) ON gb.GiuongBenh_Id = vt.GiuongBenh_Id
+            LEFT JOIN dbo.DM_PhongBan AS pbPhong WITH (NOLOCK) ON pbPhong.PhongBan_Id = gb.PhongBenh_Id
+            LEFT JOIN dbo.TiepNhan AS tn WITH (NOLOCK) ON tn.TiepNhan_Id = ba.TiepNhan_Id
+            LEFT JOIN dbo.DM_ICD AS icd WITH (NOLOCK) ON icd.ICD_Id = ba.ICD_BenhChinh
+            LEFT JOIN dbo.NhanVien AS nv WITH (NOLOCK) ON nv.NhanVien_Id = lt.BacSiDieuTriChinh_Id
+            WHERE lt.rn = 1
+              AND ba.NgayRaVien IS NULL
+            ORDER BY ba.NgayVaoVien DESC, ba.BenhAn_Id DESC;
+            """;
+
+        var inpatientRows = new List<SnapshotInpatientRow>();
+        await using (var inCmd = new SqlCommand(inpatientsQuery, connection))
+        {
+            inCmd.CommandTimeout = 120;
+            await using var reader = await inCmd.ExecuteReaderAsync(cancellationToken);
+            while (await reader.ReadAsync(cancellationToken))
+            {
+                inpatientRows.Add(new SnapshotInpatientRow(
+                    SafeGetString(reader, 20), // BenhAn_Id
+                    SafeGetString(reader, 0), // SoBenhAn
+                    SafeGetString(reader, 1), // MaYTe
+                    SafeGetString(reader, 2), // TenBenhNhan
+                    SafeGetString(reader, 3), // GioiTinh
+                    SafeGetString(reader, 4), // NgaySinh
+                    reader.IsDBNull(5) ? null : SafeGetString(reader, 5), // DiaChi
+                    SafeGetString(reader, 7), // MaKhoa
+                    SafeGetString(reader, 6), // TenKhoa
+                    reader.IsDBNull(9) ? null : SafeGetString(reader, 9), // MaPhong
+                    reader.IsDBNull(8) ? null : SafeGetString(reader, 8), // TenPhong
+                    reader.IsDBNull(10) ? null : SafeGetString(reader, 10), // Giuong
+                    reader.IsDBNull(11) ? null : SafeGetString(reader, 11), // Tang
+                    SafeGetString(reader, 12, "01/01/2026"), // NgayVaoVien
+                    reader.IsDBNull(13) ? null : SafeGetString(reader, 13), // ThoiGianVaoVien
+                    reader.IsDBNull(14) ? null : SafeGetString(reader, 14), // VaoGiuongLuc
+                    reader.IsDBNull(15) ? null : SafeGetString(reader, 15), // NgayVaoKhoa
+                    SafeGetInt32(reader, 16), // SoNgayNam
+                    reader.IsDBNull(17) ? null : SafeGetString(reader, 17), // SoBHYT
+                    reader.IsDBNull(18) ? null : SafeGetString(reader, 18), // Chẩn đoán
+                    reader.IsDBNull(19) ? null : SafeGetString(reader, 19)  // Bác sĩ
+                ));
+            }
+        }
+        await sqlite.ReplaceSnapshotInpatientsAsync(inpatientRows, cancellationToken);
+        counts["Inpatients"] = inpatientRows.Count;
+
+        // 6. Synchronize Active Outpatient Cases (BenhAnNgoaiTru with NgayRaVien IS NULL)
+        onProgress?.Invoke("Đang trích xuất Bệnh án Ngoại trú đang điều trị...");
+        var outpatientsQuery = """
+            ;WITH GiuongNgoaiTru AS (
+                SELECT
+                    gb.BenhAnNgoaiTru_Id,
+                    gb.GiuongBenh_Id,
+                    gb.PhongBenh_Id,
+                    gb.BaoPhong,
+                    gb.ThoiGianVao,
+                    ROW_NUMBER() OVER (
+                        PARTITION BY gb.BenhAnNgoaiTru_Id
+                        ORDER BY gb.NgoaiTru_GiuongBenh_Id DESC
+                    ) AS rn
+                FROM dbo.NgoaiTru_GiuongBenh AS gb WITH (NOLOCK)
+                WHERE gb.ThoiGianRa IS NULL
+                  AND ISNULL(gb.Huy, 0) = 0
+            )
+            SELECT
+                SoBenhAn = ISNULL(bant.SoBenhAn, ''),
+                SoLuuTru = ISNULL(bant.SoLuuTru, ''),
+                MaYTe = ISNULL(bn.MaYTe, ''),
+                TenBenhNhan = ISNULL(bn.TenBenhNhan, ''),
+                GioiTinh = CASE bn.GioiTinh WHEN 'T' THEN N'Nam' WHEN 'G' THEN N'Nữ' ELSE N'' END,
+                NgaySinh = COALESCE(CONVERT(varchar(10), bn.NgaySinh, 103), CAST(bn.NamSinh AS varchar(4)), '1990'),
+                DiaChi = ISNULL(bn.DiaChi, ''),
+                Khoa = ISNULL(pbKhoa.TenPhongBan, ''),
+                MaKhoa = ISNULL(pbKhoa.MaPhongBan, ''),
+                Phong = ISNULL(pbPhong.TenPhongBan, ''),
+                MaPhong = ISNULL(pbPhong.MaPhongBan, ''),
+                Giuong = ISNULL(gb.MaGiuong, ''),
+                DieuTriTuNgay = CONVERT(varchar(10), bant.DieuTriTuNgay, 103),
+                DieuTriDenNgay = CONVERT(varchar(10), bant.DieuTriDenNgay, 103),
+                NgayNhapVien = CONVERT(varchar(10), bant.NgayNhapVien, 103),
+                SoNgay = DATEDIFF(DAY, bant.ThoiGianNhapVien, GETDATE()),
+                SoBHYT = ISNULL(tn.SoBHYT, ''),
+                TenICD = ISNULL(icd.TenICD, ''),
+                BacSiDieuTri = ISNULL(nv.TenNhanVien, ''),
+                BenhAnNgoaiTru_Id = CAST(bant.BenhAnNgoaiTru_Id AS varchar(50))
+            FROM dbo.BenhAnNgoaiTru AS bant WITH (NOLOCK)
+            INNER JOIN dbo.DM_BenhNhan AS bn WITH (NOLOCK) ON bn.BenhNhan_Id = bant.BenhNhan_Id
+            LEFT JOIN GiuongNgoaiTru AS gnt ON gnt.BenhAnNgoaiTru_Id = bant.BenhAnNgoaiTru_Id AND gnt.rn = 1
+            LEFT JOIN dbo.DM_PhongBan AS pbKhoa WITH (NOLOCK) ON pbKhoa.PhongBan_Id = bant.KhoaDieuTri_Id
+            LEFT JOIN dbo.DM_GiuongBenh AS gb WITH (NOLOCK) ON gb.GiuongBenh_Id = gnt.GiuongBenh_Id
+            LEFT JOIN dbo.DM_PhongBan AS pbPhong WITH (NOLOCK) ON pbPhong.PhongBan_Id = gnt.PhongBenh_Id
+            LEFT JOIN dbo.TiepNhan AS tn WITH (NOLOCK) ON tn.TiepNhan_Id = bant.TiepNhan_Id
+            LEFT JOIN dbo.DM_ICD AS icd WITH (NOLOCK) ON icd.ICD_Id = bant.ICD_BenhChinh
+            LEFT JOIN dbo.NhanVien AS nv WITH (NOLOCK) ON nv.NhanVien_Id = bant.BacSiDieuTri_Id
+            WHERE bant.NgayRaVien IS NULL
+            ORDER BY bant.NgayNhapVien DESC, bant.BenhAnNgoaiTru_Id DESC;
+            """;
+
+        var outpatientRows = new List<SnapshotOutpatientRow>();
+        await using (var outCmd = new SqlCommand(outpatientsQuery, connection))
+        {
+            outCmd.CommandTimeout = 120;
+            await using var reader = await outCmd.ExecuteReaderAsync(cancellationToken);
+            while (await reader.ReadAsync(cancellationToken))
+            {
+                outpatientRows.Add(new SnapshotOutpatientRow(
+                    SafeGetString(reader, 19), // BenhAnNgoaiTru_Id
+                    SafeGetString(reader, 0), // SoBenhAn
+                    reader.IsDBNull(1) ? null : SafeGetString(reader, 1), // SoLuuTru
+                    SafeGetString(reader, 2), // MaYTe
+                    SafeGetString(reader, 3), // TenBenhNhan
+                    SafeGetString(reader, 4), // GioiTinh
+                    SafeGetString(reader, 5), // NgaySinh
+                    reader.IsDBNull(6) ? null : SafeGetString(reader, 6), // DiaChi
+                    SafeGetString(reader, 8), // MaKhoa
+                    SafeGetString(reader, 7), // TenKhoa
+                    reader.IsDBNull(10) ? null : SafeGetString(reader, 10), // MaPhong
+                    reader.IsDBNull(9) ? null : SafeGetString(reader, 9), // TenPhong
+                    reader.IsDBNull(11) ? null : SafeGetString(reader, 11), // Giuong
+                    reader.IsDBNull(12) ? null : SafeGetString(reader, 12), // DieuTriTuNgay
+                    reader.IsDBNull(13) ? null : SafeGetString(reader, 13), // DieuTriDenNgay
+                    SafeGetString(reader, 14, "01/01/2026"), // NgayNhapVien
+                    SafeGetInt32(reader, 15), // SoNgay
+                    reader.IsDBNull(16) ? null : SafeGetString(reader, 16), // SoBHYT
+                    reader.IsDBNull(17) ? null : SafeGetString(reader, 17), // Chẩn đoán
+                    reader.IsDBNull(18) ? null : SafeGetString(reader, 18)  // Bác sĩ
+                ));
+            }
+        }
+        await sqlite.ReplaceSnapshotOutpatientsAsync(outpatientRows, cancellationToken);
+        counts["Outpatients"] = outpatientRows.Count;
 
         return counts;
     }

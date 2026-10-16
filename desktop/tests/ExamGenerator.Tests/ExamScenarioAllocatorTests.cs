@@ -615,8 +615,12 @@ public class ExamScenarioAllocatorTests : IDisposable
         // 5. Tra cứu thông tin thanh toán
         var qThanhToan = sc.Questions[4];
         Assert.Equal("HC_TRA_CUU_THANH_TOAN", qThanhToan.ActionCode);
-        Assert.Contains("Kiểm tra thông tin thanh toán cho bệnh nhân : ……………………………………, Mã y tế : ……………………", qThanhToan.Instruction);
-        Assert.Contains("Số bệnh án nội trú : ……………………………………………………", qThanhToan.Instruction);
+        Assert.Contains("Kiểm tra thông tin thanh toán cho bệnh nhân : ", qThanhToan.Instruction);
+        Assert.Contains("Mã y tế : ", qThanhToan.Instruction);
+        Assert.Contains("Số bệnh án nội trú : ", qThanhToan.Instruction);
+        Assert.NotNull(sc.InpatientLookupCase);
+        Assert.Contains(sc.InpatientLookupCase.FullName, qThanhToan.Instruction);
+        Assert.Contains(sc.InpatientLookupCase.MedicalCode, qThanhToan.Instruction);
         Assert.Contains("Số tiền người bệnh đã thanh toán : ……………………………………………………", qThanhToan.Instruction);
         Assert.Contains("Số tiền người bệnh đã tạm ứng : ……………………………………………………", qThanhToan.Instruction);
         Assert.Contains("Số tiền còn phải thu người bệnh : ……………………………………………………", qThanhToan.Instruction);
@@ -692,5 +696,77 @@ public class ExamScenarioAllocatorTests : IDisposable
             allocator.AllocateBatchScenariosAsync("DotThi_Test", new DateOnly(2026, 9, 15), candidates));
 
         Assert.Contains("chưa được cấu hình danh sách User HIS thi trong Tab 3", ex.Message);
+    }
+
+    [Fact]
+    public async Task Frontdesk_template_generates_7_questions_and_answer_key_document()
+    {
+        await SetupSyncedCatalogAsync();
+
+        var allocator = new ExamScenarioAllocator(_database);
+        var candidates = new[]
+        {
+            new CandidateInput("Nguyễn Thị Thu Phí", "LT01", "Khoa Nội", "tpl-lt-thuphi")
+        };
+
+        var scenarios = await allocator.AllocateBatchScenariosAsync("DotThi_ThuPhi_2026", new DateOnly(2026, 10, 16), candidates);
+        Assert.Single(scenarios);
+
+        var sc = scenarios[0];
+        Assert.Equal(7, sc.Questions.Count);
+        Assert.Equal(10.0, sc.TotalScore);
+
+        // Check questions
+        Assert.Equal("LT_BAN_PHIEU_KHAM", sc.Questions[0].ActionCode);
+        Assert.Equal(1.0, sc.Questions[0].Score);
+        Assert.Contains("Tiếp nhận bệnh nhân và cho chỉ định khám bệnh", sc.Questions[0].Instruction);
+        Assert.Contains(sc.SecondPatient!.FullName.ToUpperInvariant(), sc.Questions[0].Instruction);
+        Assert.Contains(sc.Patient.FullName.ToUpperInvariant(), sc.Questions[0].Instruction);
+        Assert.Contains("Khám nội VP", sc.Questions[0].Instruction);
+        Assert.Contains("Khám ngoại tổng hợp BHYT", sc.Questions[0].Instruction);
+
+        Assert.Equal("LT_THU_PHI_VA_CLS", sc.Questions[1].ActionCode);
+        Assert.Equal(2.0, sc.Questions[1].Score);
+        Assert.Contains("THI", sc.Questions[1].Instruction);
+
+        Assert.Equal("LT_THU_TAM_UNG_NOI_TRU", sc.Questions[2].ActionCode);
+        Assert.Equal(2.0, sc.Questions[2].Score);
+        Assert.NotNull(sc.AdvancePaymentCase1);
+        Assert.NotNull(sc.AdvancePaymentOutpatientCase);
+        Assert.Contains("Bệnh nhân nội trú có số bệnh án", sc.Questions[2].Instruction);
+        Assert.Contains("Bệnh nhân bệnh án ngoại trú có số bệnh án", sc.Questions[2].Instruction);
+        Assert.Contains("1.500.000", sc.Questions[2].Instruction);
+        Assert.Contains("500.000", sc.Questions[2].Instruction);
+
+        Assert.Equal("LT_DOI_DICH_VU_CLS", sc.Questions[3].ActionCode);
+        Assert.Equal(1.0, sc.Questions[3].Score);
+
+        Assert.Equal("LT_TRA_CUU_THONG_TIN", sc.Questions[4].ActionCode);
+        Assert.Equal(2.0, sc.Questions[4].Score);
+        Assert.NotNull(sc.InpatientLookupCase);
+        Assert.NotNull(sc.OutpatientLookupCase);
+
+        Assert.Equal("LT_THANH_TOAN_RA_VIEN", sc.Questions[5].ActionCode);
+        Assert.Equal(1.0, sc.Questions[5].Score);
+        Assert.NotNull(sc.DischargeCase);
+
+        Assert.Equal("LT_TAO_THE_TAM_BHYT", sc.Questions[6].ActionCode);
+        Assert.Equal(1.0, sc.Questions[6].Score);
+        // Date of birth must be 1 month before examDate (examDate = 2026-10-16 -> birthDate = 16/09/2026)
+        Assert.Contains("Ngày sinh: 16/09/2026", sc.Questions[6].Instruction);
+
+        // Test Word writer creates exam and answer key docx
+        var tempExamDocx = Path.Combine(Path.GetTempPath(), $"DeThi_LT_{Guid.NewGuid():N}.docx");
+        var tempKeyDocx = Path.Combine(Path.GetTempPath(), $"DapAn_LT_{Guid.NewGuid():N}.docx");
+
+        var writer = new WordExamWriter();
+        writer.Create(tempExamDocx, sc);
+        writer.CreateAnswerKeyDocument(tempKeyDocx, scenarios);
+
+        Assert.True(File.Exists(tempExamDocx));
+        Assert.True(File.Exists(tempKeyDocx));
+
+        try { File.Delete(tempExamDocx); } catch { }
+        try { File.Delete(tempKeyDocx); } catch { }
     }
 }

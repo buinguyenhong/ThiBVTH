@@ -420,6 +420,30 @@ public partial class MainWindow : Window
                     {
                         await _database.MarkPatientUsedAsync(scenario.SecondPatient.MedicalCode, scenario.SecondPatient.FullName, batchName);
                     }
+                    if (scenario.InpatientLookupCase is not null && !string.IsNullOrWhiteSpace(scenario.InpatientLookupCase.MedicalCode))
+                    {
+                        await _database.MarkPatientUsedAsync(scenario.InpatientLookupCase.MedicalCode, scenario.InpatientLookupCase.FullName, batchName);
+                    }
+                    if (scenario.AdvancePaymentCase1 is not null && !string.IsNullOrWhiteSpace(scenario.AdvancePaymentCase1.MedicalCode))
+                    {
+                        await _database.MarkPatientUsedAsync(scenario.AdvancePaymentCase1.MedicalCode, scenario.AdvancePaymentCase1.FullName, batchName);
+                    }
+                    if (scenario.AdvancePaymentCase2 is not null && !string.IsNullOrWhiteSpace(scenario.AdvancePaymentCase2.MedicalCode))
+                    {
+                        await _database.MarkPatientUsedAsync(scenario.AdvancePaymentCase2.MedicalCode, scenario.AdvancePaymentCase2.FullName, batchName);
+                    }
+                    if (scenario.DischargeCase is not null && !string.IsNullOrWhiteSpace(scenario.DischargeCase.MedicalCode))
+                    {
+                        await _database.MarkPatientUsedAsync(scenario.DischargeCase.MedicalCode, scenario.DischargeCase.FullName, batchName);
+                    }
+                    if (scenario.OutpatientLookupCase is not null && !string.IsNullOrWhiteSpace(scenario.OutpatientLookupCase.MedicalCode))
+                    {
+                        await _database.MarkPatientUsedAsync(scenario.OutpatientLookupCase.MedicalCode, scenario.OutpatientLookupCase.FullName, batchName);
+                    }
+                    if (scenario.AdvancePaymentOutpatientCase is not null && !string.IsNullOrWhiteSpace(scenario.AdvancePaymentOutpatientCase.MedicalCode))
+                    {
+                        await _database.MarkPatientUsedAsync(scenario.AdvancePaymentOutpatientCase.MedicalCode, scenario.AdvancePaymentOutpatientCase.FullName, batchName);
+                    }
                 }
 
                 // 3. Generate Merged Word Document (.docx) for one-click printing of all candidates
@@ -429,6 +453,12 @@ public partial class MainWindow : Window
                     var mergedDocxPath = Path.Combine(outputDir, mergedDocxName);
                     _wordWriter.CreateMerged(mergedDocxPath, scenarios);
                     archive.CreateEntryFromFile(mergedDocxPath, mergedDocxName);
+
+                    // 4. Generate Answer Key Document for proctors and examiners
+                    var answerKeyDocxName = $"_DapAn_CoiThi_ChamThi_{batchName}_{examDate:yyyyMMdd}.docx";
+                    var answerKeyDocxPath = Path.Combine(outputDir, answerKeyDocxName);
+                    _wordWriter.CreateAnswerKeyDocument(answerKeyDocxPath, scenarios);
+                    archive.CreateEntryFromFile(answerKeyDocxPath, answerKeyDocxName);
                 }
             }
 
@@ -793,7 +823,9 @@ public partial class MainWindow : Window
                 $"• Dịch vụ Kỹ thuật / CLS: {counts.GetValueOrDefault("Services", 0):N0} bản ghi\n" +
                 $"• Tài khoản User HIS: {counts.GetValueOrDefault("Users", 0):N0} tài khoản\n" +
                 $"• Thuốc / VTYT có tồn dương: {counts.GetValueOrDefault("Drugs", 0):N0} mặt hàng\n" +
-                $"• Hồ sơ Bệnh nhân nguồn: {counts.GetValueOrDefault("Patients", 0):N0} hồ sơ";
+                $"• Hồ sơ Bệnh nhân nguồn: {counts.GetValueOrDefault("Patients", 0):N0} hồ sơ\n" +
+                $"• Ca bệnh nội trú đang nằm viện: {counts.GetValueOrDefault("Inpatients", 0):N0} ca\n" +
+                $"• Bệnh án ngoại trú đang điều trị: {counts.GetValueOrDefault("Outpatients", 0):N0} ca";
 
             ConnectionStatusText.Text = "Đồng bộ THÀNH CÔNG toàn bộ danh mục từ HIS!";
             FooterStatusText.Text = "Đồng bộ snapshot HIS thành công.";
@@ -1379,7 +1411,9 @@ public partial class MainWindow : Window
             ["Services"] = "Dịch vụ kỹ thuật",
             ["Patients"] = "Hồ sơ Bệnh nhân",
             ["Drugs"] = "Thuốc & Vật tư y tế",
-            ["Users"] = "Tài khoản HIS khảo thí"
+            ["Users"] = "Tài khoản HIS khảo thí",
+            ["Inpatients"] = "Ca bệnh nội trú đang nằm viện",
+            ["Outpatients"] = "Bệnh án ngoại trú đang điều trị"
         };
 
         CatalogsGrid.ItemsSource = summary.Select(x => new CatalogRow(
@@ -1396,6 +1430,8 @@ public partial class MainWindow : Window
         CardWhCount.Text = summary.GetValueOrDefault("Warehouses", 0).ToString("N0");
         CardDrugCount.Text = summary.GetValueOrDefault("Drugs", 0).ToString("N0");
         CardUserCount.Text = summary.GetValueOrDefault("Users", 0).ToString("N0");
+        CardInpatientCount.Text = summary.GetValueOrDefault("Inpatients", 0).ToString("N0");
+        CardOutpatientCount.Text = summary.GetValueOrDefault("Outpatients", 0).ToString("N0");
     }
 
     private static string Sanitize(string value) =>
