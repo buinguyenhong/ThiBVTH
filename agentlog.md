@@ -2,6 +2,43 @@
 
 Nhật ký ghi lại các thay đổi, quyết định thiết kế và tiến trình thực thi của Antigravity Coding Assistant trong suốt phiên làm việc.
 
+## [2026-10-17] Đồng bộ Tồn kho Theo Các Mốc Ngày Thi Cố Định & Kế hoạch Xây dựng ExamClient
+
+### 1. Đồng bộ Tồn kho Theo Các Mốc Ngày Cố Định (Trước tháng 03/2026):
+* **Bối cảnh & Nghiệp vụ:**
+  - CSDL kiểm thử/thi HIS là dữ liệu staging/đóng băng trước tháng 3/2026, không có phát sinh giao dịch mới liên tục.
+  - Chuyển hẳn cơ chế kiểm tra tồn kho từ "tồn kho tức thời" sang **tính toán trước số tồn cuối kỳ (Closing Stock)** cho 4 mốc thời gian cố định:
+    1. **Kỳ 1 (`P1_2026_01A`):** `01/01/2026` đến `15/01/2026`
+    2. **Kỳ 2 (`P2_2026_01B`):** `16/01/2026` đến `31/01/2026`
+    3. **Kỳ 3 (`P3_2026_02A`):** `01/02/2026` đến `15/02/2026`
+    4. **Kỳ 4 (`P4_2026_02B`):** `16/02/2026` đến `28/02/2026`
+* **Công thức truy vấn eHospital chuẩn (`sp_BCDP_023_BaoCaoTonKho`):**
+  - Tồn cuối kỳ tại `@DenNgay` = Số dư đầu tháng (`DuocTonDauKy`) + Nhập phát sinh đến `@DenNgay` - Xuất phát sinh đến `@DenNgay`.
+* **Lưu trữ & Phân bổ:**
+  - Tạo bảng SQLite `SnapshotInventoryPeriod` và record `SnapshotInventoryPeriodRow`, `InventoryCheckPeriodItem`.
+  - Khi sinh đề câu `TK_KIEM_TON_KHO`: Lọc theo khoa/kho của thí sinh, bốc ngẫu nhiên 1 mốc kỳ + 1 mặt hàng dược trong kỳ đó.
+  - Đề bài hiển thị chính xác mốc ngày và tên thuốc; Bảng đáp án đối soát của Giám khảo ghi rõ con số tồn cuối kỳ chính xác tuyệt đối theo màn hình eHospital.
+* **Kiểm thử & Đóng gói:**
+  - Bổ sung unit test `Inventory_check_question_allocates_from_defined_snapshot_periods_with_exact_closing_stock`.
+  - Toàn bộ **39/39 tests PASSED (100%)**.
+  - Đóng gói xuất bản cả 2 bản build: Standard và Standalone.
+
+### 2. Kế hoạch Kiến trúc Xây dựng ExamClient & Màn hình Chấm thi Đối soát:
+* Đã lập tài liệu kiến trúc chi tiết phiên bản 2.0 tại [`docs/EXAM_CLIENT_ARCHITECTURE_PLAN.md`](docs/EXAM_CLIENT_ARCHITECTURE_PLAN.md).
+* **Đặc tả Quản lý Thời gian & Cơ chế Bù giờ (Exam Duration & Extra Time):**
+  - Thời lượng đếm ngược tuân thủ thời gian riêng của từng đề thi (`DurationMinutes`).
+  - Hỗ trợ **Bù giờ sự cố phòng thi**: Giám thị nhập Mật khẩu bảo vệ + Số phút bù thêm $\rightarrow$ Đồng hồ cộng giờ và mở khóa cho thí sinh tiếp tục làm bài; thông tin bù giờ được lưu vết.
+* **Cơ chế Nộp bài 1-Click:**
+  - Nút **"Nộp bài & Gửi kết quả"** tự động đóng gói và chuyển bài làm `.sub_pkg` đến thư mục chia sẻ/máy chấm của giám khảo với một click duy nhất.
+* **Quy trình Chấm thi Đối soát (Assisted Grading - Không chấm tự động áp đặt):**
+  - Màn hình đối soát hiển thị song song: Yêu cầu đề bài vs Đáp án chuẩn vs Kết quả thực tế thí sinh làm được (dữ liệu điền + truy vấn vết thao tác trên HIS).
+  - Cung cấp **Ô nhập Điểm** cho từng câu (giám khảo toàn quyền cho điểm hoặc bấm gợi ý điểm nhanh).
+  - Cung cấp **Ô nhập Chú thích / Nhận xét** cho từng câu (ghi chú lỗi thao tác, lý do trừ điểm).
+  - Tự động cộng tổng điểm và hỗ trợ xuất Báo cáo Bảng điểm tổng hợp ra Word/Excel.
+* **Thiết kế Giao diện:** Đơn giản, rõ ràng, phông chữ to, độ tương phản cao, tập trung vào trải nghiệm thí sinh và giám khảo.
+
+---
+
 ## [2026-10-16] Tích hợp Danh mục Ca bệnh nội trú, Bệnh án ngoại trú & Mẫu đề Lễ tân - Thu phí (7 câu, 10.0đ)
 
 ### 1. Nhu cầu & Thiết kế nghiệp vụ (Dựa trên tài liệu đề thực tế `LeTan_TP_11.doc`):

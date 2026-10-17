@@ -648,6 +648,49 @@ public class ExamScenarioAllocatorTests : IDisposable
     }
 
     [Fact]
+    public async Task Inventory_check_question_allocates_from_defined_snapshot_periods_with_exact_closing_stock()
+    {
+        await SetupSyncedCatalogAsync();
+
+        // Seed fixed inventory period
+        await _database.ReplaceSnapshotInventoryPeriodsAsync(new[]
+        {
+            new SnapshotInventoryPeriodRow(
+                "P1_2026_01A",
+                "01/01/2026 đến 15/01/2026",
+                "2026-01-01",
+                "2026-01-15 23:59:59",
+                "KHO-NOI",
+                "Kho trực Nội",
+                "NOI",
+                "Khoa Nội",
+                "AMOX500",
+                "Amoxicillin 500mg",
+                "Viên",
+                125.0,
+                "Viện phí"
+            )
+        });
+
+        var allocator = new ExamScenarioAllocator(_database);
+        var candidates = new[]
+        {
+            new CandidateInput("Nguyễn Văn A", "SBD01", "Khoa Nội", "Đề Điều dưỡng nội trú chuẩn (8 câu)")
+        };
+
+        var scenarios = await allocator.AllocateBatchScenariosAsync("DotThi_PeriodTest", new DateOnly(2026, 10, 20), candidates);
+        var sc = scenarios.Single();
+
+        var qInv = sc.Questions.FirstOrDefault(q => q.ActionCode == "TK_KIEM_TON_KHO");
+        Assert.NotNull(qInv);
+        Assert.NotNull(sc.InventoryCheckPeriod);
+        Assert.Equal("AMOX500", sc.InventoryCheckPeriod.DrugCode);
+        Assert.Equal(125.0, sc.InventoryCheckPeriod.ClosingStock);
+        Assert.Contains("01/01/2026 đến ngày 15/01/2026", qInv.Instruction);
+        Assert.Contains("Amoxicillin 500mg", qInv.Instruction);
+    }
+
+    [Fact]
     public async Task Template_without_drug_order_action_does_not_allocate_ordered_drugs_or_render_drug_table()
     {
         await SetupSyncedCatalogAsync();

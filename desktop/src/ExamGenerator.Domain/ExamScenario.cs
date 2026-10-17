@@ -76,7 +76,8 @@ public sealed record ExamScenario(
     InpatientCase? AdvancePaymentCase1 = null,
     InpatientCase? AdvancePaymentCase2 = null,
     InpatientCase? DischargeCase = null,
-    OutpatientCase? AdvancePaymentOutpatientCase = null)
+    OutpatientCase? AdvancePaymentOutpatientCase = null,
+    InventoryCheckPeriodItem? InventoryCheckPeriod = null)
 {
     public double TotalScore => Questions.Sum(q => q.Score);
 }

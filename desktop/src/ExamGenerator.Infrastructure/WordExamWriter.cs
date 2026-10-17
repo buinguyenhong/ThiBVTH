@@ -261,6 +261,13 @@ public sealed class WordExamWriter
                 $"• BN: {s.Patient.FullName} (Mã: {s.Patient.MedicalCode}) | Thuốc: " +
                 (s.OrderedDrugs.Count > 0 ? string.Join("; ", s.OrderedDrugs.Select(d => $"{d.Name} ({d.Code}, SL:{d.Quantity})")) : "Theo chỉ định"),
 
+            "TK_KIEM_TON_KHO" =>
+                s.InventoryCheckPeriod is not null
+                    ? $"• Kiểm tồn kho: {s.InventoryCheckPeriod.DrugName} (Từ {s.InventoryCheckPeriod.FromDate:dd/MM/yyyy} đến {s.InventoryCheckPeriod.ToDate:dd/MM/yyyy}, Kho: {s.InventoryCheckPeriod.WarehouseName}, Nguồn: {s.InventoryCheckPeriod.FundingSource}) -> Tồn cuối kỳ: {s.InventoryCheckPeriod.ClosingStock:N0} {s.InventoryCheckPeriod.Unit}"
+                    : (s.InventoryCheckDrug is not null
+                        ? $"• Kiểm tồn kho: {s.InventoryCheckDrug.Name} (Kho: {s.InventoryCheckDrug.WarehouseName}, Nguồn: {s.InventoryCheckDrug.FundingSource})"
+                        : "• Kiểm tra tồn kho dược cơ số theo đề bài"),
+
             _ =>
                 $"• BN: {s.Patient.FullName} (Mã: {s.Patient.MedicalCode})"
         };

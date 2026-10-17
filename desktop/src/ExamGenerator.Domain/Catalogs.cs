@@ -112,6 +112,21 @@ public sealed record OutpatientCase(
     string? Diagnosis,
     string? DoctorName);
 
+public sealed record InventoryCheckPeriodItem(
+    string PeriodCode,
+    string PeriodName,
+    DateOnly FromDate,
+    DateOnly ToDate,
+    string WarehouseCode,
+    string WarehouseName,
+    string DepartmentCode,
+    string DepartmentName,
+    string DrugCode,
+    string DrugName,
+    string Unit,
+    double ClosingStock,
+    string FundingSource);
+
 public sealed record CatalogSnapshot(
     string Id,
     DateTimeOffset ImportedAt,

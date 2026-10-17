@@ -1413,7 +1413,8 @@ public partial class MainWindow : Window
             ["Drugs"] = "Thuốc & Vật tư y tế",
             ["Users"] = "Tài khoản HIS khảo thí",
             ["Inpatients"] = "Ca bệnh nội trú đang nằm viện",
-            ["Outpatients"] = "Bệnh án ngoại trú đang điều trị"
+            ["Outpatients"] = "Bệnh án ngoại trú đang điều trị",
+            ["InventoryPeriods"] = "Mốc kiểm kê tồn kho kỳ định sẵn"
         };
 
         CatalogsGrid.ItemsSource = summary.Select(x => new CatalogRow(

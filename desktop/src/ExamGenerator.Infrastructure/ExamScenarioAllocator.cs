@@ -44,6 +44,7 @@ public sealed class ExamScenarioAllocator
 
         var allInpatients = (await _database.GetAvailableInpatientsAsync(cancellationToken: cancellationToken)).ToList();
         var allOutpatients = (await _database.GetAvailableOutpatientsAsync(cancellationToken: cancellationToken)).ToList();
+        var allInventoryPeriods = (await _database.GetSnapshotInventoryPeriodsAsync(cancellationToken: cancellationToken)).ToList();
 
         // Cache warehouse drugs and remaining stock across candidates
         var warehouseDrugsCache = new Dictionary<string, IReadOnlyList<SnapshotDrugRow>>(StringComparer.OrdinalIgnoreCase);
@@ -223,11 +224,65 @@ public sealed class ExamScenarioAllocator
                     drugReturn = null;
                 }
 
-                // Inventory check drug for Q6 (preferably Viện phí source, rotated across candidates)
-                var vpDrugsForCheck = warehouseDrugs.Where(d => d.FundingSource.Equals("Viện phí", StringComparison.OrdinalIgnoreCase)).ToList();
-                var invPool = vpDrugsForCheck.Count > 0 ? vpDrugsForCheck : warehouseDrugs;
-                var invDrugRow = invPool[rng.Next(invPool.Count)];
-                var inventoryCheckDrug = new ScenarioDrug(invDrugRow.DrugCode, invDrugRow.DrugName, invDrugRow.Unit, 0, "", invDrugRow.WarehouseCode, invDrugRow.WarehouseName, invDrugRow.FundingSource);
+                // Inventory check period item for Q6 / TK_KIEM_TON_KHO (Pre-calculated fixed periods before March 2026)
+                var deptPeriods = allInventoryPeriods
+                    .Where(p => (!string.IsNullOrWhiteSpace(p.WarehouseCode) && p.WarehouseCode.Equals(targetWh.WarehouseCode, StringComparison.OrdinalIgnoreCase)) ||
+                                (!string.IsNullOrWhiteSpace(p.DepartmentCode) && p.DepartmentCode.Equals(deptCode, StringComparison.OrdinalIgnoreCase)))
+                    .ToList();
+                if (deptPeriods.Count == 0 && allInventoryPeriods.Count > 0)
+                {
+                    deptPeriods = allInventoryPeriods.ToList();
+                }
+
+                InventoryCheckPeriodItem? inventoryPeriodItem = null;
+                ScenarioDrug inventoryCheckDrug;
+
+                if (deptPeriods.Count > 0)
+                {
+                    var vpPeriods = deptPeriods.Where(p => p.FundingSource.Equals("Viện phí", StringComparison.OrdinalIgnoreCase)).ToList();
+                    var pool = vpPeriods.Count > 0 ? vpPeriods : deptPeriods;
+                    var picked = pool[rng.Next(pool.Count)];
+
+                    DateOnly.TryParse(picked.FromDate.Length >= 10 ? picked.FromDate[..10] : picked.FromDate, out var pFrom);
+                    DateOnly.TryParse(picked.ToDate.Length >= 10 ? picked.ToDate[..10] : picked.ToDate, out var pTo);
+                    if (pFrom == default) pFrom = new DateOnly(2026, 2, 1);
+                    if (pTo == default) pTo = new DateOnly(2026, 2, 28);
+
+                    inventoryPeriodItem = new InventoryCheckPeriodItem(
+                        picked.PeriodCode,
+                        picked.PeriodName,
+                        pFrom,
+                        pTo,
+                        picked.WarehouseCode,
+                        picked.WarehouseName,
+                        picked.DepartmentCode,
+                        picked.DepartmentName,
+                        picked.DrugCode,
+                        picked.DrugName,
+                        picked.Unit,
+                        picked.ClosingStock,
+                        picked.FundingSource
+                    );
+
+                    inventoryCheckDrug = new ScenarioDrug(
+                        picked.DrugCode,
+                        picked.DrugName,
+                        picked.Unit,
+                        0,
+                        "",
+                        picked.WarehouseCode,
+                        picked.WarehouseName,
+                        picked.FundingSource
+                    );
+                }
+                else
+                {
+                    // Fallback to warehouse stock if periods not populated yet
+                    var vpDrugsForCheck = warehouseDrugs.Where(d => d.FundingSource.Equals("Viện phí", StringComparison.OrdinalIgnoreCase)).ToList();
+                    var invPool = vpDrugsForCheck.Count > 0 ? vpDrugsForCheck : warehouseDrugs;
+                    var invDrugRow = invPool[rng.Next(invPool.Count)];
+                    inventoryCheckDrug = new ScenarioDrug(invDrugRow.DrugCode, invDrugRow.DrugName, invDrugRow.Unit, 0, "", invDrugRow.WarehouseCode, invDrugRow.WarehouseName, invDrugRow.FundingSource);
+                }
 
                 // Inpatient and outpatient cases for lookup / advance payment / discharge
                 InpatientCase? advanceCase1 = null;
@@ -299,7 +354,8 @@ public sealed class ExamScenarioAllocator
                         outLookupCase,
                         advanceOutpatientCase,
                         allServicesWithGroup,
-                        rng);
+                        rng,
+                        inventoryPeriodItem);
 
                     questions.Add(new ScenarioQuestion(aIdx + 1, act.Code, act.Name, instruction, act.Score));
                 }
@@ -334,7 +390,8 @@ public sealed class ExamScenarioAllocator
                     advanceCase1,
                     advanceCase2,
                     dischargeCase,
-                    advanceOutpatientCase
+                    advanceOutpatientCase,
+                    inventoryPeriodItem
                 );
 
                 scenarios.Add(scenario);
@@ -667,7 +724,8 @@ public sealed class ExamScenarioAllocator
         OutpatientCase? outLookupCase = null,
         OutpatientCase? advanceOutpatientCase = null,
         IReadOnlyList<(string Code, string Name, string GroupName)>? allServices = null,
-        Random? rng = null) => code switch
+        Random? rng = null,
+        InventoryCheckPeriodItem? inventoryPeriodItem = null) => code switch
     {
         "LT_BAN_PHIEU_KHAM" => BuildLtBanPhieuKhamInstruction(patient, secondPatient, examDate),
         "LT_THU_PHI_VA_CLS" => BuildLtThuPhiClsInstruction(pickedSieuAm, allServices),
@@ -690,7 +748,9 @@ public sealed class ExamScenarioAllocator
         "YL_CHI_DINH_THUOC_VTYT" => "Lên y lệnh(có D/S Thuốc, VTYT đính kèm)(1.5đ)\nLập  phiếu lĩnh dược(0.5đ)\nNhập nội bộ(0.5đ)\nXuất sử dụng thuốc cho bệnh nhân(0.5đ)\nSố điểm đạt được:………(đ)",
         "YL_TRA_THUOC" => $"Bệnh nhân trả thuốc và tổng hợp phiếu trả.(Chỉ thao tác trên bệnh nhân BHYT có số vào viện ở câu 1), thuốc cần trả {drugReturn?.ReturnedDrug.Name ?? "thuốc"}, số lượng trả : {drugReturn?.ReturnQuantity ?? 1} {drugReturn?.ReturnedDrug.Unit ?? "viên"}.\nSố điểm đạt được:………(đ)",
         "YL_DOI_THEM_DICH_VU" => $"Đổi dịch vụ {serviceChange?.CanceledService.Name ?? "Dịch vụ CLS 1"} thành dịch vụ {serviceChange?.NewService.Name ?? "Dịch vụ CLS 2"} thêm 01 dịch vụ: {(serviceChange?.AddedService?.Name ?? "Chụp Xquang ngực thẳng [Số hóa 1 phim]")}. (Bệnh nhân BHYT câu 1)\nSố điểm đạt được:………(đ)",
-        "TK_KIEM_TON_KHO" => $"Báo số tồn kho của một loại dược trong kho cơ số (Nguồn {inventoryDrug?.FundingSource ?? "Viện phí"}) từ ngày 01/02/2026 đến ngày 28/02/2026 : Tên dược: {inventoryDrug?.Name ?? "Thuốc/VTYT"}  số lượng tồn cuối : …………….\nSố điểm đạt được:………(đ)",
+        "TK_KIEM_TON_KHO" => inventoryPeriodItem is not null
+            ? $"Báo số tồn kho của một loại dược trong kho cơ số (Nguồn {inventoryPeriodItem.FundingSource}) từ ngày {inventoryPeriodItem.FromDate:dd/MM/yyyy} đến ngày {inventoryPeriodItem.ToDate:dd/MM/yyyy} : Tên dược: {inventoryPeriodItem.DrugName}  số lượng tồn cuối : …………….\nSố điểm đạt được:………(đ)"
+            : $"Báo số tồn kho của một loại dược trong kho cơ số (Nguồn {inventoryDrug?.FundingSource ?? "Viện phí"}) từ ngày 01/02/2026 đến ngày 28/02/2026 : Tên dược: {inventoryDrug?.Name ?? "Thuốc/VTYT"}  số lượng tồn cuối : …………….\nSố điểm đạt được:………(đ)",
         "CK_CHUYEN_KHOA" => $"Chuyển một bệnh nhân bất kỳ từ khoa {deptName} đến {targetTransferDept}(bệnh nhân nhập viện trước {cutoffDate:dd/MM/yyyy}), Số vào viện của BN: …………………, Mã y tế :…………………., họ tên bệnh nhân:……………………………………\nSố điểm đạt được:………(đ)",
         "RV_CHO_RA_VIEN" => $"Thực hiện thao tác cho bệnh nhân ra viện(bệnh nhân nhập viện trước {cutoffDate:dd/MM/yyyy}) : Số vào viện của BN: ………………………\nSố điểm đạt được:………(đ)",
         _ => actionDescMap.TryGetValue(code, out var customDesc) && !string.IsNullOrWhiteSpace(customDesc)

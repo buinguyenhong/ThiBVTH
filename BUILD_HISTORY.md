@@ -216,3 +216,11 @@
   - Tieu chuan: `desktop/publish/ExamOperationsDesktop/ExamGenerator.Desktop.exe` (148.5 KB)
   - Standalone: `desktop/publish/ExamOperationsDesktop-Standalone/ExamGenerator.Desktop.exe` (148.5 KB)
 - **Ghi chu thay doi:** Automated release build
+
+### Build [2026-10-17 11:07:06] - Commit [3fca1a4]
+- **Trang thai:** Thanh cong (34/34 Tests Passed)
+- **Cau hinh:** .NET 8 LTS (Release) + Standalone (Self-Contained win-x64)
+- **Duong dan chay:**
+  - Tieu chuan: `desktop/publish/ExamOperationsDesktop/ExamGenerator.Desktop.exe` (148.5 KB)
+  - Standalone: `desktop/publish/ExamOperationsDesktop-Standalone/ExamGenerator.Desktop.exe` (148.5 KB)
+- **Ghi chu thay doi:** Automated release build

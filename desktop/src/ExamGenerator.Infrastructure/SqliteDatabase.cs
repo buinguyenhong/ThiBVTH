@@ -182,6 +182,23 @@ public sealed class SqliteDatabase
                 DoctorName TEXT NULL
             );
             CREATE INDEX IF NOT EXISTS IX_Outpatient_Dept ON SnapshotOutpatientCase(DepartmentCode, DepartmentName);
+
+            CREATE TABLE IF NOT EXISTS SnapshotInventoryPeriod (
+                PeriodCode TEXT NOT NULL,
+                PeriodName TEXT NOT NULL,
+                FromDate TEXT NOT NULL,
+                ToDate TEXT NOT NULL,
+                WarehouseCode TEXT NOT NULL,
+                WarehouseName TEXT NOT NULL,
+                DepartmentCode TEXT NOT NULL,
+                DepartmentName TEXT NOT NULL,
+                DrugCode TEXT NOT NULL,
+                DrugName TEXT NOT NULL,
+                Unit TEXT NOT NULL,
+                ClosingStock REAL NOT NULL,
+                FundingSource TEXT NOT NULL
+            );
+            CREATE INDEX IF NOT EXISTS IX_InvPeriod_Dept_Wh ON SnapshotInventoryPeriod(DepartmentCode, WarehouseCode);
             """;
         await command.ExecuteNonQueryAsync(cancellationToken);
 
@@ -855,6 +872,10 @@ public sealed class SqliteDatabase
         var outCount = Convert.ToInt32(await outCmd.ExecuteScalarAsync(cancellationToken) ?? 0);
         result.Add(("Outpatients", outCount));
 
+        var invCmd = connection.CreateCommand(); invCmd.CommandText = "SELECT COUNT(*) FROM SnapshotInventoryPeriod";
+        var invCount = Convert.ToInt32(await invCmd.ExecuteScalarAsync(cancellationToken) ?? 0);
+        result.Add(("InventoryPeriods", invCount));
+
         return result;
     }
 
@@ -1434,6 +1455,109 @@ public sealed class SqliteDatabase
         var val = await command.ExecuteScalarAsync(cancellationToken);
         return Convert.ToInt32(val);
     }
+
+    public async Task ReplaceSnapshotInventoryPeriodsAsync(IReadOnlyList<SnapshotInventoryPeriodRow> rows, CancellationToken cancellationToken = default)
+    {
+        await using var connection = new SqliteConnection($"Data Source={DatabasePath}");
+        await connection.OpenAsync(cancellationToken);
+        await using var transaction = connection.BeginTransaction();
+        var clear = connection.CreateCommand();
+        clear.Transaction = transaction;
+        clear.CommandText = "DELETE FROM SnapshotInventoryPeriod";
+        await clear.ExecuteNonQueryAsync(cancellationToken);
+
+        foreach (var r in rows)
+        {
+            var insert = connection.CreateCommand();
+            insert.Transaction = transaction;
+            insert.CommandText = """
+                INSERT INTO SnapshotInventoryPeriod (
+                    PeriodCode, PeriodName, FromDate, ToDate, WarehouseCode, WarehouseName,
+                    DepartmentCode, DepartmentName, DrugCode, DrugName, Unit, ClosingStock, FundingSource
+                ) VALUES (
+                    $pCode, $pName, $from, $to, $whCode, $whName,
+                    $deptCode, $deptName, $dCode, $dName, $unit, $stock, $src
+                )
+            """;
+            insert.Parameters.AddWithValue("$pCode", r.PeriodCode);
+            insert.Parameters.AddWithValue("$pName", r.PeriodName);
+            insert.Parameters.AddWithValue("$from", r.FromDate);
+            insert.Parameters.AddWithValue("$to", r.ToDate);
+            insert.Parameters.AddWithValue("$whCode", r.WarehouseCode);
+            insert.Parameters.AddWithValue("$whName", r.WarehouseName);
+            insert.Parameters.AddWithValue("$deptCode", r.DepartmentCode);
+            insert.Parameters.AddWithValue("$deptName", r.DepartmentName);
+            insert.Parameters.AddWithValue("$dCode", r.DrugCode);
+            insert.Parameters.AddWithValue("$dName", r.DrugName);
+            insert.Parameters.AddWithValue("$unit", r.Unit);
+            insert.Parameters.AddWithValue("$stock", r.ClosingStock);
+            insert.Parameters.AddWithValue("$src", r.FundingSource);
+            await insert.ExecuteNonQueryAsync(cancellationToken);
+        }
+        await transaction.CommitAsync(cancellationToken);
+    }
+
+    public async Task<IReadOnlyList<SnapshotInventoryPeriodRow>> GetSnapshotInventoryPeriodsAsync(string? departmentCode = null, string? warehouseCode = null, CancellationToken cancellationToken = default)
+    {
+        var rows = new List<SnapshotInventoryPeriodRow>();
+        await using var connection = new SqliteConnection($"Data Source={DatabasePath}");
+        await connection.OpenAsync(cancellationToken);
+        var command = connection.CreateCommand();
+
+        if (string.IsNullOrWhiteSpace(departmentCode) && string.IsNullOrWhiteSpace(warehouseCode))
+        {
+            command.CommandText = """
+                SELECT PeriodCode, PeriodName, FromDate, ToDate, WarehouseCode, WarehouseName,
+                       DepartmentCode, DepartmentName, DrugCode, DrugName, Unit, ClosingStock, FundingSource
+                FROM SnapshotInventoryPeriod
+                ORDER BY PeriodCode, WarehouseName, DrugName
+            """;
+        }
+        else
+        {
+            command.CommandText = """
+                SELECT PeriodCode, PeriodName, FromDate, ToDate, WarehouseCode, WarehouseName,
+                       DepartmentCode, DepartmentName, DrugCode, DrugName, Unit, ClosingStock, FundingSource
+                FROM SnapshotInventoryPeriod
+                WHERE ($deptCode IS NULL OR DepartmentCode = $deptCode)
+                  AND ($whCode IS NULL OR WarehouseCode = $whCode)
+                ORDER BY PeriodCode, WarehouseName, DrugName
+            """;
+            command.Parameters.AddWithValue("$deptCode", (object?)departmentCode ?? DBNull.Value);
+            command.Parameters.AddWithValue("$whCode", (object?)warehouseCode ?? DBNull.Value);
+        }
+
+        await using var reader = await command.ExecuteReaderAsync(cancellationToken);
+        while (await reader.ReadAsync(cancellationToken))
+        {
+            rows.Add(new SnapshotInventoryPeriodRow(
+                reader.GetString(0),
+                reader.GetString(1),
+                reader.GetString(2),
+                reader.GetString(3),
+                reader.GetString(4),
+                reader.GetString(5),
+                reader.GetString(6),
+                reader.GetString(7),
+                reader.GetString(8),
+                reader.GetString(9),
+                reader.GetString(10),
+                reader.GetDouble(11),
+                reader.GetString(12)
+            ));
+        }
+        return rows;
+    }
+
+    public async Task<int> GetInventoryPeriodsCountAsync(CancellationToken cancellationToken = default)
+    {
+        await using var connection = new SqliteConnection($"Data Source={DatabasePath}");
+        await connection.OpenAsync(cancellationToken);
+        var command = connection.CreateCommand();
+        command.CommandText = "SELECT COUNT(*) FROM SnapshotInventoryPeriod";
+        var val = await command.ExecuteScalarAsync(cancellationToken);
+        return Convert.ToInt32(val);
+    }
 }
 
 public sealed record SnapshotUserRow(string UserId, string UserName, string FullName, string DepartmentCode, string DepartmentName);
@@ -1484,3 +1608,19 @@ public sealed record SnapshotOutpatientRow(
     string? InsuranceNumber,
     string? Diagnosis,
     string? DoctorName);
+
+public sealed record SnapshotInventoryPeriodRow(
+    string PeriodCode,
+    string PeriodName,
+    string FromDate,
+    string ToDate,
+    string WarehouseCode,
+    string WarehouseName,
+    string DepartmentCode,
+    string DepartmentName,
+    string DrugCode,
+    string DrugName,
+    string Unit,
+    double ClosingStock,
+    string FundingSource);
+
