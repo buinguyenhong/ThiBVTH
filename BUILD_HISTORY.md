@@ -235,3 +235,11 @@
   - Tieu chuan: `desktop/publish/ExamClient/ExamGenerator.Client.exe`
   - Standalone: `desktop/publish/ExamClient-Standalone/ExamGenerator.Client.exe`
 - **Ghi chu thay doi:** Phát hành phần mềm máy trạm thí sinh độc lập ExamClient (đồng hồ đếm ngược theo đề bài, cơ chế bù giờ sự cố mật khẩu giám thị, nộp bài 1-click) và Tab 7 Chấm thi đối soát (Assisted Grading - không tự động áp đặt điểm, nhập điểm & chú thích từng câu, truy vết HIS, xuất Word).
+
+### Build [2026-10-17 20:56:00]
+- **Trang thai:** Thanh cong (55/55 Tests Passed)
+- **Cau hinh:** .NET 8 LTS (Release) + Standalone (Self-Contained win-x64)
+- **Duong dan chay:**
+  - Phần mềm thi Thí sinh: `1_CHAY_PHAN_MEM_THI.bat` hoặc `1_CHAY_PHAN_MEM_THI.ps1`
+  - Phần mềm Quản trị & Chấm thi: `2_CHAY_PHAN_MEM_CHAM_THI.bat` hoặc `2_CHAY_PHAN_MEM_CHAM_THI.ps1`
+- **Ghi chu thay doi:** Tra soát toàn diện và tự động hóa khung điền đáp án trên phần mềm thi cho tất cả các câu hỏi có yêu cầu viết kết quả sau khi thực thi HIS (Tồn kho, Tra cứu thông tin, Tạo thẻ tạm BHYT, Bệnh án ngoại trú, Bệnh án nội trú, Tra cứu thanh toán, Bệnh sử, Nhận bệnh vào khoa...). Cung cấp script launcher 1-click (.bat và .ps1) tiện lợi.

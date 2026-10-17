@@ -39,3 +39,5 @@ desktop/appsettings.local.json
 desktop/exam-generator.sqlite
 desktop/output/
 scratch/
+exams/
+desktop/exams/

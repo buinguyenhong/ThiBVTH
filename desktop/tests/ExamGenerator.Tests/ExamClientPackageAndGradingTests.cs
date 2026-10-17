@@ -232,4 +232,181 @@ public sealed class ExamClientPackageAndGradingTests
             // Ignore temp cleanup failure
         }
     }
+
+    [Fact]
+    public void GenerateSamplePackages_ForExamClientTesting()
+    {
+        var pkg1 = new ClientExamPackage
+        {
+            ExamId = Guid.NewGuid().ToString("N"),
+            CandidateId = "101",
+            CandidateName = "Nguyễn Văn An",
+            DepartmentName = "Khoa Khám Bệnh",
+            HisUserCode = "USER_THI01",
+            DurationMinutes = 30,
+            Title = "BÀI THI TÁC NGHIỆP TRÊN HỆ THỐNG HIS - KHOA KHÁM BỆNH",
+            SupervisorPasswordHash = ExamPackageService.ComputeSha256("bvth@2026"),
+            Questions = new List<ClientExamQuestion>
+            {
+                new()
+                {
+                    OrderIndex = 1,
+                    ActionCode = "LT_BAN_PHIEU_KHAM",
+                    Title = "Bán phiếu khám bệnh và tiếp nhận",
+                    Instruction = "Thực hiện tiếp nhận 02 bệnh nhân trên phần mềm HIS bằng tài khoản được cấp:\n- BN 1 (Viện phí): Lê Thị Mai (SN: 1985, Đ/c: TP. Buôn Ma Thuột) - PK Nội tổng quát\n- BN 2 (BHYT): Trần Văn Hùng (Mã thẻ: GD4660000000001) - PK Ngoại tổng hợp",
+                    MaxScore = 3.0,
+                    IsFillIn = false
+                },
+                new()
+                {
+                    OrderIndex = 2,
+                    ActionCode = "TK_KIEM_TON_KHO",
+                    Title = "Kiểm tra tồn kho dược theo kỳ",
+                    Instruction = "Tra cứu báo cáo tồn kho dược trên phần mềm HIS theo thông số bên dưới và điền số lượng tồn cuối kỳ vào ô trả lời.",
+                    MaxScore = 3.0,
+                    IsFillIn = true,
+                    FillInPrompt = "Nhập số lượng tồn kho cuối kỳ (sau khi tra cứu trên HIS):",
+                    DetailText = "• Tên thuốc: Paracetamol 500mg (Mã: DUOC_001)\n• Kho dược: Kho Chẵn Bệnh Viện\n• Nguồn: BHYT\n• Kỳ kiểm tra: Từ 01/02/2026 đến hết ngày 15/02/2026"
+                },
+                new()
+                {
+                    OrderIndex = 3,
+                    ActionCode = "LT_THU_TAM_UNG_NOI_TRU",
+                    Title = "Thu tạm ứng viện phí",
+                    Instruction = "Thực hiện thu tạm ứng viện phí trên HIS cho 02 bệnh nhân:\n• BN nội trú: Phạm Văn Nam (Số BA: BA2026012, Khoa: Nội tổng hợp, Giường: G01) - Số tiền: 1.500.000 đ\n• BN ngoại trú: Hoàng Thị Lan (Số BA: BA2026099) - Số tiền: 500.000 đ",
+                    MaxScore = 4.0,
+                    IsFillIn = false
+                }
+            }
+        };
+
+        var pkg2 = new ClientExamPackage
+        {
+            ExamId = Guid.NewGuid().ToString("N"),
+            CandidateId = "102",
+            CandidateName = "Trần Thị Bích",
+            DepartmentName = "Khoa Dược",
+            HisUserCode = "USER_THI02",
+            DurationMinutes = 45,
+            Title = "BÀI THI TÁC NGHIỆP TRÊN HỆ THỐNG HIS - KHOA DƯỢC",
+            SupervisorPasswordHash = ExamPackageService.ComputeSha256("bvth@2026"),
+            Questions = new List<ClientExamQuestion>
+            {
+                new()
+                {
+                    OrderIndex = 1,
+                    ActionCode = "TK_KIEM_TON_KHO",
+                    Title = "Kiểm tra số lượng tồn kho dược cơ số",
+                    Instruction = "Đăng nhập HIS tra cứu số lượng tồn cuối kỳ của mặt hàng theo mốc thời gian quy định và ghi kết quả vào ô trả lời.",
+                    MaxScore = 5.0,
+                    IsFillIn = true,
+                    FillInPrompt = "Số lượng tồn kho cuối kỳ:",
+                    DetailText = "• Tên thuốc: Cefotaxim 1g (Mã: DUOC_CEF1G)\n• Kho dược: Kho Lẻ Bệnh Viện\n• Nguồn: Viện phí\n• Kỳ kiểm tra: Từ 16/01/2026 đến hết ngày 31/01/2026"
+                },
+                new()
+                {
+                    OrderIndex = 2,
+                    ActionCode = "YL_CHI_DINH_THUOC_VTYT",
+                    Title = "Lên y lệnh thuốc & vật tư y tế",
+                    Instruction = "Thực hiện lên y lệnh thuốc trên HIS cho bệnh nhân Nguyễn Văn A (Mã BN: BN000123) theo danh sách chỉ định.",
+                    MaxScore = 5.0,
+                    IsFillIn = false,
+                    DetailText = "1. [DUOC_001] Paracetamol 500mg - SL: 10 viên (BHYT)\n2. [VTYT_002] Bơm tiêm 5ml - SL: 2 cái (Viện phí)"
+                }
+            }
+        };
+
+        var pkg3 = new ClientExamPackage
+        {
+            ExamId = Guid.NewGuid().ToString("N"),
+            CandidateId = "103",
+            CandidateName = "Lê Hoàng Cường",
+            DepartmentName = "Lễ Tân - Thu Phí",
+            HisUserCode = "USER_THI03",
+            DurationMinutes = 35,
+            Title = "BÀI THI TÁC NGHIỆP TRÊN HỆ THỐNG HIS - LỄ TÂN THU PHÍ",
+            SupervisorPasswordHash = ExamPackageService.ComputeSha256("bvth@2026"),
+            Questions = new List<ClientExamQuestion>
+            {
+                new()
+                {
+                    OrderIndex = 1,
+                    ActionCode = "LT_TAO_THE_TAM_BHYT",
+                    Title = "Cấp thẻ tạm BHYT cho trẻ em dưới 6 tuổi",
+                    Instruction = "Thực hiện cấp mã thẻ tạm BHYT trên phần mềm HIS và nhập mã thẻ tạm đã tạo vào ô bên dưới:\n- Bé gái, sinh trước ngày thi 1 tháng\n- Loại đối tượng: Trẻ em dưới 6 tuổi (Mã TE1...)\n- Hạn thẻ: 30 ngày kể từ ngày thi",
+                    MaxScore = 5.0,
+                    IsFillIn = true,
+                    FillInPrompt = "Nhập mã thẻ tạm BHYT đã tạo trên HIS (VD: TE1...):"
+                },
+                new()
+                {
+                    OrderIndex = 2,
+                    ActionCode = "LT_TRA_CUU_THONG_TIN",
+                    Title = "Tra cứu thông tin bệnh nhân nội trú",
+                    Instruction = "Tra cứu thông tin bệnh nhân nội trú trên HIS và nhập kết quả (Số bệnh án, Khoa, Giường, Ngày vào viện) vào ô trả lời bên dưới.",
+                    MaxScore = 5.0,
+                    IsFillIn = true,
+                    FillInPrompt = "Nhập kết quả tra cứu (Số BA, Giường, Ngày vào viện,...):",
+                    DetailText = "• Tên bệnh nhân cần tra cứu: Võ Văn Hậu (Mã BN: BN009876)"
+                }
+            }
+        };
+
+        var current = new DirectoryInfo(AppContext.BaseDirectory);
+        while (current != null && !File.Exists(Path.Combine(current.FullName, "ExamGenerator.Desktop.sln")) && !Directory.Exists(Path.Combine(current.FullName, "desktop")))
+        {
+            current = current.Parent;
+        }
+        var repoRoot = current?.FullName ?? AppContext.BaseDirectory;
+        if (File.Exists(Path.Combine(repoRoot, "ExamGenerator.Desktop.sln")))
+        {
+            repoRoot = current!.Parent?.FullName ?? repoRoot;
+        }
+
+        var targetDirs = new[]
+        {
+            Path.Combine(repoRoot, "exams"),
+            Path.Combine(repoRoot, "desktop", "publish", "ExamClient", "exams"),
+            Path.Combine(repoRoot, "desktop", "publish", "ExamClient-Standalone", "exams"),
+            Path.Combine(repoRoot, "desktop", "publish", "ExamOperationsDesktop", "exams"),
+            Path.Combine(repoRoot, "desktop", "publish", "ExamOperationsDesktop-Standalone", "exams"),
+            Path.Combine(repoRoot, "desktop", "src", "ExamGenerator.Client", "bin", "Debug", "net8.0-windows", "exams")
+        };
+
+        foreach (var dir in targetDirs)
+        {
+            Directory.CreateDirectory(dir);
+            ExamPackageService.SavePackage(pkg1, Path.Combine(dir, "101_KKHAM_001.exam_pkg"));
+            ExamPackageService.SavePackage(pkg2, Path.Combine(dir, "102_KDUOC_002.exam_pkg"));
+            ExamPackageService.SavePackage(pkg3, Path.Combine(dir, "103_LTTP_003.exam_pkg"));
+        }
+    }
+
+    [Theory]
+    [InlineData("TK_KIEM_TON_KHO", "Kiểm tra tồn kho")]
+    [InlineData("LT_TRA_CUU_THONG_TIN", "Tra cứu buồng giường")]
+    [InlineData("LT_TAO_THE_TAM_BHYT", "Tạo mã thẻ tạm")]
+    [InlineData("KB_BENH_AN_NGOAI_TRU", "Tạo bệnh án ngoại trú")]
+    [InlineData("KB_CHI_DINH_NOI_TRU", "Chỉ định nội trú")]
+    [InlineData("HC_TRA_CUU_THANH_TOAN", "Tra cứu thanh toán")]
+    [InlineData("TC_TRA_CUU_BENH_SU", "Tra cứu bệnh sử")]
+    [InlineData("NT_NHAN_BENH_KHOA", "Nhận bệnh vào khoa")]
+    public void AllFillInQuestions_AreProperlyIdentifiedAndPrompted(string actionCode, string title)
+    {
+        Assert.True(ExamPackageService.IsQuestionFillIn(actionCode, null, title));
+        var prompt = ExamPackageService.GetFillInPrompt(actionCode, null, title);
+        Assert.NotNull(prompt);
+        Assert.NotEmpty(prompt);
+    }
+
+    [Theory]
+    [InlineData("CUSTOM_ACTION", "Ghi lại số vào viện của người bệnh sau khi tiếp nhận")]
+    [InlineData("CUSTOM_ACTION", "Điền số bệnh án vào ô bên dưới")]
+    [InlineData("CUSTOM_ACTION", "Nhập kết quả tra cứu tồn kho cuối kỳ")]
+    public void CustomInstruction_WithFillKeywords_AutoIdentifiedAsFillIn(string actionCode, string instruction)
+    {
+        Assert.True(ExamPackageService.IsQuestionFillIn(actionCode, instruction, null));
+        var prompt = ExamPackageService.GetFillInPrompt(actionCode, instruction, null);
+        Assert.NotNull(prompt);
+    }
 }

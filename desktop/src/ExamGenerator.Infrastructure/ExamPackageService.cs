@@ -49,8 +49,8 @@ public sealed class ExamPackageService
 
         foreach (var q in scenario.Questions)
         {
-            var isFillIn = IsQuestionFillIn(q.ActionCode);
-            var fillInPrompt = GetFillInPrompt(q.ActionCode);
+            var isFillIn = IsQuestionFillIn(q.ActionCode, q.Instruction, q.Title);
+            var fillInPrompt = GetFillInPrompt(q.ActionCode, q.Instruction, q.Title);
             var detailText = BuildQuestionDetail(scenario, q);
 
             pkg.Questions.Add(new ClientExamQuestion
@@ -69,25 +69,55 @@ public sealed class ExamPackageService
         return pkg;
     }
 
-    public static bool IsQuestionFillIn(string actionCode)
+    public static bool IsQuestionFillIn(string actionCode, string? instruction = null, string? title = null)
     {
-        return actionCode switch
+        switch (actionCode)
         {
-            "TK_KIEM_TON_KHO" => true,
-            "LT_TRA_CUU_THONG_TIN" => true,
-            "LT_TAO_THE_TAM_BHYT" => true,
-            _ => false
-        };
+            case "TK_KIEM_TON_KHO":
+            case "LT_TRA_CUU_THONG_TIN":
+            case "LT_TAO_THE_TAM_BHYT":
+            case "KB_BENH_AN_NGOAI_TRU":
+            case "KB_CHI_DINH_NOI_TRU":
+            case "HC_TRA_CUU_THANH_TOAN":
+            case "TC_TRA_CUU_BENH_SU":
+            case "NT_NHAN_BENH_KHOA":
+                return true;
+        }
+
+        var text = (instruction ?? "") + " " + (title ?? "");
+        if (text.Contains("điền", StringComparison.OrdinalIgnoreCase) ||
+            text.Contains("nhập", StringComparison.OrdinalIgnoreCase) ||
+            text.Contains("ghi lại", StringComparison.OrdinalIgnoreCase) ||
+            text.Contains("số bệnh án", StringComparison.OrdinalIgnoreCase) ||
+            text.Contains("số vào viện", StringComparison.OrdinalIgnoreCase) ||
+            text.Contains("tồn kho", StringComparison.OrdinalIgnoreCase) ||
+            text.Contains("tra cứu", StringComparison.OrdinalIgnoreCase) ||
+            text.Contains("mã thẻ", StringComparison.OrdinalIgnoreCase) ||
+            text.Contains("hạn sử dụng", StringComparison.OrdinalIgnoreCase))
+        {
+            return true;
+        }
+
+        return false;
     }
 
-    public static string? GetFillInPrompt(string actionCode)
+    public static string? GetFillInPrompt(string actionCode, string? instruction = null, string? title = null)
     {
         return actionCode switch
         {
             "TK_KIEM_TON_KHO" => "Nhập số lượng tồn kho cuối kỳ (sau khi tra cứu trên HIS):",
             "LT_TRA_CUU_THONG_TIN" => "Nhập kết quả tra cứu (Số bệnh án, Khoa, Giường, Ngày vào viện,...):",
-            "LT_TAO_THE_TAM_BHYT" => "Nhập mã thẻ tạm BHYT đã tạo trên HIS (nếu có):",
-            _ => null
+            "LT_TAO_THE_TAM_BHYT" => "Điền Mã số thẻ BHYT tạm & Hạn sử dụng sau khi tạo trên cổng giám định:",
+            "KB_BENH_AN_NGOAI_TRU" => "Điền Số bệnh án ngoại trú đã lập trên HIS:",
+            "KB_CHI_DINH_NOI_TRU" => "Điền Số bệnh án nội trú đã chỉ định trên HIS:",
+            "HC_TRA_CUU_THANH_TOAN" => "Điền kết quả tra cứu thanh toán (Số BA, Đã thanh toán, Tạm ứng, Còn phải thu, Tổng tiền):",
+            "TC_TRA_CUU_BENH_SU" => "Điền kết quả tra cứu lịch sử khám chữa bệnh / bệnh sử:",
+            "NT_NHAN_BENH_KHOA" => "Ghi lại Số vào viện và Buồng/Giường bệnh đã nhận:",
+            _ => (instruction ?? "").Contains("điền", StringComparison.OrdinalIgnoreCase) || 
+                 (instruction ?? "").Contains("nhập", StringComparison.OrdinalIgnoreCase) || 
+                 (instruction ?? "").Contains("ghi lại", StringComparison.OrdinalIgnoreCase)
+                ? "Nhập đáp án / kết quả sau khi thực hiện trên HIS:"
+                : null
         };
     }
 
@@ -212,6 +242,21 @@ public sealed class ExamPackageService
                     : (scenario.InventoryCheckDrug is not null
                         ? $"• Kiểm tồn kho: {scenario.InventoryCheckDrug.Name} (Kho: {scenario.InventoryCheckDrug.WarehouseName})"
                         : "• Kiểm tra tồn kho theo đề bài"),
+
+            "KB_BENH_AN_NGOAI_TRU" =>
+                $"• Lập bệnh án ngoại trú cho BN: {scenario.Patient.FullName} (Mã: {scenario.Patient.MedicalCode}) | Thí sinh điền Số bệnh án ngoại trú",
+
+            "KB_CHI_DINH_NOI_TRU" =>
+                $"• Chỉ định nhập viện nội trú BN: {scenario.Patient.FullName} (Mã: {scenario.Patient.MedicalCode}) | Thí sinh điền Số bệnh án nội trú",
+
+            "HC_TRA_CUU_THANH_TOAN" =>
+                $"• Tra cứu thông tin thanh toán viện phí của BN: {scenario.Patient.FullName} (Mã: {scenario.Patient.MedicalCode}) | Đối soát thông tin số tiền thanh toán/tạm ứng",
+
+            "TC_TRA_CUU_BENH_SU" =>
+                $"• Tra cứu lịch sử KCB BN: {scenario.Patient.FullName} (Mã: {scenario.Patient.MedicalCode}) | Đối soát thông tin các đợt khám",
+
+            "NT_NHAN_BENH_KHOA" =>
+                $"• Nhận bệnh vào khoa BN: {scenario.Patient.FullName} (Mã: {scenario.Patient.MedicalCode}) | Thí sinh ghi lại Số vào viện và Buồng/Giường đã nhận",
 
             _ => $"• BN: {scenario.Patient.FullName} (Mã: {scenario.Patient.MedicalCode})"
         };
