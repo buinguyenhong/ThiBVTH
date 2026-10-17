@@ -1,0 +1,125 @@
+<Window x:Class="ExamGenerator.Client.ExtraTimeDialog"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Cộng thêm giờ làm bài (Sự cố)"
+        Width="480"
+        Height="420"
+        WindowStartupLocation="CenterOwner"
+        ResizeMode="NoResize"
+        Background="#F8FAFC">
+
+    <Border Padding="24">
+        <Grid>
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="*"/>
+                <RowDefinition Height="Auto"/>
+            </Grid.RowDefinitions>
+
+            <!-- Header -->
+            <StackPanel Grid.Row="0" Margin="0,0,0,16">
+                <TextBlock Text="⏰ CỘNG GIỜ LÀM BÀI DO SỰ CỐ"
+                           FontSize="18"
+                           FontWeight="Bold"
+                           Foreground="{StaticResource BrandNavy}"/>
+                <TextBlock Text="Chỉ dành cho Giám thị / Cán bộ coi thi xác nhận khi máy trạm gặp sự cố khách quan."
+                           FontSize="12"
+                           Foreground="{StaticResource TextSecondary}"
+                           TextWrapping="Wrap"
+                           Margin="0,4,0,0"/>
+            </StackPanel>
+
+            <!-- Body Inputs -->
+            <StackPanel Grid.Row="1">
+                <TextBlock Text="Mật khẩu Giám thị (*):"
+                           FontWeight="SemiBold"
+                           Foreground="{StaticResource TextPrimary}"
+                           Margin="0,4,0,2"/>
+                <PasswordBox x:Name="SupervisorPasswordBox"
+                             Height="38"
+                             FontSize="14"/>
+
+                <TextBlock Text="Số phút bù thêm (*):"
+                           FontWeight="SemiBold"
+                           Foreground="{StaticResource TextPrimary}"
+                           Margin="0,10,0,2"/>
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="Auto"/>
+                    </Grid.ColumnDefinitions>
+                    <TextBox x:Name="ExtraMinutesTextBox"
+                             Grid.Column="0"
+                             Text="5"
+                             Height="38"
+                             FontSize="15"
+                             FontWeight="Bold"
+                             HorizontalContentAlignment="Center"/>
+                    <Button Grid.Column="1"
+                            Content="+5p"
+                            Style="{StaticResource SecondaryButton}"
+                            Height="38"
+                            Width="48"
+                            Margin="4,0,0,8"
+                            Click="QuickMinute_Click"
+                            Tag="5"/>
+                    <Button Grid.Column="2"
+                            Content="+10p"
+                            Style="{StaticResource SecondaryButton}"
+                            Height="38"
+                            Width="54"
+                            Margin="4,0,0,8"
+                            Click="QuickMinute_Click"
+                            Tag="10"/>
+                    <Button Grid.Column="3"
+                            Content="+15p"
+                            Style="{StaticResource SecondaryButton}"
+                            Height="38"
+                            Width="54"
+                            Margin="4,0,0,8"
+                            Click="QuickMinute_Click"
+                            Tag="15"/>
+                </Grid>
+
+                <TextBlock Text="Lý do / Ghi chú sự cố:"
+                           FontWeight="SemiBold"
+                           Foreground="{StaticResource TextPrimary}"
+                           Margin="0,6,0,2"/>
+                <TextBox x:Name="IncidentReasonTextBox"
+                         Text="Sự cố kỹ thuật máy trạm / Mất kết nối HIS"
+                         Height="50"
+                         TextWrapping="Wrap"
+                         AcceptsReturn="True"
+                         VerticalScrollBarVisibility="Auto"/>
+
+                <!-- Error message -->
+                <TextBlock x:Name="ErrorMessageTextBlock"
+                           Foreground="{StaticResource DangerRed}"
+                           FontWeight="SemiBold"
+                           FontSize="12"
+                           TextWrapping="Wrap"
+                           Visibility="Collapsed"
+                           Margin="0,4,0,0"/>
+            </StackPanel>
+
+            <!-- Footer Buttons -->
+            <StackPanel Grid.Row="2"
+                        Orientation="Horizontal"
+                        HorizontalAlignment="Right"
+                        Margin="0,16,0,0">
+                <Button Content="Hủy bỏ"
+                        Style="{StaticResource SecondaryButton}"
+                        Width="100"
+                        Height="38"
+                        Click="Cancel_Click"/>
+                <Button Content="Xác nhận bù giờ"
+                        Style="{StaticResource PrimaryButton}"
+                        Width="140"
+                        Height="38"
+                        Click="Confirm_Click"/>
+            </StackPanel>
+        </Grid>
+    </Border>
+</Window>

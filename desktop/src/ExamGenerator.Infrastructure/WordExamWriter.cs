@@ -605,6 +605,177 @@ public sealed class WordExamWriter
         body.Append(p);
     }
 
+    public void CreateGradingReportDocument(string filePath, CandidateGradingRecord record)
+    {
+        ArgumentNullException.ThrowIfNull(record);
+
+        using var document = WordprocessingDocument.Create(filePath, WordprocessingDocumentType.Document);
+        var mainPart = document.AddMainDocumentPart();
+        mainPart.Document = new Document(new Body());
+        var body = mainPart.Document.Body!;
+
+        // 1. Header (Left: Hospital, Right: Council)
+        var headerTable = new Table();
+        headerTable.AppendChild(new TableProperties(
+            new TableWidth { Type = TableWidthUnitValues.Dxa, Width = "10205" },
+            new TableJustification { Val = TableRowAlignmentValues.Center },
+            new TableBorders(
+                new TopBorder { Val = BorderValues.None },
+                new BottomBorder { Val = BorderValues.None },
+                new LeftBorder { Val = BorderValues.None },
+                new RightBorder { Val = BorderValues.None },
+                new InsideHorizontalBorder { Val = BorderValues.None },
+                new InsideVerticalBorder { Val = BorderValues.None }
+            )
+        ));
+
+        var headerRow = new TableRow();
+        var leftCell = new TableCell(new TableCellProperties(new TableCellWidth { Type = TableWidthUnitValues.Dxa, Width = "6000" }));
+        AddCellLine(leftCell, "BỆNH VIỆN ĐA KHOA THIỆN HẠNH", 12, bold: true, align: JustificationValues.Left);
+        AddCellLine(leftCell, $"Khoa: {record.DepartmentName}", 11, bold: false, align: JustificationValues.Left);
+        AddCellLine(leftCell, $"Thí sinh: {record.CandidateName} (SBD: {record.CandidateId})", 11, bold: true, align: JustificationValues.Left);
+        AddCellLine(leftCell, $"User HIS: {record.HisUserCode} | Mã đề: {record.PaperCode}", 11, bold: false, align: JustificationValues.Left);
+
+        var rightCell = new TableCell(new TableCellProperties(new TableWidth { Type = TableWidthUnitValues.Dxa, Width = "4205" }));
+        AddCellLine(rightCell, "HỘI ĐỒNG THI TUYỂN DỤNG", 12, bold: true, align: JustificationValues.Center);
+        AddCellLine(rightCell, $"Ngày thi: {record.StartedAt:dd/MM/yyyy}", 11, bold: false, align: JustificationValues.Center);
+        AddCellLine(rightCell, $"Nộp lúc: {record.SubmittedAt:HH:mm:ss}", 11, bold: false, align: JustificationValues.Center);
+        if (record.TotalExtraMinutes > 0)
+        {
+            AddCellLine(rightCell, $"Bù giờ sự cố: +{record.TotalExtraMinutes} phút", 11, bold: true, align: JustificationValues.Center);
+        }
+
+        headerRow.Append(leftCell, rightCell);
+        headerTable.Append(headerRow);
+        body.Append(headerTable);
+        AddEmptyParagraph(body, 80);
+
+        // 2. Title
+        AddCenteredTitle(body, "BIÊN BẢN CHẤM THI ĐỐI SOÁT TÁC NGHIỆP TRÊN HIS", 14);
+        AddEmptyParagraph(body, 40);
+
+        // 3. Table of Grading Items
+        var table = new Table();
+        table.AppendChild(new TableProperties(
+            new TableWidth { Type = TableWidthUnitValues.Dxa, Width = "10205" },
+            new TableJustification { Val = TableRowAlignmentValues.Center },
+            new TableBorders(
+                new TopBorder { Val = BorderValues.Single, Size = 4, Color = "auto" },
+                new BottomBorder { Val = BorderValues.Single, Size = 4, Color = "auto" },
+                new LeftBorder { Val = BorderValues.Single, Size = 4, Color = "auto" },
+                new RightBorder { Val = BorderValues.Single, Size = 4, Color = "auto" },
+                new InsideHorizontalBorder { Val = BorderValues.Single, Size = 4, Color = "auto" },
+                new InsideVerticalBorder { Val = BorderValues.Single, Size = 4, Color = "auto" }
+            )
+        ));
+
+        // Header Row: STT (500) | Câu & Thang điểm (1800) | Đáp án chuẩn / Yêu cầu (2600) | Kết quả thí sinh thực hiện & Vết HIS (3105) | Điểm chấm (1000) | Nhận xét (1200) = 10205
+        var tableHeader = new TableRow();
+        tableHeader.Append(
+            CreateDrugTableCell("STT", 500, true, JustificationValues.Center, isHeader: true),
+            CreateDrugTableCell("Câu hỏi & Thang điểm", 1800, true, JustificationValues.Left, isHeader: true),
+            CreateDrugTableCell("Đáp án chuẩn / Yêu cầu", 2600, true, JustificationValues.Left, isHeader: true),
+            CreateDrugTableCell("Kết quả thực hiện & Vết HIS", 3105, true, JustificationValues.Left, isHeader: true),
+            CreateDrugTableCell("Điểm chấm", 1000, true, JustificationValues.Center, isHeader: true),
+            CreateDrugTableCell("Nhận xét", 1200, true, JustificationValues.Left, isHeader: true)
+        );
+        table.Append(tableHeader);
+
+        foreach (var item in record.Items.OrderBy(x => x.OrderIndex))
+        {
+            var row = new TableRow();
+            row.Append(CreateDrugTableCell(item.OrderIndex.ToString(), 500, false, JustificationValues.Center));
+
+            // Col 2
+            var qCell = new TableCell(new TableCellProperties(new TableCellWidth { Type = TableWidthUnitValues.Dxa, Width = "1800" }));
+            AddCellLine(qCell, item.Title, 10, bold: true);
+            AddCellLine(qCell, $"Tối đa: {item.MaxScore:0.#}đ", 9, isItalic: true);
+            row.Append(qCell);
+
+            // Col 3: Expected
+            var expCell = new TableCell(new TableCellProperties(new TableCellWidth { Type = TableWidthUnitValues.Dxa, Width = "2600" }));
+            AddCellLine(expCell, item.ExpectedAnswer, 10);
+            row.Append(expCell);
+
+            // Col 4: Actual
+            var actCell = new TableCell(new TableCellProperties(new TableCellWidth { Type = TableWidthUnitValues.Dxa, Width = "3105" }));
+            var actualText = !string.IsNullOrWhiteSpace(item.CandidateAnswer)
+                ? $"Thí sinh đã điền: {item.CandidateAnswer}"
+                : (!string.IsNullOrWhiteSpace(item.HisAuditTrail) ? item.HisAuditTrail : "Thực hành trên HIS");
+            AddCellLine(actCell, actualText, 10);
+            row.Append(actCell);
+
+            // Col 5: Score Awarded
+            var scoreText = item.ScoreAwarded.HasValue ? $"{item.ScoreAwarded.Value:0.#}đ" : "-";
+            row.Append(CreateDrugTableCell(scoreText, 1000, true, JustificationValues.Center));
+
+            // Col 6: Remark
+            var remCell = new TableCell(new TableCellProperties(new TableCellWidth { Type = TableWidthUnitValues.Dxa, Width = "1200" }));
+            AddCellLine(remCell, string.IsNullOrWhiteSpace(item.ExaminerRemark) ? "-" : item.ExaminerRemark, 10);
+            row.Append(remCell);
+
+            table.Append(row);
+        }
+
+        // Summary Total Row
+        var sumRow = new TableRow();
+        var labelCell = new TableCell(new TableCellProperties(
+            new TableCellWidth { Type = TableWidthUnitValues.Dxa, Width = "8005" },
+            new GridSpan { Val = 4 }
+        ));
+        AddCellLine(labelCell, "TỔNG ĐIỂM CHẤM TOÀN BÀI:", 11, bold: true, align: JustificationValues.Right);
+        sumRow.Append(labelCell);
+
+        sumRow.Append(CreateDrugTableCell($"{record.TotalScore:0.#} / {record.MaxTotalScore:0.#}đ", 1000, true, JustificationValues.Center));
+        sumRow.Append(CreateDrugTableCell("", 1200, false, JustificationValues.Center));
+        table.Append(sumRow);
+
+        body.Append(table);
+        AddEmptyParagraph(body, 60);
+
+        // 4. General remarks
+        if (!string.IsNullOrWhiteSpace(record.GeneralRemark))
+        {
+            AddQuestionHeader(body, "Nhận xét tổng thể của Cán bộ chấm thi:");
+            AddBodyParagraph(body, record.GeneralRemark);
+            AddEmptyParagraph(body, 60);
+        }
+
+        // 5. Signatures
+        var signTable = new Table();
+        signTable.AppendChild(new TableProperties(
+            new TableWidth { Type = TableWidthUnitValues.Dxa, Width = "10205" },
+            new TableJustification { Val = TableRowAlignmentValues.Center },
+            new TableBorders(
+                new TopBorder { Val = BorderValues.None },
+                new BottomBorder { Val = BorderValues.None },
+                new LeftBorder { Val = BorderValues.None },
+                new RightBorder { Val = BorderValues.None },
+                new InsideHorizontalBorder { Val = BorderValues.None },
+                new InsideVerticalBorder { Val = BorderValues.None }
+            )
+        ));
+
+        var signRow = new TableRow();
+        var sign1 = new TableCell(new TableCellProperties(new TableCellWidth { Type = TableWidthUnitValues.Dxa, Width = "5102" }));
+        AddCellLine(sign1, "CÁN BỘ COI THI", 11, bold: true, align: JustificationValues.Center);
+        AddCellLine(sign1, "(Ký và ghi rõ họ tên)", 10, isItalic: true, align: JustificationValues.Center);
+        for (var i = 0; i < 4; i++) AddCellEmptyLine(sign1, 12);
+
+        var sign2 = new TableCell(new TableCellProperties(new TableCellWidth { Type = TableWidthUnitValues.Dxa, Width = "5103" }));
+        AddCellLine(sign2, "CÁN BỘ CHẤM THI", 11, bold: true, align: JustificationValues.Center);
+        AddCellLine(sign2, "(Ký và ghi rõ họ tên)", 10, isItalic: true, align: JustificationValues.Center);
+        for (var i = 0; i < 4; i++) AddCellEmptyLine(sign2, 12);
+        AddCellLine(sign2, string.IsNullOrWhiteSpace(record.ExaminerName) ? "Giám khảo" : record.ExaminerName, 11, bold: true, align: JustificationValues.Center);
+
+        signRow.Append(sign1, sign2);
+        signTable.Append(signRow);
+        body.Append(signTable);
+
+        body.Append(CreateSectionProperties());
+        mainPart.Document.Save();
+    }
+
     private static RunProperties CreateRunProps(int sizeHalfPt, bool isBold = false, bool isItalic = false, bool isUnderline = false)
     {
         var rPr = new RunProperties(

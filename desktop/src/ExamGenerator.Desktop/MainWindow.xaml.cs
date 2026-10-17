@@ -33,12 +33,22 @@ public partial class MainWindow : Window
 
     private string? _selectedMappingDepartment;
 
+    private readonly ObservableCollection<SubmissionRowViewModel> _submissions = [];
+    private readonly ObservableCollection<GradingItemViewModel> _currentGradingItems = [];
+    private SubmissionRowViewModel? _selectedSubmission;
+    private string _submissionsDirectory = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "submissions");
+    private List<ExamScenario> _lastGeneratedScenarios = [];
+    private readonly HisAuditTrailService _auditTrailService = new();
+
     public MainWindow()
     {
         InitializeComponent();
         _database = new SqliteDatabase(_storage);
         _settingsStore = new JsonApplicationSettingsStore(_storage);
         _credentialStore = new ProtectedCredentialStore(_storage);
+
+        SubmissionsGrid.ItemsSource = _submissions;
+        GradingItemsControl.ItemsSource = _currentGradingItems;
     }
 
     private async void Window_Loaded(object sender, RoutedEventArgs e)
@@ -388,6 +398,7 @@ public partial class MainWindow : Window
             var allocator = new ExamScenarioAllocator(_database);
             var candidateInputs = candidates.Select(c => new CandidateInput(c.Name, c.Id, c.Department, c.Template, c.DurationMinutes, c.WarehouseCode, c.WarehouseName)).ToList();
             var scenarios = await allocator.AllocateBatchScenariosAsync(batchName, examDate, candidateInputs);
+            _lastGeneratedScenarios = scenarios.ToList();
 
             var outputDir = _storage.OutputDirectory;
             Directory.CreateDirectory(outputDir);
@@ -410,6 +421,18 @@ public partial class MainWindow : Window
                     var sqlPath = Path.Combine(outputDir, sqlName);
                     await File.WriteAllTextAsync(sqlPath, sqlContent);
                     archive.CreateEntryFromFile(sqlPath, sqlName);
+
+                    // 3. Generate ExamClient package (.exam_pkg)
+                    var clientPkg = ExamPackageService.CreatePackage(scenario);
+                    var pkgName = $"{sbd}_{scenario.DepartmentCode}_{scenario.ScenarioId[..6]}.exam_pkg";
+                    var pkgPath = Path.Combine(outputDir, pkgName);
+                    ExamPackageService.SavePackage(clientPkg, pkgPath);
+                    archive.CreateEntryFromFile(pkgPath, $"ExamClient_Packages/{pkgName}");
+
+                    // Also copy to local exams directory for instant ExamClient availability
+                    var clientExamsDir = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "exams");
+                    if (!Directory.Exists(clientExamsDir)) Directory.CreateDirectory(clientExamsDir);
+                    File.Copy(pkgPath, Path.Combine(clientExamsDir, pkgName), true);
 
                     // Mark patient used in database
                     if (!string.IsNullOrWhiteSpace(scenario.Patient.MedicalCode))
@@ -1341,6 +1364,10 @@ public partial class MainWindow : Window
             {
                 await ReloadHistoryDataAsync();
             }
+            else if (header.Contains("Chấm thi"))
+            {
+                await ReloadSubmissionsAsync();
+            }
         }
     }
 
@@ -1465,6 +1492,353 @@ public partial class MainWindow : Window
         public string FileName => Path.GetFileName(FilePath);
         public string FormattedExamDate => DateTime.TryParse(ExamDate, out var d) ? d.ToString("dd/MM/yyyy") : ExamDate;
         public string FormattedCreatedAt => DateTimeOffset.TryParse(CreatedAt, out var dt) ? dt.ToString("dd/MM/yyyy HH:mm:ss") : CreatedAt;
+    }
+
+    private async void ExportExamClientPackages_Click(object sender, RoutedEventArgs e)
+    {
+        try
+        {
+            var scenarios = _lastGeneratedScenarios;
+            if (scenarios.Count == 0 && _candidates.Count > 0)
+            {
+                var batchName = Sanitize(BatchNameTextBox.Text);
+                if (string.IsNullOrWhiteSpace(batchName)) batchName = "DotThi_ThiTuyen";
+                var examDate = ExamDatePicker.SelectedDate.HasValue
+                    ? DateOnly.FromDateTime(ExamDatePicker.SelectedDate.Value)
+                    : DateOnly.FromDateTime(DateTime.Today);
+
+                var allocator = new ExamScenarioAllocator(_database);
+                var candidateInputs = _candidates.Select(c => new CandidateInput(c.Name, c.Id, c.Department, c.Template, c.DurationMinutes, c.WarehouseCode, c.WarehouseName)).ToList();
+                scenarios = (await allocator.AllocateBatchScenariosAsync(batchName, examDate, candidateInputs)).ToList();
+                _lastGeneratedScenarios = scenarios;
+            }
+
+            if (scenarios.Count == 0)
+            {
+                MessageBox.Show("Chưa có danh sách thí sinh hoặc đề thi để xuất gói ExamClient.", "Thông báo", MessageBoxButton.OK, MessageBoxImage.Information);
+                return;
+            }
+
+            var defaultDir = Path.Combine(_storage.OutputDirectory, "ExamClient_Packages");
+            var exported = ExamPackageService.ExportPackages(scenarios, defaultDir);
+
+            // Also copy to local exams folder for instant ExamClient availability
+            var clientExamsDir = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "exams");
+            if (!Directory.Exists(clientExamsDir)) Directory.CreateDirectory(clientExamsDir);
+            foreach (var f in exported)
+            {
+                File.Copy(f, Path.Combine(clientExamsDir, Path.GetFileName(f)), true);
+            }
+
+            MessageBox.Show($"Đã xuất thành công {exported.Count} gói đề thi ExamClient (.exam_pkg) vào thư mục:\n{defaultDir}\n\nĐã sẵn sàng chuyển giao cho các máy trạm phòng thi!", "Xuất gói đề thi thành công", MessageBoxButton.OK, MessageBoxImage.Information);
+
+            System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo("explorer.exe", defaultDir) { UseShellExecute = true });
+        }
+        catch (Exception ex)
+        {
+            MessageBox.Show($"Lỗi khi xuất gói đề thi: {ex.Message}", "Lỗi", MessageBoxButton.OK, MessageBoxImage.Error);
+        }
+    }
+
+    private void BrowseSubmissionsDirectory_Click(object sender, RoutedEventArgs e)
+    {
+        var dialog = new Microsoft.Win32.OpenFileDialog
+        {
+            Title = "Chọn một tệp bài nộp (.sub_pkg) để mở thư mục chứa",
+            Filter = "Gói bài nộp (*.sub_pkg)|*.sub_pkg|Tất cả tệp (*.*)|*.*"
+        };
+        if (dialog.ShowDialog() == true)
+        {
+            _submissionsDirectory = Path.GetDirectoryName(dialog.FileName) ?? _submissionsDirectory;
+            _ = ReloadSubmissionsAsync();
+        }
+    }
+
+    private async void ReloadSubmissions_Click(object sender, RoutedEventArgs e)
+    {
+        await ReloadSubmissionsAsync();
+    }
+
+    private async Task ReloadSubmissionsAsync()
+    {
+        _submissions.Clear();
+
+        var searchDirs = new List<string>
+        {
+            _submissionsDirectory,
+            Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "submissions"),
+            Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "..", "ExamGenerator.Client", "submissions"),
+            Path.Combine(Directory.GetCurrentDirectory(), "submissions")
+        };
+
+        var seenFiles = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+        foreach (var dir in searchDirs)
+        {
+            if (!Directory.Exists(dir)) continue;
+
+            foreach (var file in Directory.GetFiles(dir, "*.sub_pkg"))
+            {
+                if (!seenFiles.Add(file)) continue;
+
+                try
+                {
+                    var sub = ExamPackageService.LoadSubmission(file);
+                    var record = await _database.GetCandidateGradingAsync(sub.SubmissionId);
+
+                    _submissions.Add(new SubmissionRowViewModel
+                    {
+                        FilePath = file,
+                        Submission = sub,
+                        CandidateId = sub.CandidateId,
+                        CandidateName = sub.CandidateName,
+                        DepartmentName = sub.DepartmentName,
+                        DisplayScore = record is not null ? $"{record.TotalScore:0.#}đ" : "Chưa chấm",
+                        StatusText = record is not null ? "Đã chấm" : "Chờ chấm",
+                        GradingRecord = record
+                    });
+                }
+                catch
+                {
+                    // Ignore corrupted file
+                }
+            }
+        }
+
+        GradingSummaryBadge.Text = $"{_submissions.Count} bài nộp ({_submissions.Count(x => x.GradingRecord != null)} đã chấm)";
+    }
+
+    private void SubmissionsGrid_SelectionChanged(object sender, SelectionChangedEventArgs e)
+    {
+        if (SubmissionsGrid.SelectedItem is not SubmissionRowViewModel row)
+        {
+            _selectedSubmission = null;
+            NoSubmissionSelectedPlaceholder.Visibility = Visibility.Visible;
+            CandidateGradingPanel.Visibility = Visibility.Collapsed;
+            return;
+        }
+
+        _selectedSubmission = row;
+        NoSubmissionSelectedPlaceholder.Visibility = Visibility.Collapsed;
+        CandidateGradingPanel.Visibility = Visibility.Visible;
+
+        var sub = row.Submission;
+        GradingCandidateNameTextBlock.Text = sub.CandidateName;
+        GradingCandidateIdTextBlock.Text = $"SBD: {sub.CandidateId}";
+        GradingDepartmentTextBlock.Text = sub.DepartmentName;
+        GradingHisUserTextBlock.Text = sub.HisUserCode;
+        GradingSubmittedAtTextBlock.Text = sub.SubmittedAt.ToString("HH:mm:ss dd/MM/yyyy");
+        GradingExtraTimeTextBlock.Text = sub.TotalExtraMinutes > 0 ? $"+{sub.TotalExtraMinutes} phút" : "Không có";
+
+        // Find scenario if available
+        var scenario = _lastGeneratedScenarios.FirstOrDefault(s => s.CandidateId == sub.CandidateId);
+
+        _currentGradingItems.Clear();
+
+        var existingGrading = row.GradingRecord;
+
+        foreach (var ans in sub.Answers.OrderBy(x => x.OrderIndex))
+        {
+            var qScenario = scenario?.Questions.FirstOrDefault(q => q.OrderIndex == ans.OrderIndex);
+            var title = qScenario?.Title ?? $"Câu {ans.OrderIndex}";
+            var instruction = qScenario?.Instruction ?? "(Thực hiện tác nghiệp theo đề bài)";
+            var maxScore = qScenario?.Score ?? 2.0;
+
+            var expected = scenario is not null && qScenario is not null
+                ? ExamPackageService.BuildExpectedAnswer(scenario, qScenario)
+                : "(Đối soát theo đáp án đề thi và hướng dẫn chuẩn)";
+
+            var existingItem = existingGrading?.Items.FirstOrDefault(i => i.OrderIndex == ans.OrderIndex);
+
+            var candidateActual = !string.IsNullOrWhiteSpace(ans.FillInValue)
+                ? $"Thí sinh đã điền: {ans.FillInValue}"
+                : (!string.IsNullOrWhiteSpace(existingItem?.CandidateAnswer)
+                    ? existingItem.CandidateAnswer
+                    : "Tác nghiệp trên phần mềm HIS (bấm 'Truy vấn vết HIS' để đối soát)");
+
+            var itemVm = new GradingItemViewModel(RecalculateTotalGradingScore)
+            {
+                OrderIndex = ans.OrderIndex,
+                ActionCode = ans.ActionCode,
+                TitleHeader = $"Câu {ans.OrderIndex}: {title}",
+                MaxScore = maxScore,
+                MaxScoreText = $"Thang điểm: {maxScore:0.#} đ",
+                Instruction = instruction,
+                ExpectedAnswer = expected,
+                CandidateActualDisplay = candidateActual,
+                ScoreAwarded = existingItem?.ScoreAwarded,
+                ExaminerRemark = existingItem?.ExaminerRemark ?? string.Empty
+            };
+
+            _currentGradingItems.Add(itemVm);
+        }
+
+        ExaminerNameTextBox.Text = existingGrading?.ExaminerName ?? "Giám khảo Hội đồng thi";
+        GeneralRemarkTextBox.Text = existingGrading?.GeneralRemark ?? "Bài làm đạt yêu cầu";
+
+        RecalculateTotalGradingScore();
+    }
+
+    private void RecalculateTotalGradingScore()
+    {
+        var sum = _currentGradingItems.Sum(i => i.ScoreAwarded ?? 0.0);
+        GradingTotalScoreTextBlock.Text = sum.ToString("0.#", System.Globalization.CultureInfo.InvariantCulture);
+    }
+
+    private async void QueryHisAuditTrail_Click(object sender, RoutedEventArgs e)
+    {
+        if (_selectedSubmission is null)
+        {
+            MessageBox.Show("Vui lòng chọn một thí sinh để truy vấn vết HIS.", "Thông báo", MessageBoxButton.OK, MessageBoxImage.Information);
+            return;
+        }
+
+        var sub = _selectedSubmission.Submission;
+        var settings = await _settingsStore.LoadAsync();
+        var profile = settings.SqlServerProfiles.FirstOrDefault();
+        if (profile is null)
+        {
+            MessageBox.Show("Chưa cấu hình thông tin kết nối CSDL HIS trong Tab 4.", "Cảnh báo", MessageBoxButton.OK, MessageBoxImage.Warning);
+            return;
+        }
+
+        var pwd = _credentialStore.Load(profile.Name);
+        FooterStatusText.Text = $"Đang truy vấn lịch sử tác nghiệp HIS cho thí sinh {sub.CandidateName} ({sub.HisUserCode})...";
+
+        try
+        {
+            foreach (var item in _currentGradingItems)
+            {
+                if (!ExamPackageService.IsQuestionFillIn(item.ActionCode))
+                {
+                    var audit = await _auditTrailService.QueryAuditTrailAsync(
+                        profile,
+                        pwd,
+                        sub.HisUserCode,
+                        sub.StartedAt,
+                        sub.SubmittedAt,
+                        item.ActionCode);
+
+                    item.CandidateActualDisplay = audit;
+                }
+            }
+            FooterStatusText.Text = "Đã cập nhật vết tác nghiệp HIS cho thí sinh.";
+            MessageBox.Show("Đã truy vấn lịch sử tác nghiệp HIS thành công!", "Thông báo", MessageBoxButton.OK, MessageBoxImage.Information);
+        }
+        catch (Exception ex)
+        {
+            MessageBox.Show($"Lỗi truy vấn vết HIS: {ex.Message}", "Lỗi", MessageBoxButton.OK, MessageBoxImage.Error);
+        }
+    }
+
+    private async void SaveGrading_Click(object sender, RoutedEventArgs e)
+    {
+        if (_selectedSubmission is null) return;
+
+        var sub = _selectedSubmission.Submission;
+        var totalScore = _currentGradingItems.Sum(i => i.ScoreAwarded ?? 0.0);
+        var maxTotalScore = _currentGradingItems.Sum(i => i.MaxScore);
+
+        var record = new CandidateGradingRecord
+        {
+            SubmissionId = sub.SubmissionId,
+            CandidateId = sub.CandidateId,
+            CandidateName = sub.CandidateName,
+            PaperCode = sub.PaperCode,
+            DepartmentName = sub.DepartmentName,
+            HisUserCode = sub.HisUserCode,
+            StartedAt = sub.StartedAt,
+            SubmittedAt = sub.SubmittedAt,
+            TotalExtraMinutes = sub.TotalExtraMinutes,
+            TotalScore = totalScore,
+            MaxTotalScore = maxTotalScore > 0 ? maxTotalScore : 10.0,
+            ExaminerName = ExaminerNameTextBox.Text.Trim(),
+            GeneralRemark = GeneralRemarkTextBox.Text.Trim(),
+            GradedAt = DateTime.Now,
+            Items = _currentGradingItems.Select(i => new ExamGradingItem
+            {
+                OrderIndex = i.OrderIndex,
+                ActionCode = i.ActionCode,
+                Title = i.TitleHeader,
+                Instruction = i.Instruction,
+                MaxScore = i.MaxScore,
+                ExpectedAnswer = i.ExpectedAnswer,
+                CandidateAnswer = i.CandidateActualDisplay,
+                ScoreAwarded = i.ScoreAwarded,
+                ExaminerRemark = i.ExaminerRemark
+            }).ToList()
+        };
+
+        await _database.SaveCandidateGradingAsync(record);
+
+        _selectedSubmission.GradingRecord = record;
+        _selectedSubmission.DisplayScore = $"{totalScore:0.#}đ";
+        _selectedSubmission.StatusText = "Đã chấm";
+
+        SubmissionsGrid.Items.Refresh();
+        GradingSummaryBadge.Text = $"{_submissions.Count} bài nộp ({_submissions.Count(x => x.GradingRecord != null)} đã chấm)";
+
+        MessageBox.Show($"Đã lưu kết quả chấm thi cho thí sinh {record.CandidateName}!\n\nTổng điểm đạt được: {totalScore:0.#} / {maxTotalScore:0.#} điểm.", "Lưu chấm thi thành công", MessageBoxButton.OK, MessageBoxImage.Information);
+    }
+
+    private void ExportGradingWord_Click(object sender, RoutedEventArgs e)
+    {
+        if (_selectedSubmission is null) return;
+
+        var sub = _selectedSubmission.Submission;
+        var totalScore = _currentGradingItems.Sum(i => i.ScoreAwarded ?? 0.0);
+        var maxTotalScore = _currentGradingItems.Sum(i => i.MaxScore);
+
+        var record = new CandidateGradingRecord
+        {
+            SubmissionId = sub.SubmissionId,
+            CandidateId = sub.CandidateId,
+            CandidateName = sub.CandidateName,
+            PaperCode = sub.PaperCode,
+            DepartmentName = sub.DepartmentName,
+            HisUserCode = sub.HisUserCode,
+            StartedAt = sub.StartedAt,
+            SubmittedAt = sub.SubmittedAt,
+            TotalExtraMinutes = sub.TotalExtraMinutes,
+            TotalScore = totalScore,
+            MaxTotalScore = maxTotalScore > 0 ? maxTotalScore : 10.0,
+            ExaminerName = ExaminerNameTextBox.Text.Trim(),
+            GeneralRemark = GeneralRemarkTextBox.Text.Trim(),
+            GradedAt = DateTime.Now,
+            Items = _currentGradingItems.Select(i => new ExamGradingItem
+            {
+                OrderIndex = i.OrderIndex,
+                ActionCode = i.ActionCode,
+                Title = i.TitleHeader,
+                Instruction = i.Instruction,
+                MaxScore = i.MaxScore,
+                ExpectedAnswer = i.ExpectedAnswer,
+                CandidateAnswer = i.CandidateActualDisplay,
+                ScoreAwarded = i.ScoreAwarded,
+                ExaminerRemark = i.ExaminerRemark
+            }).ToList()
+        };
+
+        var outputDir = Path.Combine(_storage.OutputDirectory, "BienBanChamThi");
+        if (!Directory.Exists(outputDir)) Directory.CreateDirectory(outputDir);
+
+        var safeCand = string.IsNullOrWhiteSpace(record.CandidateId) ? "NO_SBD" : record.CandidateId.Trim();
+        var fileName = $"BienBanCham_{safeCand}_{Sanitize(record.CandidateName)}_{DateTime.Now:yyyyMMdd_HHmmss}.docx";
+        var filePath = Path.Combine(outputDir, fileName);
+
+        try
+        {
+            _wordWriter.CreateGradingReportDocument(filePath, record);
+            var res = MessageBox.Show($"Đã xuất biên bản chấm thi thành công:\n{filePath}\n\nBạn có muốn mở tệp tin Word ngay không?", "Xuất biên bản thành công", MessageBoxButton.YesNo, MessageBoxImage.Information);
+            if (res == MessageBoxResult.Yes)
+            {
+                System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo("explorer.exe", $"/select,\"{filePath}\"") { UseShellExecute = true });
+            }
+        }
+        catch (Exception ex)
+        {
+            MessageBox.Show($"Lỗi khi xuất Word: {ex.Message}", "Lỗi", MessageBoxButton.OK, MessageBoxImage.Error);
+        }
     }
 }
 
@@ -1660,4 +2034,110 @@ public sealed class UserItemViewModel : System.ComponentModel.INotifyPropertyCha
 
     public event System.ComponentModel.PropertyChangedEventHandler? PropertyChanged;
 }
+
+public sealed class SubmissionRowViewModel : System.ComponentModel.INotifyPropertyChanged
+{
+    public string FilePath { get; set; } = string.Empty;
+    public ClientSubmissionPackage Submission { get; set; } = null!;
+    public string CandidateId { get; set; } = string.Empty;
+    public string CandidateName { get; set; } = string.Empty;
+    public string DepartmentName { get; set; } = string.Empty;
+
+    private string _displayScore = "Chưa chấm";
+    public string DisplayScore
+    {
+        get => _displayScore;
+        set { _displayScore = value; OnPropertyChanged(nameof(DisplayScore)); }
+    }
+
+    private string _statusText = "Chờ chấm";
+    public string StatusText
+    {
+        get => _statusText;
+        set { _statusText = value; OnPropertyChanged(nameof(StatusText)); }
+    }
+
+    public CandidateGradingRecord? GradingRecord { get; set; }
+
+    public event System.ComponentModel.PropertyChangedEventHandler? PropertyChanged;
+    private void OnPropertyChanged(string prop) => PropertyChanged?.Invoke(this, new System.ComponentModel.PropertyChangedEventArgs(prop));
+}
+
+public sealed class GradingItemViewModel : System.ComponentModel.INotifyPropertyChanged
+{
+    private readonly Action? _onScoreChanged;
+
+    public int OrderIndex { get; set; }
+    public string ActionCode { get; set; } = string.Empty;
+    public string TitleHeader { get; set; } = string.Empty;
+    public double MaxScore { get; set; }
+    public string MaxScoreText { get; set; } = string.Empty;
+    public string Instruction { get; set; } = string.Empty;
+    public string ExpectedAnswer { get; set; } = string.Empty;
+
+    private string _candidateActualDisplay = string.Empty;
+    public string CandidateActualDisplay
+    {
+        get => _candidateActualDisplay;
+        set { _candidateActualDisplay = value; OnPropertyChanged(nameof(CandidateActualDisplay)); }
+    }
+
+    private double? _scoreAwarded;
+    public double? ScoreAwarded
+    {
+        get => _scoreAwarded;
+        set
+        {
+            if (_scoreAwarded != value)
+            {
+                _scoreAwarded = value;
+                OnPropertyChanged(nameof(ScoreAwarded));
+                _scoreAwardedText = value.HasValue ? value.Value.ToString("0.#", System.Globalization.CultureInfo.InvariantCulture) : string.Empty;
+                OnPropertyChanged(nameof(ScoreAwardedText));
+                _onScoreChanged?.Invoke();
+            }
+        }
+    }
+
+    private string _scoreAwardedText = string.Empty;
+    public string ScoreAwardedText
+    {
+        get => _scoreAwardedText;
+        set
+        {
+            if (_scoreAwardedText != value)
+            {
+                _scoreAwardedText = value;
+                OnPropertyChanged(nameof(ScoreAwardedText));
+                if (double.TryParse(value.Trim(), System.Globalization.NumberStyles.Any, System.Globalization.CultureInfo.InvariantCulture, out var parsed) ||
+                    double.TryParse(value.Trim(), out parsed))
+                {
+                    _scoreAwarded = Math.Min(parsed, MaxScore);
+                }
+                else if (string.IsNullOrWhiteSpace(value))
+                {
+                    _scoreAwarded = null;
+                }
+                OnPropertyChanged(nameof(ScoreAwarded));
+                _onScoreChanged?.Invoke();
+            }
+        }
+    }
+
+    private string _examinerRemark = string.Empty;
+    public string ExaminerRemark
+    {
+        get => _examinerRemark;
+        set { _examinerRemark = value; OnPropertyChanged(nameof(ExaminerRemark)); }
+    }
+
+    public GradingItemViewModel(Action? onScoreChanged = null)
+    {
+        _onScoreChanged = onScoreChanged;
+    }
+
+    public event System.ComponentModel.PropertyChangedEventHandler? PropertyChanged;
+    private void OnPropertyChanged(string prop) => PropertyChanged?.Invoke(this, new System.ComponentModel.PropertyChangedEventArgs(prop));
+}
+
 

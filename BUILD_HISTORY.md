@@ -224,3 +224,14 @@
   - Tieu chuan: `desktop/publish/ExamOperationsDesktop/ExamGenerator.Desktop.exe` (148.5 KB)
   - Standalone: `desktop/publish/ExamOperationsDesktop-Standalone/ExamGenerator.Desktop.exe` (148.5 KB)
 - **Ghi chu thay doi:** Automated release build
+
+### Build [2026-10-17 14:41:13] - Commit [3752d2c]
+- **Trang thai:** Thanh cong (43/43 Tests Passed)
+- **Cau hinh:** .NET 8 LTS (Release) + Standalone (Self-Contained win-x64)
+- **Duong dan chay ExamOperationsDesktop (Hội đồng / Giám khảo):**
+  - Tieu chuan: `desktop/publish/ExamOperationsDesktop/ExamGenerator.Desktop.exe`
+  - Standalone: `desktop/publish/ExamOperationsDesktop-Standalone/ExamGenerator.Desktop.exe`
+- **Duong dan chay ExamClient (Máy trạm Thí sinh):**
+  - Tieu chuan: `desktop/publish/ExamClient/ExamGenerator.Client.exe`
+  - Standalone: `desktop/publish/ExamClient-Standalone/ExamGenerator.Client.exe`
+- **Ghi chu thay doi:** Phát hành phần mềm máy trạm thí sinh độc lập ExamClient (đồng hồ đếm ngược theo đề bài, cơ chế bù giờ sự cố mật khẩu giám thị, nộp bài 1-click) và Tab 7 Chấm thi đối soát (Assisted Grading - không tự động áp đặt điểm, nhập điểm & chú thích từng câu, truy vết HIS, xuất Word).

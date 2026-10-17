@@ -199,6 +199,25 @@ public sealed class SqliteDatabase
                 FundingSource TEXT NOT NULL
             );
             CREATE INDEX IF NOT EXISTS IX_InvPeriod_Dept_Wh ON SnapshotInventoryPeriod(DepartmentCode, WarehouseCode);
+
+            CREATE TABLE IF NOT EXISTS CandidateGrading (
+                SubmissionId TEXT PRIMARY KEY NOT NULL,
+                CandidateId TEXT NOT NULL,
+                CandidateName TEXT NOT NULL,
+                PaperCode TEXT NOT NULL,
+                DepartmentName TEXT NOT NULL,
+                HisUserCode TEXT NOT NULL,
+                StartedAt TEXT NOT NULL,
+                SubmittedAt TEXT NOT NULL,
+                TotalExtraMinutes INTEGER NOT NULL,
+                TotalScore REAL NOT NULL,
+                MaxTotalScore REAL NOT NULL,
+                ExaminerName TEXT NOT NULL,
+                GeneralRemark TEXT NOT NULL,
+                GradedAt TEXT NOT NULL,
+                ItemsJson TEXT NOT NULL
+            );
+            CREATE INDEX IF NOT EXISTS IX_CandidateGrading_Cand ON CandidateGrading(CandidateId);
             """;
         await command.ExecuteNonQueryAsync(cancellationToken);
 
@@ -1557,6 +1576,123 @@ public sealed class SqliteDatabase
         command.CommandText = "SELECT COUNT(*) FROM SnapshotInventoryPeriod";
         var val = await command.ExecuteScalarAsync(cancellationToken);
         return Convert.ToInt32(val);
+    }
+
+    public async Task SaveCandidateGradingAsync(CandidateGradingRecord record, CancellationToken cancellationToken = default)
+    {
+        await using var connection = new SqliteConnection($"Data Source={DatabasePath}");
+        await connection.OpenAsync(cancellationToken);
+        var command = connection.CreateCommand();
+        command.CommandText = @"
+            INSERT INTO CandidateGrading (
+                SubmissionId, CandidateId, CandidateName, PaperCode, DepartmentName,
+                HisUserCode, StartedAt, SubmittedAt, TotalExtraMinutes, TotalScore,
+                MaxTotalScore, ExaminerName, GeneralRemark, GradedAt, ItemsJson
+            ) VALUES (
+                @subId, @candId, @candName, @paperCode, @deptName,
+                @hisUser, @startedAt, @subAt, @extraMin, @totalScore,
+                @maxTotal, @examiner, @remark, @gradedAt, @itemsJson
+            )
+            ON CONFLICT(SubmissionId) DO UPDATE SET
+                TotalScore = excluded.TotalScore,
+                ExaminerName = excluded.ExaminerName,
+                GeneralRemark = excluded.GeneralRemark,
+                GradedAt = excluded.GradedAt,
+                ItemsJson = excluded.ItemsJson";
+
+        command.Parameters.AddWithValue("@subId", record.SubmissionId);
+        command.Parameters.AddWithValue("@candId", record.CandidateId);
+        command.Parameters.AddWithValue("@candName", record.CandidateName);
+        command.Parameters.AddWithValue("@paperCode", record.PaperCode);
+        command.Parameters.AddWithValue("@deptName", record.DepartmentName);
+        command.Parameters.AddWithValue("@hisUser", record.HisUserCode);
+        command.Parameters.AddWithValue("@startedAt", record.StartedAt.ToString("O"));
+        command.Parameters.AddWithValue("@subAt", record.SubmittedAt.ToString("O"));
+        command.Parameters.AddWithValue("@extraMin", record.TotalExtraMinutes);
+        command.Parameters.AddWithValue("@totalScore", record.TotalScore);
+        command.Parameters.AddWithValue("@maxTotal", record.MaxTotalScore);
+        command.Parameters.AddWithValue("@examiner", record.ExaminerName ?? string.Empty);
+        command.Parameters.AddWithValue("@remark", record.GeneralRemark ?? string.Empty);
+        command.Parameters.AddWithValue("@gradedAt", (record.GradedAt ?? DateTime.Now).ToString("O"));
+        command.Parameters.AddWithValue("@itemsJson", System.Text.Json.JsonSerializer.Serialize(record.Items));
+
+        await command.ExecuteNonQueryAsync(cancellationToken);
+    }
+
+    public async Task<CandidateGradingRecord?> GetCandidateGradingAsync(string submissionId, CancellationToken cancellationToken = default)
+    {
+        await using var connection = new SqliteConnection($"Data Source={DatabasePath}");
+        await connection.OpenAsync(cancellationToken);
+        var command = connection.CreateCommand();
+        command.CommandText = "SELECT SubmissionId, CandidateId, CandidateName, PaperCode, DepartmentName, HisUserCode, StartedAt, SubmittedAt, TotalExtraMinutes, TotalScore, MaxTotalScore, ExaminerName, GeneralRemark, GradedAt, ItemsJson FROM CandidateGrading WHERE SubmissionId = @subId";
+        command.Parameters.AddWithValue("@subId", submissionId);
+
+        await using var reader = await command.ExecuteReaderAsync(cancellationToken);
+        if (await reader.ReadAsync(cancellationToken))
+        {
+            var itemsJson = reader.GetString(14);
+            var items = string.IsNullOrWhiteSpace(itemsJson)
+                ? new List<ExamGradingItem>()
+                : System.Text.Json.JsonSerializer.Deserialize<List<ExamGradingItem>>(itemsJson) ?? new List<ExamGradingItem>();
+
+            return new CandidateGradingRecord
+            {
+                SubmissionId = reader.GetString(0),
+                CandidateId = reader.GetString(1),
+                CandidateName = reader.GetString(2),
+                PaperCode = reader.GetString(3),
+                DepartmentName = reader.GetString(4),
+                HisUserCode = reader.GetString(5),
+                StartedAt = DateTime.Parse(reader.GetString(6)),
+                SubmittedAt = DateTime.Parse(reader.GetString(7)),
+                TotalExtraMinutes = reader.GetInt32(8),
+                TotalScore = reader.GetDouble(9),
+                MaxTotalScore = reader.GetDouble(10),
+                ExaminerName = reader.GetString(11),
+                GeneralRemark = reader.GetString(12),
+                GradedAt = DateTime.Parse(reader.GetString(13)),
+                Items = items
+            };
+        }
+        return null;
+    }
+
+    public async Task<IReadOnlyList<CandidateGradingRecord>> GetAllCandidateGradingsAsync(CancellationToken cancellationToken = default)
+    {
+        await using var connection = new SqliteConnection($"Data Source={DatabasePath}");
+        await connection.OpenAsync(cancellationToken);
+        var command = connection.CreateCommand();
+        command.CommandText = "SELECT SubmissionId, CandidateId, CandidateName, PaperCode, DepartmentName, HisUserCode, StartedAt, SubmittedAt, TotalExtraMinutes, TotalScore, MaxTotalScore, ExaminerName, GeneralRemark, GradedAt, ItemsJson FROM CandidateGrading ORDER BY GradedAt DESC";
+
+        var list = new List<CandidateGradingRecord>();
+        await using var reader = await command.ExecuteReaderAsync(cancellationToken);
+        while (await reader.ReadAsync(cancellationToken))
+        {
+            var itemsJson = reader.GetString(14);
+            var items = string.IsNullOrWhiteSpace(itemsJson)
+                ? new List<ExamGradingItem>()
+                : System.Text.Json.JsonSerializer.Deserialize<List<ExamGradingItem>>(itemsJson) ?? new List<ExamGradingItem>();
+
+            list.Add(new CandidateGradingRecord
+            {
+                SubmissionId = reader.GetString(0),
+                CandidateId = reader.GetString(1),
+                CandidateName = reader.GetString(2),
+                PaperCode = reader.GetString(3),
+                DepartmentName = reader.GetString(4),
+                HisUserCode = reader.GetString(5),
+                StartedAt = DateTime.Parse(reader.GetString(6)),
+                SubmittedAt = DateTime.Parse(reader.GetString(7)),
+                TotalExtraMinutes = reader.GetInt32(8),
+                TotalScore = reader.GetDouble(9),
+                MaxTotalScore = reader.GetDouble(10),
+                ExaminerName = reader.GetString(11),
+                GeneralRemark = reader.GetString(12),
+                GradedAt = DateTime.Parse(reader.GetString(13)),
+                Items = items
+            });
+        }
+        return list;
     }
 }
 

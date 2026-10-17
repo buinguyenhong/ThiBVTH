@@ -15,9 +15,12 @@ Write-Host "==========================================================" -Foregro
 
 $WorkspaceRoot = $PSScriptRoot
 $DesktopProj = Join-Path $WorkspaceRoot "desktop\src\ExamGenerator.Desktop\ExamGenerator.Desktop.csproj"
+$ClientProj = Join-Path $WorkspaceRoot "desktop\src\ExamGenerator.Client\ExamGenerator.Client.csproj"
 $TestProj = Join-Path $WorkspaceRoot "desktop\tests\ExamGenerator.Tests\ExamGenerator.Tests.csproj"
 $PublishDir = Join-Path $WorkspaceRoot "desktop\publish\ExamOperationsDesktop"
 $PublishStandaloneDir = Join-Path $WorkspaceRoot "desktop\publish\ExamOperationsDesktop-Standalone"
+$PublishClientDir = Join-Path $WorkspaceRoot "desktop\publish\ExamClient"
+$PublishClientStandaloneDir = Join-Path $WorkspaceRoot "desktop\publish\ExamClient-Standalone"
 $BuildHistoryFile = Join-Path $WorkspaceRoot "BUILD_HISTORY.md"
 
 # 1. Chay Unit Tests
@@ -29,9 +32,10 @@ if ($LASTEXITCODE -ne 0) {
 }
 Write-Host "-> Toan bo Unit Tests PASSED thanh cong!" -ForegroundColor Green
 
-# 2. Publish Release (Bản tiêu chuẩn & Bản Standalone)
+# 2. Publish Release (Bản tiêu chuẩn & Bản Standalone cho cả Desktop & Client)
 Write-Host "`n[2/4] Build va Publish phien ban Tieu Chuan (Framework-dependent)..." -ForegroundColor Yellow
 dotnet publish $DesktopProj -c Release -o $PublishDir
+dotnet publish $ClientProj -c Release -o $PublishClientDir
 if ($LASTEXITCODE -ne 0) {
     Write-Error "Dotnet publish ban tieu chuan that bai!"
     exit 1
@@ -39,6 +43,7 @@ if ($LASTEXITCODE -ne 0) {
 
 Write-Host "`n[2b/4] Build va Publish phien ban Standalone (Self-Contained win-x64)..." -ForegroundColor Yellow
 dotnet publish $DesktopProj -c Release -r win-x64 --self-contained true -p:PublishSingleFile=false -o $PublishStandaloneDir
+dotnet publish $ClientProj -c Release -r win-x64 --self-contained true -p:PublishSingleFile=false -o $PublishClientStandaloneDir
 if ($LASTEXITCODE -ne 0) {
     Write-Error "Dotnet publish ban Standalone that bai!"
     exit 1

@@ -2,6 +2,45 @@
 
 Nhật ký ghi lại các thay đổi, quyết định thiết kế và tiến trình thực thi của Antigravity Coding Assistant trong suốt phiên làm việc.
 
+## [2026-10-17] Hoàn thành Xây dựng Phân hệ ExamClient và Tab 7 Chấm thi Đối soát (Assisted Grading)
+
+### 1. Phân hệ Máy trạm Thí sinh `ExamGenerator.Client` (Độc lập, Bảo mật, Đơn giản, Rõ ràng):
+* **Thời gian làm bài theo từng đề:** Đồng hồ đếm ngược kỹ thuật số hiển thị to, rõ ràng, tuân theo thời lượng riêng của từng đề thi (`DurationMinutes`). Đổi màu xanh lá (>5p) $\rightarrow$ vàng (<=5p) $\rightarrow$ đỏ (<=1p). Khi về 00:00 tự động khóa bài làm và hiện cảnh báo.
+* **Cơ chế Bù giờ Sự cố Phòng thi (Incident Extra Time):**
+  - Tích hợp nút **"⏰ Bù giờ sự cố"** ngay trên thanh trạng thái.
+  - Hộp thoại yêu cầu Giám thị nhập Mật khẩu bảo vệ (`bvth@2026` hoặc hash trong gói đề) + Số phút bù thêm (+5p, +10p, +15p hoặc số phút tùy ý) + Lý do sự cố.
+  - Khi xác nhận thành công: Thời gian được cộng thêm vào đồng hồ, bài làm được mở khóa tức thời để thí sinh tiếp tục làm; nhật ký bù giờ được lưu vào bài nộp.
+* **Giao diện làm bài trực quan, phân tách rõ ràng:**
+  - Câu hỏi thực hành HIS: Hiển thị badge hướng dẫn thao tác trực tiếp trên phần mềm HIS bằng tài khoản được cấp.
+  - Câu hỏi điền kết quả (Kiểm tồn kho, Tra cứu, Thẻ tạm): Hiển thị hộp nhập liệu lớn, tự động lưu kết quả liên tục khi gõ phím.
+* **Nộp bài 1-Click (`.sub_pkg`):**
+  - Bấm nút **"📤 NỘP BÀI & GỬI KẾT QUẢ"** $\rightarrow$ Hộp thoại xác nhận nhanh $\rightarrow$ Tự động đóng gói `.sub_pkg` và gửi về thư mục bài nộp `submissions/` (local và shared folder).
+  - Hiển thị màn hình thông báo hoàn thành trang trọng, chuyên nghiệp.
+
+### 2. Nâng cấp `ExamOperationsDesktop` (Phân hệ Hội đồng & Giám khảo):
+* **Nút "📦 Xuất gói đề ExamClient (.exam_pkg)" tại Tab 1:**
+  - Cho phép xuất toàn bộ gói đề thi cho thí sinh dưới dạng `.exam_pkg` vào thư mục chuyển giao phòng thi hoặc USB chỉ với 1 click. Đề thi đóng gói bảo mật, không chứa đáp án chuẩn hay công thức chấm.
+* **Tab 7: "7. Chấm thi đối soát (Assisted Grading)":**
+  - Danh sách bài nộp `.sub_pkg`: Hiển thị SBD, Họ tên, Khoa, Thời gian nộp, Bù giờ, Điểm đã chấm, Trạng thái (Chờ chấm / Đã chấm).
+  - **Màn hình đối soát song song không tự động áp đặt điểm:**
+    + Hiển thị [Yêu cầu & Thang điểm] vs [Đáp án chuẩn theo đề] vs [Kết quả thực tế thí sinh làm].
+    + Nếu câu điền: Hiển thị đúng chuỗi thí sinh đã gõ trong ExamClient.
+    + Nếu câu thực hành HIS: Cung cấp nút **"🔍 Truy vấn vết HIS"** tự động query CSDL SQL Server HIS (theo `HisUserCode` trong khoảng thời gian thi `StartedAt` - `SubmittedAt`) để đối soát chính xác lượt tiếp nhận, hóa đơn thu tiền,...
+    + **Ô nhập điểm cho từng câu:** TextBox gõ điểm trực tiếp, giới hạn tối đa theo thang điểm câu.
+    + **Ô nhập chú thích / nhận xét:** Cho phép giám khảo ghi chú chi tiết lý do trừ/cộng điểm cho từng câu.
+    + **Tự động tính tổng điểm:** Cập nhật tức thời khi gõ điểm từng câu.
+  - **Lưu trữ & Xuất biên bản:**
+    + Nút "💾 Lưu kết quả chấm": Lưu trữ bền vững vào bảng SQLite `CandidateGrading`.
+    + Nút "🖨️ Xuất biên bản chấm (Word)": Xuất biên bản chấm thi đối soát chính thức (.docx) có đầy đủ điểm từng câu, chú thích, nhận xét tổng thể và phần chữ ký giám khảo.
+
+### 3. Kiểm thử & Đóng gói Phát hành:
+* Toàn bộ **43/43 Unit Tests PASSED 100%**.
+* Đã build và publish đầy đủ cả 2 ứng dụng (Tiêu chuẩn và Standalone win-x64):
+  - `desktop/publish/ExamOperationsDesktop` & `desktop/publish/ExamOperationsDesktop-Standalone`
+  - `desktop/publish/ExamClient` & `desktop/publish/ExamClient-Standalone`
+
+---
+
 ## [2026-10-17] Đồng bộ Tồn kho Theo Các Mốc Ngày Thi Cố Định & Kế hoạch Xây dựng ExamClient
 
 ### 1. Đồng bộ Tồn kho Theo Các Mốc Ngày Cố Định (Trước tháng 03/2026):

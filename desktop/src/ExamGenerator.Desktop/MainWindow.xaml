@@ -164,6 +164,7 @@
                                         <TextBlock x:Name="GenerationStatusText" Text="Sẵn sàng chạy Preflight và sinh đề." Foreground="{StaticResource TextSecondary}" FontWeight="Medium"/>
                                     </StackPanel>
                                     <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+                                        <Button Content="📦 Xuất gói đề ExamClient (.exam_pkg)" Style="{StaticResource AccentButton}" Margin="0,0,8,0" Click="ExportExamClientPackages_Click"/>
                                         <Button Content="Sinh phần đã chọn (.zip)" Style="{StaticResource SecondaryButton}" Click="GenerateSelected_Click"/>
                                         <Button Content="⚡ Sinh Cả Đợt Thi (.zip)" Style="{StaticResource PrimaryButton}" Padding="20,10" FontSize="14" Click="GenerateAll_Click"/>
                                     </StackPanel>
@@ -731,6 +732,226 @@
                             </DataGrid.Columns>
                         </DataGrid>
                     </Border>
+                </Grid>
+            </TabItem>
+
+            <!-- TAB 7: CHẤM THI ĐỐI SOÁT (ASSISTED GRADING) -->
+            <TabItem Header="7. Chấm thi đối soát">
+                <Grid Margin="6,12">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="*"/>
+                    </Grid.RowDefinitions>
+
+                    <!-- Top Toolbar -->
+                    <Border Grid.Row="0" Style="{StaticResource CardBorder}" Margin="0,0,0,10">
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="Auto"/>
+                            </Grid.ColumnDefinitions>
+                            <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                <TextBlock Text="Chấm thi Đối soát (Assisted Grading)" FontSize="16" FontWeight="SemiBold"/>
+                                <Border Background="{StaticResource BrandTealSoft}" CornerRadius="10" Padding="8,2" Margin="10,0">
+                                    <TextBlock x:Name="GradingSummaryBadge" Text="0 bài nộp" Foreground="{StaticResource BrandTealDark}" FontSize="12" FontWeight="SemiBold"/>
+                                </Border>
+                                <TextBlock Text="Đối soát bài làm so với đáp án và vết HIS - Nhập điểm &amp; nhận xét cho từng câu." Foreground="{StaticResource TextSecondary}" FontSize="12" VerticalAlignment="Center" Margin="10,0,0,0"/>
+                            </StackPanel>
+                            <StackPanel Grid.Column="1" Orientation="Horizontal" HorizontalAlignment="Right">
+                                <Button Content="📂 Chọn thư mục bài nộp..." Style="{StaticResource SecondaryButton}" Click="BrowseSubmissionsDirectory_Click"/>
+                                <Button Content="🔄 Làm mới bài nộp" Style="{StaticResource SecondaryButton}" Click="ReloadSubmissions_Click"/>
+                                <Button Content="🔍 Truy vấn vết HIS" Style="{StaticResource AccentButton}" Click="QueryHisAuditTrail_Click"/>
+                            </StackPanel>
+                        </Grid>
+                    </Border>
+
+                    <!-- Main 2-column layout -->
+                    <Grid Grid.Row="1">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="380" MinWidth="300"/>
+                            <ColumnDefinition Width="8"/>
+                            <ColumnDefinition Width="*" MinWidth="500"/>
+                        </Grid.ColumnDefinitions>
+
+                        <!-- Column Left: Submissions List -->
+                        <Border Grid.Column="0" Style="{StaticResource CardBorder}" Padding="12">
+                            <DockPanel>
+                                <TextBlock DockPanel.Dock="Top" Text="DANH SÁCH BÀI THI ĐÃ NỘP" FontWeight="Bold" FontSize="13" Foreground="{StaticResource BrandNavy}" Margin="0,0,0,8"/>
+                                
+                                <DataGrid x:Name="SubmissionsGrid" SelectionChanged="SubmissionsGrid_SelectionChanged" AutoGenerateColumns="False" IsReadOnly="True">
+                                    <DataGrid.Columns>
+                                        <DataGridTextColumn Header="SBD" Binding="{Binding CandidateId}" Width="65"/>
+                                        <DataGridTextColumn Header="Thí sinh" Binding="{Binding CandidateName}" Width="1.2*"/>
+                                        <DataGridTextColumn Header="Khoa" Binding="{Binding DepartmentName}" Width="*"/>
+                                        <DataGridTextColumn Header="Điểm" Binding="{Binding DisplayScore}" Width="60"/>
+                                        <DataGridTextColumn Header="Trạng thái" Binding="{Binding StatusText}" Width="85"/>
+                                    </DataGrid.Columns>
+                                </DataGrid>
+                            </DockPanel>
+                        </Border>
+
+                        <!-- GridSplitter -->
+                        <GridSplitter Grid.Column="1" Width="8" Background="Transparent" HorizontalAlignment="Center"/>
+
+                        <!-- Column Right: Assisted Grading Worksheet -->
+                        <Border Grid.Column="2" Style="{StaticResource CardBorder}" Padding="16">
+                            <Grid>
+                                <!-- Placeholder when nothing selected -->
+                                <TextBlock x:Name="NoSubmissionSelectedPlaceholder"
+                                           Text="Vui lòng chọn một thí sinh từ danh sách bên trái để thực hiện chấm thi đối soát."
+                                           FontSize="14"
+                                           Foreground="{StaticResource TextMuted}"
+                                           HorizontalAlignment="Center"
+                                           VerticalAlignment="Center"/>
+
+                                <!-- Candidate Grading Panel -->
+                                <Grid x:Name="CandidateGradingPanel" Visibility="Collapsed">
+                                    <Grid.RowDefinitions>
+                                        <RowDefinition Height="Auto"/>
+                                        <RowDefinition Height="*"/>
+                                        <RowDefinition Height="Auto"/>
+                                    </Grid.RowDefinitions>
+
+                                    <!-- Candidate Header Summary Card -->
+                                    <Border Grid.Row="0" Background="#F8FAFC" BorderBrush="{StaticResource BorderSubtle}" BorderThickness="1" CornerRadius="8" Padding="14" Margin="0,0,0,12">
+                                        <Grid>
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="*"/>
+                                                <ColumnDefinition Width="Auto"/>
+                                            </Grid.ColumnDefinitions>
+                                            <StackPanel>
+                                                <StackPanel Orientation="Horizontal">
+                                                    <TextBlock x:Name="GradingCandidateNameTextBlock" Text="Nguyễn Văn A" FontSize="16" FontWeight="Bold" Foreground="{StaticResource BrandNavy}"/>
+                                                    <TextBlock Text=" - " Foreground="{StaticResource TextSecondary}" FontSize="16"/>
+                                                    <TextBlock x:Name="GradingCandidateIdTextBlock" Text="SBD: 101" FontSize="16" FontWeight="Bold" Foreground="{StaticResource BrandTealDark}"/>
+                                                    <TextBlock Text=" | Khoa: " Foreground="{StaticResource TextSecondary}" FontSize="13" Margin="10,3,0,0"/>
+                                                    <TextBlock x:Name="GradingDepartmentTextBlock" Text="Ngoại" FontSize="13" FontWeight="SemiBold" Margin="0,3,0,0"/>
+                                                </StackPanel>
+                                                <StackPanel Orientation="Horizontal" Margin="0,4,0,0">
+                                                    <TextBlock Text="User HIS: " Foreground="{StaticResource TextSecondary}" FontSize="12"/>
+                                                    <TextBlock x:Name="GradingHisUserTextBlock" Text="USER_THI" FontWeight="SemiBold" Foreground="{StaticResource BrandCyan}" FontSize="12"/>
+                                                    <TextBlock Text=" | Nộp lúc: " Foreground="{StaticResource TextSecondary}" FontSize="12" Margin="10,0,0,0"/>
+                                                    <TextBlock x:Name="GradingSubmittedAtTextBlock" Text="08:35:12" FontSize="12"/>
+                                                    <TextBlock Text=" | Bù giờ: " Foreground="{StaticResource TextSecondary}" FontSize="12" Margin="10,0,0,0"/>
+                                                    <TextBlock x:Name="GradingExtraTimeTextBlock" Text="+5 phút" FontWeight="Bold" Foreground="{StaticResource WarningAmber}" FontSize="12"/>
+                                                </StackPanel>
+                                            </StackPanel>
+
+                                            <!-- Real-time Total Score Box -->
+                                            <Border Grid.Column="1" Background="{StaticResource BrandTealSoft}" BorderBrush="{StaticResource BrandTeal}" BorderThickness="1.5" CornerRadius="8" Padding="16,8" VerticalAlignment="Center">
+                                                <StackPanel HorizontalAlignment="Center">
+                                                    <TextBlock Text="TỔNG ĐIỂM CHẤM" FontSize="10" FontWeight="Bold" Foreground="{StaticResource BrandTealDark}" HorizontalAlignment="Center"/>
+                                                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
+                                                        <TextBlock x:Name="GradingTotalScoreTextBlock" Text="0.0" FontSize="26" FontWeight="Bold" Foreground="{StaticResource BrandTealDark}"/>
+                                                        <TextBlock Text=" / 10.0" FontSize="14" FontWeight="SemiBold" Foreground="{StaticResource TextSecondary}" VerticalAlignment="Bottom" Margin="2,0,0,4"/>
+                                                    </StackPanel>
+                                                </StackPanel>
+                                            </Border>
+                                        </Grid>
+                                    </Border>
+
+                                    <!-- Questions Scoring List -->
+                                    <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto" Margin="0,0,0,12">
+                                        <ItemsControl x:Name="GradingItemsControl">
+                                            <ItemsControl.ItemTemplate>
+                                                <DataTemplate>
+                                                    <Border BorderBrush="{StaticResource BorderSubtle}" BorderThickness="1" CornerRadius="8" Padding="14" Margin="0,0,0,12" Background="White">
+                                                        <StackPanel>
+                                                            <!-- Row 1: Question Header & Max Score -->
+                                                            <Grid Margin="0,0,0,8">
+                                                                <TextBlock Text="{Binding TitleHeader}" FontWeight="Bold" FontSize="14" Foreground="{StaticResource BrandNavy}"/>
+                                                                <TextBlock Text="{Binding MaxScoreText}" HorizontalAlignment="Right" FontWeight="SemiBold" Foreground="{StaticResource BrandCyan}" FontSize="12"/>
+                                                            </Grid>
+
+                                                            <!-- Row 2: Question Instruction -->
+                                                            <TextBlock Text="{Binding Instruction}" TextWrapping="Wrap" Foreground="{StaticResource TextPrimary}" FontSize="13" LineHeight="20" Margin="0,0,0,8"/>
+
+                                                            <!-- Row 3: Expected Answer vs Candidate's Actual Performance -->
+                                                            <Grid Margin="0,0,0,10">
+                                                                <Grid.ColumnDefinitions>
+                                                                    <ColumnDefinition Width="*"/>
+                                                                    <ColumnDefinition Width="*"/>
+                                                                </Grid.ColumnDefinitions>
+
+                                                                <!-- Left: Expected Answer -->
+                                                                <Border Grid.Column="0" Background="#F1F5F9" CornerRadius="6" Padding="10" Margin="0,0,6,0">
+                                                                    <StackPanel>
+                                                                        <TextBlock Text="🎯 ĐÁP ÁN CHUẨN / YÊU CẦU THỰC HIỆN:" FontWeight="Bold" FontSize="11" Foreground="{StaticResource BrandTealDark}" Margin="0,0,0,4"/>
+                                                                        <TextBlock Text="{Binding ExpectedAnswer}" TextWrapping="Wrap" FontSize="12.5" LineHeight="18" Foreground="#1E293B"/>
+                                                                    </StackPanel>
+                                                                </Border>
+
+                                                                <!-- Right: Actual Candidate Result -->
+                                                                <Border Grid.Column="1" Background="#FEF3C7" CornerRadius="6" Padding="10" Margin="6,0,0,0">
+                                                                    <StackPanel>
+                                                                        <TextBlock Text="📝 KẾT QUẢ THÍ SINH ĐÃ THỰC HIỆN:" FontWeight="Bold" FontSize="11" Foreground="#92400E" Margin="0,0,0,4"/>
+                                                                        <TextBlock Text="{Binding CandidateActualDisplay}" TextWrapping="Wrap" FontSize="12.5" LineHeight="18" Foreground="#78350F"/>
+                                                                    </StackPanel>
+                                                                </Border>
+                                                            </Grid>
+
+                                                            <!-- Row 4: Scoring Input & Examiner Note -->
+                                                            <Border Background="#F8FAFC" BorderBrush="{StaticResource BorderSubtle}" BorderThickness="1" CornerRadius="6" Padding="10">
+                                                                <Grid>
+                                                                    <Grid.ColumnDefinitions>
+                                                                        <ColumnDefinition Width="Auto"/>
+                                                                        <ColumnDefinition Width="130"/>
+                                                                        <ColumnDefinition Width="Auto"/>
+                                                                        <ColumnDefinition Width="*"/>
+                                                                    </Grid.ColumnDefinitions>
+                                                                    <TextBlock Grid.Column="0" Text="Điểm chấm:" FontWeight="Bold" VerticalAlignment="Center" Margin="0,0,8,0" Foreground="{StaticResource BrandNavy}"/>
+                                                                    <TextBox Grid.Column="1"
+                                                                             Text="{Binding ScoreAwardedText, UpdateSourceTrigger=PropertyChanged}"
+                                                                             Height="36"
+                                                                             FontSize="15"
+                                                                             FontWeight="Bold"
+                                                                             HorizontalContentAlignment="Center"
+                                                                             Margin="0,0,8,0"/>
+                                                                    <TextBlock Grid.Column="2" Text="Chú thích / Nhận xét:" FontWeight="SemiBold" VerticalAlignment="Center" Margin="8,0,8,0" Foreground="{StaticResource TextSecondary}"/>
+                                                                    <TextBox Grid.Column="3"
+                                                                             Text="{Binding ExaminerRemark, UpdateSourceTrigger=PropertyChanged}"
+                                                                             Height="36"
+                                                                             FontSize="13"
+                                                                             Padding="8,5"
+                                                                             Margin="0"/>
+                                                                </Grid>
+                                                            </Border>
+                                                        </StackPanel>
+                                                    </Border>
+                                                </DataTemplate>
+                                            </ItemsControl.ItemTemplate>
+                                        </ItemsControl>
+                                    </ScrollViewer>
+
+                                    <!-- Bottom Examiner Signature & Actions -->
+                                    <Border Grid.Row="2" Background="#F1F5F9" BorderBrush="{StaticResource BorderSubtle}" BorderThickness="1" CornerRadius="8" Padding="14">
+                                        <Grid>
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="220"/>
+                                                <ColumnDefinition Width="*"/>
+                                                <ColumnDefinition Width="Auto"/>
+                                            </Grid.ColumnDefinitions>
+
+                                            <StackPanel Grid.Column="0" Margin="0,0,12,0">
+                                                <TextBlock Text="Cán bộ chấm thi:" FontWeight="SemiBold" FontSize="11" Foreground="{StaticResource TextSecondary}"/>
+                                                <TextBox x:Name="ExaminerNameTextBox" Text="Giám khảo Hội đồng thi" Height="34" Margin="0,2,0,0"/>
+                                            </StackPanel>
+
+                                            <StackPanel Grid.Column="1" Margin="0,0,12,0">
+                                                <TextBlock Text="Nhận xét tổng thể bài thi:" FontWeight="SemiBold" FontSize="11" Foreground="{StaticResource TextSecondary}"/>
+                                                <TextBox x:Name="GeneralRemarkTextBox" Text="Bài làm đạt yêu cầu" Height="34" Margin="0,2,0,0"/>
+                                            </StackPanel>
+
+                                            <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Bottom">
+                                                <Button Content="💾 LƯU KẾT QUẢ CHẤM" Style="{StaticResource PrimaryButton}" Padding="16,8" Height="38" Click="SaveGrading_Click"/>
+                                                <Button Content="🖨️ XUẤT BIÊN BẢN CHẤM (WORD)" Style="{StaticResource AccentButton}" Padding="16,8" Height="38" Margin="8,0,0,0" Click="ExportGradingWord_Click"/>
+                                            </StackPanel>
+                                        </Grid>
+                                    </Border>
+                                </Grid>
+                            </Grid>
+                        </Border>
+                    </Grid>
                 </Grid>
             </TabItem>
 
