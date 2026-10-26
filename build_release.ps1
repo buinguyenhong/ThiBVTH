@@ -127,7 +127,7 @@ try {
 $LogEntry = @"
 
 ### Build [$Timestamp] - Commit [$GitCommit]
-- **Trang thai:** Thanh cong (55/55 Tests Passed)
+- **Trang thai:** Thanh cong (56/56 Tests Passed)
 - **Cau hinh:** .NET 8 LTS (Release) + Standalone (Self-Contained win-x64)
 - **Duong dan chay ExamOperationsDesktop (Hoi dong / Giam khao):**
   - Tieu chuan: ``desktop/publish/ExamOperationsDesktop/ExamGenerator.Desktop.exe`` ($ExeSizeKb KB)

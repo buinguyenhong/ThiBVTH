@@ -69,7 +69,8 @@ public static class SystemActionCatalog
         new("LT_DOI_DICH_VU_CLS", "Hủy và đổi dịch vụ CLS", 1.0, "Lễ tân & Thu phí", "Chọn quyển hóa đơn ký hiệu: THI để thu: Hủy và đổi dịch vụ Siêu âm ổ bụng thành dịch vụ Chụp Xquang cột sống cổ chếch hai bên [Số hoá 2 phim] và thu tiền lại.", true),
         new("LT_TRA_CUU_THONG_TIN", "Tra cứu buồng giường & lịch sử KCB", 2.0, "Hành chính & Tra cứu", "Tìm thông tin của bệnh nhân đang điều trị nội trú (Khoa điều trị, Phòng bệnh, Số giường) và bệnh nhân ngoại trú (Số lượt khám, Ngày ĐT nội trú gần nhất, Ngày ĐT ngoại trú gần nhất).", true),
         new("LT_THANH_TOAN_RA_VIEN", "Thu thanh toán ra viện", 1.0, "Viện phí & Thu ngân", "Thu Thanh Toán Ra viện cho bệnh nhân nội trú có số bệnh án chỉ định (Dùng quyển hóa đơn VAT_THI).", true),
-        new("LT_TAO_THE_TAM_BHYT", "Tạo mã thẻ BHYT tạm trẻ em", 1.0, "Tiếp đón & Nhập viện", "Truy cập cổng giám định BHYT và tạo mã thẻ tạm cho trẻ em sơ sinh dưới 6 tuổi (Bé gái mẹ...). Sau đó điền Mã số thẻ BHYT và Hạn sử dụng thẻ (Dùng quyển hóa đơn VAT_THI).", true)
+        new("LT_TAO_THE_TAM_BHYT", "Tạo mã thẻ BHYT tạm trẻ em", 1.0, "Tiếp đón & Nhập viện", "Truy cập cổng giám định BHYT và tạo mã thẻ tạm cho trẻ em sơ sinh dưới 6 tuổi (Bé gái mẹ...). Sau đó điền Mã số thẻ BHYT và Hạn sử dụng thẻ (Dùng quyển hóa đơn VAT_THI).", true),
+        new("TT_TUONG_TRINH_PTTT", "Nhập nội dung tường trình PT-TT", 4.0, "Phẫu thuật - Thủ thuật", "Nhập nội dung tường trình PT-TT cho các dịch vụ đã chỉ định cho bệnh nhân.", true)
     };
 
     public static IReadOnlyList<SystemActionDefinition> All => DefaultActions;

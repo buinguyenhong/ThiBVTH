@@ -254,3 +254,25 @@
   - Tieu chuan: `desktop/publish/ExamClient/ExamGenerator.Client.exe` (148.5 KB)
   - Standalone: `desktop/publish/ExamClient-Standalone/ExamGenerator.Client.exe` (148.5 KB)
 - **Ghi chu thay doi:** Phat hanh ban build dong goi moi nhat sau khi tra soat toan bo de thi va cau hoi
+
+### Build [2026-10-26 10:31:42] - Commit [2f42bfc]
+- **Trang thai:** Thanh cong (57/57 Tests Passed)
+- **Cau hinh:** .NET 8 LTS (Release) + Standalone (Self-Contained win-x64)
+- **Duong dan chay ExamOperationsDesktop (Hoi dong / Giam khao):**
+  - Tieu chuan: `desktop/publish/ExamOperationsDesktop/ExamGenerator.Desktop.exe` (148.5 KB)
+  - Standalone: `desktop/publish/ExamOperationsDesktop-Standalone/ExamGenerator.Desktop.exe` (148.5 KB)
+- **Duong dan chay ExamClient (May tram Thi sinh):**
+  - Tieu chuan: `desktop/publish/ExamClient/ExamGenerator.Client.exe` (148.5 KB)
+  - Standalone: `desktop/publish/ExamClient-Standalone/ExamGenerator.Client.exe` (148.5 KB)
+- **Ghi chu thay doi:** Tich hop 3 mau de thi moi DETHI2608: KTV Phuc hoi chuc nang, KTV Gay me hoi suc va Dieu duong Than nhan tao
+
+### Build [2026-10-26 11:18:13] - Commit [7b033d0]
+- **Trang thai:** Thanh cong (56/56 Tests Passed)
+- **Cau hinh:** .NET 8 LTS (Release) + Standalone (Self-Contained win-x64)
+- **Duong dan chay ExamOperationsDesktop (Hoi dong / Giam khao):**
+  - Tieu chuan: `desktop/publish/ExamOperationsDesktop/ExamGenerator.Desktop.exe` (148.5 KB)
+  - Standalone: `desktop/publish/ExamOperationsDesktop-Standalone/ExamGenerator.Desktop.exe` (148.5 KB)
+- **Duong dan chay ExamClient (May tram Thi sinh):**
+  - Tieu chuan: `desktop/publish/ExamClient/ExamGenerator.Client.exe` (148.5 KB)
+  - Standalone: `desktop/publish/ExamClient-Standalone/ExamGenerator.Client.exe` (148.5 KB)
+- **Ghi chu thay doi:** Chuan hoa 3 mau de thi DETHI2608 su dung Action Dược goc YL_CHI_DINH_THUOC_VTYT va bo sung Action TT_TUONG_TRINH_PTTT

@@ -409,4 +409,73 @@ public sealed class ExamClientPackageAndGradingTests
         var prompt = ExamPackageService.GetFillInPrompt(actionCode, instruction, null);
         Assert.NotNull(prompt);
     }
+
+    [Fact]
+    public async Task NewTemplates_PhucHoiChucNang_GayMeHoiSuc_ThanNhanTao_AreProperlySeededAndConfigured()
+    {
+        var tempDir = Path.Combine(Path.GetTempPath(), $"test_new_templates_{Guid.NewGuid():N}");
+        Directory.CreateDirectory(tempDir);
+        try
+        {
+            var storage = new LocalApplicationStorage(tempDir);
+            var db = new SqliteDatabase(storage);
+            await db.InitializeAsync();
+            await db.EnsureDefaultTemplatesAsync();
+
+            var templates = await db.GetTemplatesAsync();
+            
+            // 1. Kỹ thuật viên Phục hồi chức năng (4 câu, 10đ)
+            var phcn = templates.FirstOrDefault(t => t.Id == "tpl-ktv-phcn");
+            Assert.False(string.IsNullOrEmpty(phcn.Id));
+            Assert.Equal("Khoa Phục hồi chức năng", phcn.Department);
+            Assert.Equal("Kỹ thuật viên", phcn.Position);
+            Assert.Equal(4, phcn.QuestionCount);
+            Assert.Equal(10.0, phcn.TotalScore);
+            var phcnActions = await db.GetTemplateActionDetailsAsync("tpl-ktv-phcn");
+            Assert.Equal(4, phcnActions.Count);
+            Assert.Equal(10.0, phcnActions.Sum(a => a.Score));
+            Assert.Contains(phcnActions, a => a.Code == "KB_BENH_AN_NGOAI_TRU" && a.Score == 3.0);
+            Assert.Contains(phcnActions, a => a.Code == "YL_CHI_DINH_CLS" && a.Score == 2.0);
+            Assert.Contains(phcnActions, a => a.Code == "TT_TUONG_TRINH_PTTT" && a.Score == 4.0);
+            Assert.Contains(phcnActions, a => a.Code == "TK_KIEM_TON_KHO" && a.Score == 1.0);
+
+            // 2. Kỹ thuật viên Gây mê hồi sức (2 câu, 10đ)
+            var gmhs = templates.FirstOrDefault(t => t.Id == "tpl-ktv-gmhs");
+            Assert.False(string.IsNullOrEmpty(gmhs.Id));
+            Assert.Equal("Khoa Gây mê hồi sức", gmhs.Department);
+            Assert.Equal("Kỹ thuật viên", gmhs.Position);
+            Assert.Equal(2, gmhs.QuestionCount);
+            Assert.Equal(10.0, gmhs.TotalScore);
+            var gmhsActions = await db.GetTemplateActionDetailsAsync("tpl-ktv-gmhs");
+            Assert.Equal(2, gmhsActions.Count);
+            Assert.Equal(10.0, gmhsActions.Sum(a => a.Score));
+            Assert.Contains(gmhsActions, a => a.Code == "YL_CHI_DINH_THUOC_VTYT" && a.Score == 8.0);
+            Assert.Contains(gmhsActions, a => a.Code == "TK_KIEM_TON_KHO" && a.Score == 2.0);
+
+            // 3. Điều dưỡng Thận nhân tạo (5 câu, 10đ)
+            var tnt = templates.FirstOrDefault(t => t.Id == "tpl-dd-tnt");
+            Assert.False(string.IsNullOrEmpty(tnt.Id));
+            Assert.Equal("Khoa Thận nhân tạo", tnt.Department);
+            Assert.Equal("Điều dưỡng", tnt.Position);
+            Assert.Equal(5, tnt.QuestionCount);
+            Assert.Equal(10.0, tnt.TotalScore);
+            var tntActions = await db.GetTemplateActionDetailsAsync("tpl-dd-tnt");
+            Assert.Equal(5, tntActions.Count);
+            Assert.Equal(10.0, tntActions.Sum(a => a.Score));
+            Assert.Contains(tntActions, a => a.Code == "KB_BENH_AN_NGOAI_TRU" && a.Score == 2.0);
+            Assert.Contains(tntActions, a => a.Code == "YL_CHI_DINH_CLS" && a.Score == 1.0);
+            Assert.Contains(tntActions, a => a.Code == "TT_TUONG_TRINH_PTTT" && a.Score == 4.0);
+            Assert.Contains(tntActions, a => a.Code == "TK_KIEM_TON_KHO" && a.Score == 1.0);
+            Assert.Contains(tntActions, a => a.Code == "HC_TRA_CUU_THANH_TOAN" && a.Score == 2.0);
+
+            // 4. Verify Built-in actions seeded
+            var actions = await db.GetActionDefinitionsAsync();
+            Assert.Contains(actions, a => a.Code == "TT_TUONG_TRINH_PTTT" && a.IsBuiltIn);
+        }
+        finally
+        {
+            Microsoft.Data.Sqlite.SqliteConnection.ClearAllPools();
+            try { if (Directory.Exists(tempDir)) Directory.Delete(tempDir, true); } catch { }
+        }
+    }
 }

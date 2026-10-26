@@ -311,7 +311,10 @@ public sealed class SqliteDatabase
             "('tpl-ktv-xn','Đề Kỹ thuật viên Xét nghiệm','Khoa Xét Nghiệm','Kỹ thuật viên',2,10,'WardAdmissionPreparation',$at), " +
             "('tpl-ktv-cdha','Đề Kỹ thuật viên Chẩn đoán hình ảnh','Khoa Chẩn đoán hình ảnh','Kỹ thuật viên',2,10,'WardAdmissionPreparation',$at), " +
             "('tpl-thu-ngan','Đề Thu ngân Quầy viện phí','Phòng Tài chính kế toán','Thu ngân',3,10,'DirectReception',$at), " +
-            "('tpl-lt-thuphi','Đề Lễ tân - Thu phí phòng khám (7 câu)','Khoa Khám bệnh','Lễ tân',7,10,'DirectReception',$at)";
+            "('tpl-lt-thuphi','Đề Lễ tân - Thu phí phòng khám (7 câu)','Khoa Khám bệnh','Lễ tân',7,10,'DirectReception',$at), " +
+            "('tpl-ktv-phcn','Đề Kỹ thuật viên Phục hồi chức năng (4 câu)','Khoa Phục hồi chức năng','Kỹ thuật viên',4,10,'DirectReception',$at), " +
+            "('tpl-ktv-gmhs','Đề Kỹ thuật viên Gây mê hồi sức (2 câu)','Khoa Gây mê hồi sức','Kỹ thuật viên',2,10,'WardAdmissionPreparation',$at), " +
+            "('tpl-dd-tnt','Đề Điều dưỡng Thận nhân tạo (5 câu)','Khoa Thận nhân tạo','Điều dưỡng',5,10,'DirectReception',$at)";
         command.Parameters.AddWithValue("$at", DateTimeOffset.Now.ToString("O"));
         await command.ExecuteNonQueryAsync(cancellationToken);
 
@@ -392,7 +395,18 @@ public sealed class SqliteDatabase
             ('tpl-lt-thuphi','LT_DOI_DICH_VU_CLS','Hủy và đổi dịch vụ CLS',1),
             ('tpl-lt-thuphi','LT_TRA_CUU_THONG_TIN','Tra cứu buồng giường & lịch sử KCB',2),
             ('tpl-lt-thuphi','LT_THANH_TOAN_RA_VIEN','Thu thanh toán ra viện',1),
-            ('tpl-lt-thuphi','LT_TAO_THE_TAM_BHYT','Tạo mã thẻ BHYT tạm trẻ em',1);
+            ('tpl-lt-thuphi','LT_TAO_THE_TAM_BHYT','Tạo mã thẻ BHYT tạm trẻ em',1),
+            ('tpl-ktv-phcn','KB_BENH_AN_NGOAI_TRU','Nhận bệnh vào khoa - tạo Bệnh án ngoại trú, nhập nội dung bệnh án',3),
+            ('tpl-ktv-phcn','YL_CHI_DINH_CLS','Chỉ định các dịch vụ CLS, thủ thuật, phẫu thuật',2),
+            ('tpl-ktv-phcn','TT_TUONG_TRINH_PTTT','Nhập nội dung tường trình PT-TT cho các dịch vụ đã chỉ định',4),
+            ('tpl-ktv-phcn','TK_KIEM_TON_KHO','Báo số tồn kho dược cơ số (Nguồn Viện phí)',1),
+            ('tpl-ktv-gmhs','YL_CHI_DINH_THUOC_VTYT','Thực hiện thao tác lên các loại Dược – VTYT và chu trình Lĩnh - Nhập - Xuất',8),
+            ('tpl-ktv-gmhs','TK_KIEM_TON_KHO','Báo số tồn kho dược trong kho Gây mê (Nguồn viện phí)',2),
+            ('tpl-dd-tnt','KB_BENH_AN_NGOAI_TRU','Nhận bệnh vào khoa - tạo Bệnh án ngoại trú, nhập nội dung bệnh án',2),
+            ('tpl-dd-tnt','YL_CHI_DINH_CLS','Chỉ định các dịch vụ CLS, thủ thuật, phẫu thuật',1),
+            ('tpl-dd-tnt','TT_TUONG_TRINH_PTTT','Nhập nội dung tường trình PT-TT và Chu trình Dược',4),
+            ('tpl-dd-tnt','TK_KIEM_TON_KHO','Báo số tồn kho của một loại dược trong kho cơ số (Nguồn Viện phí)',1),
+            ('tpl-dd-tnt','HC_TRA_CUU_THANH_TOAN','Kiểm tra viện phí của bệnh nhân đang nằm viện',2);
             """;
         await actions.ExecuteNonQueryAsync(cancellationToken);
     }

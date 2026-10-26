@@ -110,7 +110,7 @@ public sealed class ExamPackageService
             "LT_TAO_THE_TAM_BHYT" => "Điền Mã số thẻ BHYT tạm & Hạn sử dụng sau khi tạo trên cổng giám định:",
             "KB_BENH_AN_NGOAI_TRU" => "Điền Số bệnh án ngoại trú đã lập trên HIS:",
             "KB_CHI_DINH_NOI_TRU" => "Điền Số bệnh án nội trú đã chỉ định trên HIS:",
-            "HC_TRA_CUU_THANH_TOAN" => "Điền kết quả tra cứu thanh toán (Số BA, Đã thanh toán, Tạm ứng, Còn phải thu, Tổng tiền):",
+            "HC_TRA_CUU_THANH_TOAN" => "Điền kết quả tra cứu thanh toán / viện phí (Họ tên, Mã YT/Số BA, Tổng tiền, Tạm ứng, Còn lại):",
             "TC_TRA_CUU_BENH_SU" => "Điền kết quả tra cứu lịch sử khám chữa bệnh / bệnh sử:",
             "NT_NHAN_BENH_KHOA" => "Ghi lại Số vào viện và Buồng/Giường bệnh đã nhận:",
             _ => (instruction ?? "").Contains("điền", StringComparison.OrdinalIgnoreCase) || 
@@ -250,7 +250,10 @@ public sealed class ExamPackageService
                 $"• Chỉ định nhập viện nội trú BN: {scenario.Patient.FullName} (Mã: {scenario.Patient.MedicalCode}) | Thí sinh điền Số bệnh án nội trú",
 
             "HC_TRA_CUU_THANH_TOAN" =>
-                $"• Tra cứu thông tin thanh toán viện phí của BN: {scenario.Patient.FullName} (Mã: {scenario.Patient.MedicalCode}) | Đối soát thông tin số tiền thanh toán/tạm ứng",
+                $"• Tra cứu viện phí của BN tại {scenario.DepartmentName} | Đối soát 5 thông tin: Họ tên, Mã YT/Số BA, Tổng chi phí, Tạm ứng, Còn lại",
+
+            "TT_TUONG_TRINH_PTTT" =>
+                $"• Tường trình PT-TT BN: {scenario.Patient.FullName} (Mã: {scenario.Patient.MedicalCode}) | Đối soát nội dung tường trình trên phân hệ PT-TT HIS",
 
             "TC_TRA_CUU_BENH_SU" =>
                 $"• Tra cứu lịch sử KCB BN: {scenario.Patient.FullName} (Mã: {scenario.Patient.MedicalCode}) | Đối soát thông tin các đợt khám",
