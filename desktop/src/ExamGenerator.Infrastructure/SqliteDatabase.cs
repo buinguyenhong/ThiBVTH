@@ -314,7 +314,10 @@ public sealed class SqliteDatabase
             "('tpl-lt-thuphi','Đề Lễ tân - Thu phí phòng khám (7 câu)','Khoa Khám bệnh','Lễ tân',7,10,'DirectReception',$at), " +
             "('tpl-ktv-phcn','Đề Kỹ thuật viên Phục hồi chức năng (4 câu)','Khoa Phục hồi chức năng','Kỹ thuật viên',4,10,'DirectReception',$at), " +
             "('tpl-ktv-gmhs','Đề Kỹ thuật viên Gây mê hồi sức (2 câu)','Khoa Gây mê hồi sức','Kỹ thuật viên',2,10,'WardAdmissionPreparation',$at), " +
-            "('tpl-dd-tnt','Đề Điều dưỡng Thận nhân tạo (5 câu)','Khoa Thận nhân tạo','Điều dưỡng',5,10,'DirectReception',$at)";
+            "('tpl-dd-tnt','Đề Điều dưỡng Thận nhân tạo (5 câu)','Khoa Thận nhân tạo','Điều dưỡng',5,10,'DirectReception',$at), " +
+            "('tpl-dd-mat','Đề Điều dưỡng Khoa Mắt (6 câu)','Khoa Mắt','Điều dưỡng',6,10,'WardAdmissionPreparation',$at), " +
+            "('tpl-dd-tmh','Đề Điều dưỡng Khoa Tai Mũi Họng (6 câu)','Khoa Tai Mũi Họng','Điều dưỡng',6,10,'WardAdmissionPreparation',$at), " +
+            "('tpl-dd-rhm','Đề Điều dưỡng Khoa Răng Hàm Mặt (6 câu)','Khoa Răng Hàm Mặt','Điều dưỡng',6,10,'WardAdmissionPreparation',$at)";
         command.Parameters.AddWithValue("$at", DateTimeOffset.Now.ToString("O"));
         await command.ExecuteNonQueryAsync(cancellationToken);
 
@@ -406,7 +409,25 @@ public sealed class SqliteDatabase
             ('tpl-dd-tnt','YL_CHI_DINH_CLS','Chỉ định các dịch vụ CLS, thủ thuật, phẫu thuật',1),
             ('tpl-dd-tnt','TT_TUONG_TRINH_PTTT','Nhập nội dung tường trình PT-TT và Chu trình Dược',4),
             ('tpl-dd-tnt','TK_KIEM_TON_KHO','Báo số tồn kho của một loại dược trong kho cơ số (Nguồn Viện phí)',1),
-            ('tpl-dd-tnt','HC_TRA_CUU_THANH_TOAN','Kiểm tra viện phí của bệnh nhân đang nằm viện',2);
+            ('tpl-dd-tnt','HC_TRA_CUU_THANH_TOAN','Kiểm tra viện phí của bệnh nhân đang nằm viện',2),
+            ('tpl-dd-mat','KB_CHI_DINH_CLS','Trên màn hình khám bệnh - Chỉ định CLS – Thủ thuật cho bệnh nhân',2),
+            ('tpl-dd-mat','TT_TUONG_TRINH_PTTT','Viết tường trình cho thủ thuật cho bệnh nhân ở câu 1',1),
+            ('tpl-dd-mat','KB_BENH_AN_NGOAI_TRU','Chỉ định điều trị ngoại trú và lập bệnh án ngoại trú',2),
+            ('tpl-dd-mat','KB_CHI_DINH_NOI_TRU','Chỉ định nhập viện điều trị nội trú',1),
+            ('tpl-dd-mat','YL_CHI_DINH_THUOC_VTYT','Lên phiếu lĩnh cơ số Dược/ VTYT: Lập phiếu, Nhập Nội Bộ, Xuất sử dụng',3),
+            ('tpl-dd-mat','TC_TRA_CUU_BENH_SU','Tra cứu lịch sử KCB/ Bệnh sử của bệnh nhân',1),
+            ('tpl-dd-tmh','KB_CHI_DINH_CLS','Trên màn hình khám bệnh - Chỉ định CLS – Thủ thuật cho bệnh nhân',2),
+            ('tpl-dd-tmh','TT_TUONG_TRINH_PTTT','Viết tường trình cho thủ thuật cho bệnh nhân ở câu 1',1),
+            ('tpl-dd-tmh','KB_BENH_AN_NGOAI_TRU','Chỉ định điều trị ngoại trú và lập bệnh án ngoại trú',2),
+            ('tpl-dd-tmh','KB_CHI_DINH_NOI_TRU','Chỉ định nhập viện điều trị nội trú',1),
+            ('tpl-dd-tmh','YL_CHI_DINH_THUOC_VTYT','Lên phiếu lĩnh cơ số Dược/ VTYT: Lập phiếu, Nhập Nội Bộ, Xuất sử dụng',3),
+            ('tpl-dd-tmh','TC_TRA_CUU_BENH_SU','Tra cứu lịch sử KCB/ Bệnh sử của bệnh nhân',1),
+            ('tpl-dd-rhm','KB_CHI_DINH_CLS','Trên màn hình khám bệnh - Chỉ định CLS – Thủ thuật cho bệnh nhân',2),
+            ('tpl-dd-rhm','TT_TUONG_TRINH_PTTT','Viết tường trình cho thủ thuật cho bệnh nhân ở câu 1',1),
+            ('tpl-dd-rhm','KB_BENH_AN_NGOAI_TRU','Chỉ định điều trị ngoại trú và lập bệnh án ngoại trú',2),
+            ('tpl-dd-rhm','KB_CHI_DINH_NOI_TRU','Chỉ định nhập viện điều trị nội trú',1),
+            ('tpl-dd-rhm','YL_CHI_DINH_THUOC_VTYT','Lên phiếu lĩnh cơ số Dược/ VTYT: Lập phiếu, Nhập Nội Bộ, Xuất sử dụng',3),
+            ('tpl-dd-rhm','TC_TRA_CUU_BENH_SU','Tra cứu lịch sử KCB/ Bệnh sử của bệnh nhân',1);
             """;
         await actions.ExecuteNonQueryAsync(cancellationToken);
     }

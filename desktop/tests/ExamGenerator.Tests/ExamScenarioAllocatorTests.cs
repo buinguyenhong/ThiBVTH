@@ -925,4 +925,127 @@ public class ExamScenarioAllocatorTests : IDisposable
         Assert.True(File.Exists(tempDocx));
         try { File.Delete(tempDocx); } catch { }
     }
+
+    [Fact]
+    public async Task LienChuyenKhoa_Mat_Tmh_Rhm_Allocate_And_Render_Two_Users()
+    {
+        await SetupSyncedCatalogAsync();
+
+        // Setup Khoa Mắt
+        await _database.SaveDepartmentConfigurationAsync("MAT", "Khoa Mắt", "KHO-MAT", "Kho Mắt");
+        await _database.ReplaceSnapshotUsersAsync(new[]
+        {
+            new SnapshotUserRow("u_mat_1", "HOADT", "ĐD. Hoàng Đỗ Thư", "MAT", "Khoa Mắt"),
+            new SnapshotUserRow("u_mat_2", "YENNTH_DD", "ĐD. Nguyễn Thị Yến", "MAT", "Khoa Mắt")
+        });
+        await _database.SaveDepartmentUserMappingsAsync("MAT", "Khoa Mắt", new[]
+        {
+            ("u_mat_1", "HOADT", "ĐD. Hoàng Đỗ Thư"),
+            ("u_mat_2", "YENNTH_DD", "ĐD. Nguyễn Thị Yến")
+        });
+
+        // Setup CLS & Thủ thuật khoa Mắt
+        await _database.ReplaceCatalogAsync("Services", new (string Id, string Code, string Name, string? ParentId)[]
+        {
+            ("s_mat_1", "CLS_DAYMAT", "Chụp đáy mắt không huỳnh quang", "Mắt"),
+            ("s_mat_2", "TT_APXEMI", "Rạch áp xe mi", "Mắt"),
+            ("s_mat_3", "CLS_DO_NHANAP", "Đo nhãn áp", "Mắt"),
+            ("s_mat_4", "TT_CONG_DO", "Rửa cùng đồ bóc giả mạc", "Mắt")
+        });
+
+        // Setup Tồn kho Mắt (Nguồn Viện phí)
+        await _database.ReplaceSnapshotDrugsAsync(new[]
+        {
+            new SnapshotDrugRow("d1", "GaTV21", "Găng tay kiểm tra có bột size S", "Đôi", "KHO-MAT", "Kho Mắt", "Viện phí", 100),
+            new SnapshotDrugRow("d2", "BoTV19", "Bơm tiêm MPV 1ml 26G", "Cái", "KHO-MAT", "Kho Mắt", "Viện phí", 100),
+            new SnapshotDrugRow("d3", "ChNV2", "Chỉ CARELON (Nylon) 7/0", "Tép", "KHO-MAT", "Kho Mắt", "Viện phí", 50),
+            new SnapshotDrugRow("d4", "ChDV8", "Chỉ Dafilon 6/0 45cm", "Tép", "KHO-MAT", "Kho Mắt", "Viện phí", 50),
+            new SnapshotDrugRow("d5", "DaGV3", "Dây garo VN", "Cái", "KHO-MAT", "Kho Mắt", "Viện phí", 30),
+            new SnapshotDrugRow("d6", "KiLV1", "Kim Luồn VASOFIX G20", "Cái", "KHO-MAT", "Kho Mắt", "Viện phí", 80),
+            new SnapshotDrugRow("d7", "LuDV4", "Lưỡi dao mổ số 11", "Cái", "KHO-MAT", "Kho Mắt", "Viện phí", 60),
+            new SnapshotDrugRow("d8", "NACT23", "NATRI CLORID 0,9% 10ml", "Lọ", "KHO-MAT", "Kho Mắt", "Viện phí", 200)
+        });
+
+        var allocator = new ExamScenarioAllocator(_database);
+        var candidates = new[]
+        {
+            new CandidateInput("Hoàng Ngọc Linh", "MAT01", "Khoa Mắt", "tpl-dd-mat")
+        };
+
+        var scenarios = await allocator.AllocateBatchScenariosAsync("DotThi_Mat_2026", new DateOnly(2026, 6, 25), candidates);
+        Assert.Single(scenarios);
+
+        var sc = scenarios[0];
+        Assert.Equal(6, sc.Questions.Count);
+        Assert.Equal(10.0, sc.TotalScore);
+
+        // Câu 1 (2đ): Trên màn hình khám bệnh - Chỉ định CLS - Thủ thuật khoa Mắt
+        var q1 = sc.Questions[0];
+        Assert.Equal("KB_CHI_DINH_CLS", q1.ActionCode);
+        Assert.Equal(2.0, q1.Score);
+        Assert.Contains("Trên màn hình khám bệnh - Chỉ định CLS – Thủ thuật cho bệnh nhân", q1.Instruction);
+
+        // Câu 2 (1đ): Viết tường trình thủ thuật
+        var q2 = sc.Questions[1];
+        Assert.Equal("TT_TUONG_TRINH_PTTT", q2.ActionCode);
+        Assert.Equal(1.0, q2.Score);
+        Assert.Contains("Viết  tường trình cho thủ thuật", q2.Instruction);
+
+        // Câu 3 (2đ): Lập bệnh án ngoại trú
+        var q3 = sc.Questions[2];
+        Assert.Equal("KB_BENH_AN_NGOAI_TRU", q3.ActionCode);
+        Assert.Equal(2.0, q3.Score);
+        Assert.Contains("Chỉ định điều trị ngoại trú và lập bệnh án ngoại trú cho bệnh nhân", q3.Instruction);
+
+        // Câu 4 (1đ): Nhập viện nội trú Khoa GMHS
+        var q4 = sc.Questions[3];
+        Assert.Equal("KB_CHI_DINH_NOI_TRU", q4.ActionCode);
+        Assert.Equal(1.0, q4.Score);
+        Assert.Contains("Nhập khoa : Khoa phẫu thuật GMHS", q4.Instruction);
+
+        // Câu 5 (3đ): Lên phiếu lĩnh cơ số Dược / VTYT
+        var q5 = sc.Questions[4];
+        Assert.Equal("YL_CHI_DINH_THUOC_VTYT", q5.ActionCode);
+        Assert.Equal(3.0, q5.Score);
+        Assert.Contains("Lên phiếu lĩnh cơ số Dược/ VTYT", q5.Instruction);
+        Assert.Contains("Lập phiếu", q5.Instruction);
+        Assert.Contains("Nhập Nội Bộ", q5.Instruction);
+        Assert.Contains("Xuất sử dụng", q5.Instruction);
+
+        // Dược được cấp phát có 8 món Viện phí
+        Assert.Equal(8, sc.OrderedDrugs.Count);
+        foreach (var d in sc.OrderedDrugs)
+        {
+            Assert.Equal("Viện phí", d.FundingSource);
+            Assert.Equal(1, d.Quantity);
+        }
+
+        // Câu 6 (1đ): Tra cứu lịch sử KCB/Bệnh sử
+        var q6 = sc.Questions[5];
+        Assert.Equal("TC_TRA_CUU_BENH_SU", q6.ActionCode);
+        Assert.Equal(1.0, q6.Score);
+        Assert.Contains("Tra cứu lịch sử KCB/ Bệnh sử của bệnh nhân", q6.Instruction);
+        Assert.Contains("Đợt khám bệnh gần nhất", q6.Instruction);
+        Assert.Contains("CLS thực hiện gần nhất", q6.Instruction);
+
+        // Test Word rendering: Footnote with 2 users (BS để trống, ĐD có username)
+        var tempDocx = Path.Combine(Path.GetTempPath(), $"DeThi_Mat_{Guid.NewGuid():N}.docx");
+        var writer = new WordExamWriter();
+        writer.Create(tempDocx, sc);
+        Assert.True(File.Exists(tempDocx));
+
+        // Read XML from generated DOCX to verify footer text
+        using (var archive = System.IO.Compression.ZipFile.OpenRead(tempDocx))
+        {
+            var docEntry = archive.GetEntry("word/document.xml");
+            Assert.NotNull(docEntry);
+            using var reader = new StreamReader(docEntry.Open());
+            var xmlContent = await reader.ReadToEndAsync();
+            Assert.Contains("sử dụng user ………………; password: 123 để thi", xmlContent);
+            Assert.Contains($"sử dụng user {sc.HisUserCode}; Password: 123 để làm câu 5", xmlContent);
+            Assert.Contains("Danh mục Dược – VTYT:", xmlContent);
+        }
+
+        try { File.Delete(tempDocx); } catch { }
+    }
 }

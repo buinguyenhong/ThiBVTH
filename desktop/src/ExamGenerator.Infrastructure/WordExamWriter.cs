@@ -257,8 +257,23 @@ public sealed class WordExamWriter
             "LT_TAO_THE_TAM_BHYT" =>
                 $"• Cấp thẻ tạm BHYT: Bé gái (Sinh {s.ExamDate.AddMonths(-1):dd/MM/yyyy}, trước ngày thi 1 tháng) | Mã BHYT tạm: TE1... | Hạn thẻ: 30 ngày",
 
+            "KB_CHI_DINH_CLS" =>
+                $"• BN: {s.Patient.FullName} (Mã: {s.Patient.MedicalCode}) | Chỉ định CLS & Thủ thuật theo đề bài",
+
+            "TT_TUONG_TRINH_PTTT" =>
+                $"• BN: {s.Patient.FullName} (Mã: {s.Patient.MedicalCode}) | Viết nội dung tường trình thủ thuật đã chỉ định",
+
+            "KB_BENH_AN_NGOAI_TRU" =>
+                $"• BN: {(s.SecondPatient ?? s.Patient).FullName} (Mã: {(s.SecondPatient ?? s.Patient).MedicalCode}) | Chỉ định điều trị & Lập bệnh án ngoại trú",
+
+            "KB_CHI_DINH_NOI_TRU" =>
+                $"• BN: {(s.AdvancePaymentCase1?.FullName ?? "Theo đề")} (Mã: {(s.AdvancePaymentCase1?.MedicalCode ?? "")}) | Chỉ định nhập viện nội trú (Khoa GMHS)",
+
+            "TC_TRA_CUU_BENH_SU" =>
+                $"• Tra cứu BN: {(s.OutpatientLookupCase?.FullName ?? "Theo đề")} (Mã: {(s.OutpatientLookupCase?.MedicalCode ?? "")}) | Lịch sử đợt khám & CLS gần nhất",
+
             "YL_CHI_DINH_THUOC_VTYT" =>
-                $"• BN: {s.Patient.FullName} (Mã: {s.Patient.MedicalCode}) | Thuốc: " +
+                $"• BN: {s.Patient.FullName} (Mã: {s.Patient.MedicalCode}) | Thuốc/VTYT: " +
                 (s.OrderedDrugs.Count > 0 ? string.Join("; ", s.OrderedDrugs.Select(d => $"{d.Name} ({d.Code}, SL:{d.Quantity})")) : "Theo chỉ định"),
 
             "TK_KIEM_TON_KHO" =>
@@ -316,14 +331,24 @@ public sealed class WordExamWriter
             AddEmptyParagraph(body, 30);
         }
 
+        var isGmhs = scenario.TemplateId.Equals("tpl-ktv-gmhs", StringComparison.OrdinalIgnoreCase) ||
+                     scenario.DepartmentName.Contains("Gây mê", StringComparison.OrdinalIgnoreCase);
+        var isLienChuyenKhoa = scenario.TemplateId.Equals("tpl-dd-mat", StringComparison.OrdinalIgnoreCase) ||
+                               scenario.TemplateId.Equals("tpl-dd-tmh", StringComparison.OrdinalIgnoreCase) ||
+                               scenario.TemplateId.Equals("tpl-dd-rhm", StringComparison.OrdinalIgnoreCase);
+
         var hasDrugOrder = scenario.Questions.Any(q => q.ActionCode.Equals("YL_CHI_DINH_THUOC_VTYT", StringComparison.OrdinalIgnoreCase));
         if (hasDrugOrder && scenario.OrderedDrugs.Count > 0)
         {
-            var isGmhs = scenario.TemplateId.Equals("tpl-ktv-gmhs", StringComparison.OrdinalIgnoreCase) ||
-                         scenario.DepartmentName.Contains("Gây mê", StringComparison.OrdinalIgnoreCase);
+            if (isLienChuyenKhoa)
+            {
+                AddFooterNote(body, "Lưu ý : khi thực hiện câu 5 phải yêu cầu nhân viên vi tính hỗ trợ thao tác xuất dược nội bộ.");
+                AddEmptyParagraph(body, 20);
+            }
+
             var title = isGmhs
                 ? "Danh mục Dược – VTYT dùng trong phẫu thuật:"
-                : "Danh sách thuốc, VTYT cần lên y lệnh cho bệnh nhân:";
+                : (isLienChuyenKhoa ? "Danh mục Dược – VTYT:" : "Danh sách thuốc, VTYT cần lên y lệnh cho bệnh nhân:");
             AddSectionTitle(body, title);
             var drugTable = CreateDrugsTable(scenario.OrderedDrugs);
             body.Append(drugTable);
@@ -332,13 +357,21 @@ public sealed class WordExamWriter
 
         // 6. Footer Note: User & Password
         var userCode = string.IsNullOrWhiteSpace(scenario.HisUserCode) ? "USER_THI" : scenario.HisUserCode;
-        AddFooterNote(body, $"Lưu ý : User đăng nhập chương trình: {userCode}; PassWord : 123");
-
-        var isFrontdesk = scenario.Questions.Any(q => q.ActionCode.StartsWith("LT_", StringComparison.OrdinalIgnoreCase)) ||
-                          scenario.TemplateId.Equals("tpl-lt-thuphi", StringComparison.OrdinalIgnoreCase);
-        if (isFrontdesk)
+        if (isLienChuyenKhoa)
         {
-            AddFooterNote(body, "Ghi chú: Thí sinh kiểm tra kỹ Quyển hoá đơn / Ký hiệu hoá đơn khi in (sử dụng quyển THI hoặc VAT_THI theo quy định). Thí sinh không thao tác trên dữ liệu bệnh nhân ngoài danh sách đề bài giao.");
+            AddFooterNote(body, "Note\t- sử dụng user ………………; password: 123 để thi");
+            AddFooterNote(body, $"\t- sử dụng user {userCode}; Password: 123 để làm câu 5");
+        }
+        else
+        {
+            AddFooterNote(body, $"Lưu ý : User đăng nhập chương trình: {userCode}; PassWord : 123");
+
+            var isFrontdesk = scenario.Questions.Any(q => q.ActionCode.StartsWith("LT_", StringComparison.OrdinalIgnoreCase)) ||
+                              scenario.TemplateId.Equals("tpl-lt-thuphi", StringComparison.OrdinalIgnoreCase);
+            if (isFrontdesk)
+            {
+                AddFooterNote(body, "Ghi chú: Thí sinh kiểm tra kỹ Quyển hoá đơn / Ký hiệu hoá đơn khi in (sử dụng quyển THI hoặc VAT_THI theo quy định). Thí sinh không thao tác trên dữ liệu bệnh nhân ngoài danh sách đề bài giao.");
+            }
         }
     }
 

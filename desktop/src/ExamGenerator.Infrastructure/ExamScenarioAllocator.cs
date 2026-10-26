@@ -164,6 +164,10 @@ public sealed class ExamScenarioAllocator
                 var isWardAdmission = tpl.ReceptionMode.Contains("WardAdmissionPreparation", StringComparison.OrdinalIgnoreCase);
 
                 var isGmhs = deptName.Contains("Gây mê", StringComparison.OrdinalIgnoreCase) || tpl.Id.Equals("tpl-ktv-gmhs", StringComparison.OrdinalIgnoreCase);
+                var isMat = deptName.Contains("Mắt", StringComparison.OrdinalIgnoreCase) || tpl.Id.Equals("tpl-dd-mat", StringComparison.OrdinalIgnoreCase);
+                var isTmh = deptName.Contains("Tai Mũi Họng", StringComparison.OrdinalIgnoreCase) || deptName.Contains("TMH", StringComparison.OrdinalIgnoreCase) || tpl.Id.Equals("tpl-dd-tmh", StringComparison.OrdinalIgnoreCase);
+                var isRhm = deptName.Contains("Răng Hàm Mặt", StringComparison.OrdinalIgnoreCase) || deptName.Contains("RHM", StringComparison.OrdinalIgnoreCase) || tpl.Id.Equals("tpl-dd-rhm", StringComparison.OrdinalIgnoreCase);
+                var isLienChuyenKhoa = isMat || isTmh || isRhm;
 
                 // Allocate 2 patients from synced snapshot (1 BHYT, 1 Viện phí)
                 var bhytRow = availablePatients.FirstOrDefault(p => p.PaymentType.Equals("BHYT", StringComparison.OrdinalIgnoreCase));
@@ -262,6 +266,89 @@ public sealed class ExamScenarioAllocator
                     ? surgeryServices[rng.Next(surgeryServices.Count)].Name
                     : "Phẫu thuật lấy thai lần đầu [gây tê]";
 
+                // Lọc CLS và Thủ thuật chuyên khoa cho Mắt - Tai Mũi Họng - Răng Hàm Mặt (Câu 1 & Câu 2)
+                ScenarioService? pickedSpecialtyCls = null;
+                ScenarioService? pickedSpecialtyThuThuat = null;
+                if (isLienChuyenKhoa)
+                {
+                    if (isMat)
+                    {
+                        var matCls = allServicesWithGroup
+                            .Where(s => s.GroupName.Contains("Mắt", StringComparison.OrdinalIgnoreCase)
+                                     || s.Name.Contains("đáy mắt", StringComparison.OrdinalIgnoreCase)
+                                     || s.Name.Contains("nhãn áp", StringComparison.OrdinalIgnoreCase)
+                                     || s.Name.Contains("khúc xạ", StringComparison.OrdinalIgnoreCase)
+                                     || s.Name.Contains("thị lực", StringComparison.OrdinalIgnoreCase)
+                                     || s.Name.Contains("giác mạc", StringComparison.OrdinalIgnoreCase)
+                                     || s.Name.Contains("kết mạc", StringComparison.OrdinalIgnoreCase))
+                            .ToList();
+                        var matTt = allServicesWithGroup
+                            .Where(s => s.GroupName.Contains("Mắt", StringComparison.OrdinalIgnoreCase)
+                                     || s.Name.Contains("áp xe mi", StringComparison.OrdinalIgnoreCase)
+                                     || s.Name.Contains("giả mạc", StringComparison.OrdinalIgnoreCase)
+                                     || s.Name.Contains("cùng đồ", StringComparison.OrdinalIgnoreCase)
+                                     || s.Name.Contains("lệ đạo", StringComparison.OrdinalIgnoreCase)
+                                     || s.Name.Contains("cắt chỉ mắt", StringComparison.OrdinalIgnoreCase)
+                                     || s.Name.Contains("nặn tuyến", StringComparison.OrdinalIgnoreCase)
+                                     || s.Name.Contains("thông lệ đạo", StringComparison.OrdinalIgnoreCase)
+                                     || s.Name.Contains("bơm rửa lệ đạo", StringComparison.OrdinalIgnoreCase))
+                            .ToList();
+
+                        var cCls = matCls.Count > 0 ? matCls[rng.Next(matCls.Count)] : (Code: "CDHA_DAYMAT", Name: "Chụp đáy mắt không huỳnh quang", GroupName: "Mắt");
+                        var cTt = matTt.Count > 0 ? matTt[rng.Next(matTt.Count)] : (Code: "TT_APXEMI", Name: "Rạch áp xe mi", GroupName: "Mắt");
+                        pickedSpecialtyCls = new ScenarioService(cCls.Code, cCls.Name, cCls.GroupName);
+                        pickedSpecialtyThuThuat = new ScenarioService(cTt.Code, cTt.Name, cTt.GroupName);
+                    }
+                    else if (isTmh)
+                    {
+                        var tmhCls = allServicesWithGroup
+                            .Where(s => s.GroupName.Contains("Tai Mũi Họng", StringComparison.OrdinalIgnoreCase)
+                                     || s.Name.Contains("nội soi tai", StringComparison.OrdinalIgnoreCase)
+                                     || s.Name.Contains("nội soi mũi", StringComparison.OrdinalIgnoreCase)
+                                     || s.Name.Contains("thanh quản", StringComparison.OrdinalIgnoreCase)
+                                     || s.Name.Contains("thính lực", StringComparison.OrdinalIgnoreCase)
+                                     || s.Name.Contains("nhĩ lượng", StringComparison.OrdinalIgnoreCase))
+                            .ToList();
+                        var tmhTt = allServicesWithGroup
+                            .Where(s => s.GroupName.Contains("Tai Mũi Họng", StringComparison.OrdinalIgnoreCase)
+                                     || s.Name.Contains("rửa mũi", StringComparison.OrdinalIgnoreCase)
+                                     || s.Name.Contains("thuốc tai", StringComparison.OrdinalIgnoreCase)
+                                     || s.Name.Contains("khí dung", StringComparison.OrdinalIgnoreCase)
+                                     || s.Name.Contains("dị vật tai", StringComparison.OrdinalIgnoreCase)
+                                     || s.Name.Contains("dị vật mũi", StringComparison.OrdinalIgnoreCase)
+                                     || s.Name.Contains("đốt cuốn mũi", StringComparison.OrdinalIgnoreCase))
+                            .ToList();
+
+                        var cCls = tmhCls.Count > 0 ? tmhCls[rng.Next(tmhCls.Count)] : (Code: "CLS_NSTMH", Name: "Nội soi tai mũi họng", GroupName: "Tai Mũi Họng");
+                        var cTt = tmhTt.Count > 0 ? tmhTt[rng.Next(tmhTt.Count)] : (Code: "TT_HUTMUI", Name: "Hút rửa mũi xoang", GroupName: "Tai Mũi Họng");
+                        pickedSpecialtyCls = new ScenarioService(cCls.Code, cCls.Name, cCls.GroupName);
+                        pickedSpecialtyThuThuat = new ScenarioService(cTt.Code, cTt.Name, cTt.GroupName);
+                    }
+                    else // isRhm
+                    {
+                        var rhmCls = allServicesWithGroup
+                            .Where(s => s.GroupName.Contains("Răng", StringComparison.OrdinalIgnoreCase)
+                                     || s.Name.Contains("X-quang răng", StringComparison.OrdinalIgnoreCase)
+                                     || s.Name.Contains("Panorama", StringComparison.OrdinalIgnoreCase)
+                                     || s.Name.Contains("toàn cảnh", StringComparison.OrdinalIgnoreCase)
+                                     || s.Name.Contains("Cephalo", StringComparison.OrdinalIgnoreCase))
+                            .ToList();
+                        var rhmTt = allServicesWithGroup
+                            .Where(s => s.GroupName.Contains("Răng", StringComparison.OrdinalIgnoreCase)
+                                     || s.Name.Contains("cao răng", StringComparison.OrdinalIgnoreCase)
+                                     || s.Name.Contains("nhổ răng", StringComparison.OrdinalIgnoreCase)
+                                     || s.Name.Contains("trám răng", StringComparison.OrdinalIgnoreCase)
+                                     || s.Name.Contains("hàn răng", StringComparison.OrdinalIgnoreCase)
+                                     || s.Name.Contains("tủy răng", StringComparison.OrdinalIgnoreCase))
+                            .ToList();
+
+                        var cCls = rhmCls.Count > 0 ? rhmCls[rng.Next(rhmCls.Count)] : (Code: "CLS_XQRANG", Name: "Chụp X-quang răng cận chóp", GroupName: "Răng Hàm Mặt");
+                        var cTt = rhmTt.Count > 0 ? rhmTt[rng.Next(rhmTt.Count)] : (Code: "TT_CAORANG", Name: "Lấy cao răng và đánh bóng hai hàm", GroupName: "Răng Hàm Mặt");
+                        pickedSpecialtyCls = new ScenarioService(cCls.Code, cCls.Name, cCls.GroupName);
+                        pickedSpecialtyThuThuat = new ScenarioService(cTt.Code, cTt.Name, cTt.GroupName);
+                    }
+                }
+
                 // Allocate Clinical Services categorized by modality (Siêu âm, Xquang, CT/MRI, Xét nghiệm)
                 var (orderedServices, q2Instruction, serviceChange, pickedSieuAm, pickedXquang) = AllocateClinicalServices(allServicesWithGroup, rng);
 
@@ -273,10 +360,10 @@ public sealed class ExamScenarioAllocator
 
                 if (hasDrugOrderAction)
                 {
-                    // Allocate Drugs: Standard 3 BH + 2 VP or GMHS surgical supply list, strictly checking remaining stock
-                    orderedDrugs = AllocateCandidateDrugs(inStockCandidateDrugs, remainingStock, targetWh.WarehouseName, deptName, group.Count(), rng, isGmhs);
+                    // Allocate Drugs: Standard 3 BH + 2 VP, or GMHS surgical supply list, or Specialty clinic supply list
+                    orderedDrugs = AllocateCandidateDrugs(inStockCandidateDrugs, remainingStock, targetWh.WarehouseName, deptName, group.Count(), rng, isGmhs, isLienChuyenKhoa);
 
-                    if (orderedDrugs.Count > 0 && !isGmhs)
+                    if (orderedDrugs.Count > 0 && !isGmhs && !isLienChuyenKhoa)
                     {
                         var returnItem = orderedDrugs.Count > 1 ? orderedDrugs[1] : orderedDrugs[0];
                         drugReturn = new ScenarioDrugReturn(returnItem, 1, "Người bệnh xuất hiện phản ứng phụ nhẹ / đổi thuốc theo y lệnh bác sĩ");
@@ -424,7 +511,10 @@ public sealed class ExamScenarioAllocator
                         targetWh.WarehouseName,
                         gmhsSurgeryName,
                         gmhsAdmissionNumber,
-                        isGmhs);
+                        isGmhs,
+                        isLienChuyenKhoa,
+                        pickedSpecialtyCls,
+                        pickedSpecialtyThuThuat);
 
                     questions.Add(new ScenarioQuestion(aIdx + 1, act.Code, act.Name, instruction, act.Score));
                 }
@@ -477,12 +567,13 @@ public sealed class ExamScenarioAllocator
         string departmentName,
         int totalCandidates,
         Random rng,
-        bool isGmhs = false)
+        bool isGmhs = false,
+        bool isLienChuyenKhoa = false)
     {
         var orderedDrugs = new List<ScenarioDrug>();
         var alreadyPickedCodes = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
-        // Pattern for allocation: GMHS uses surgical consumables (primarily Viện phí VP)
+        // Pattern for allocation: GMHS uses surgical consumables, Liên chuyên khoa uses specialty clinic consumables (Viện phí VP)
         (string PreferredSource, int DesiredQty)[] preferredSlots;
         if (isGmhs)
         {
@@ -494,6 +585,20 @@ public sealed class ExamScenarioAllocator
                 ("Viện phí", 5),
                 ("Viện phí", 2),
                 ("Viện phí", 2)
+            };
+        }
+        else if (isLienChuyenKhoa)
+        {
+            preferredSlots = new (string PreferredSource, int DesiredQty)[]
+            {
+                ("Viện phí", 1),
+                ("Viện phí", 1),
+                ("Viện phí", 1),
+                ("Viện phí", 1),
+                ("Viện phí", 1),
+                ("Viện phí", 1),
+                ("Viện phí", 1),
+                ("Viện phí", 1)
             };
         }
         else
@@ -573,11 +678,13 @@ public sealed class ExamScenarioAllocator
 
             var usage = isGmhs
                 ? "Dùng trong phẫu thuật"
-                : (chosen.Unit.Contains("Chai", StringComparison.OrdinalIgnoreCase)
-                    ? "Truyền tĩnh mạch XL giọt/phút"
-                    : (chosen.Unit.Contains("Lọ", StringComparison.OrdinalIgnoreCase) || chosen.Unit.Contains("Ống", StringComparison.OrdinalIgnoreCase)
-                        ? "Tiêm bắp 01 ống lúc 08h00"
-                        : "Sáng 1 viên, chiều 1 viên sau ăn"));
+                : (isLienChuyenKhoa
+                    ? "Cơ số tủ trực"
+                    : (chosen.Unit.Contains("Chai", StringComparison.OrdinalIgnoreCase)
+                        ? "Truyền tĩnh mạch XL giọt/phút"
+                        : (chosen.Unit.Contains("Lọ", StringComparison.OrdinalIgnoreCase) || chosen.Unit.Contains("Ống", StringComparison.OrdinalIgnoreCase)
+                            ? "Tiêm bắp 01 ống lúc 08h00"
+                            : "Sáng 1 viên, chiều 1 viên sau ăn")));
 
             orderedDrugs.Add(new ScenarioDrug(
                 chosen.DrugCode,
@@ -812,7 +919,10 @@ public sealed class ExamScenarioAllocator
         string? targetWarehouseName = null,
         string? surgeryName = null,
         string? surgeryPatientAdmissionNumber = null,
-        bool isGmhs = false) => code switch
+        bool isGmhs = false,
+        bool isLienChuyenKhoa = false,
+        ScenarioService? pickedSpecialtyCls = null,
+        ScenarioService? pickedSpecialtyThuThuat = null) => code switch
     {
         "LT_BAN_PHIEU_KHAM" => BuildLtBanPhieuKhamInstruction(patient, secondPatient, examDate),
         "LT_THU_PHI_VA_CLS" => BuildLtThuPhiClsInstruction(pickedSieuAm, allServices),
@@ -823,25 +933,37 @@ public sealed class ExamScenarioAllocator
         "LT_TAO_THE_TAM_BHYT" => BuildLtTaoTheTamInstruction(examDate, rng),
         "TC_THU_TAM_UNG" => $"Thu tạm ứng viện phí cho bệnh nhân có số bệnh án nội trú : {advanceCase1?.SoBenhAn ?? "21.004865"}, số tiền tạm ứng : 1.500.000 đồng.\nSố điểm đạt được:………(đ)",
         "TC_THANH_TOAN_RA_VIEN" => $"Thực hiện quyết toán và in hóa đơn thanh toán viện phí ra viện cho bệnh nhân nội trú có số bệnh án: {dischargeCase?.SoBenhAn ?? "21.004266"} (Dùng quyển hóa đơn VAT_THI).\nSố điểm đạt được:………(đ)",
-        "TC_TRA_CUU_BENH_SU" => $"Tra cứu lịch sử khám chữa bệnh của bệnh nhân: {outLookupCase?.FullName ?? "Đỗ Phúc Huy"}, Mã y tế : {outLookupCase?.MedicalCode ?? "23000059"}.\n- Tổng số lượt khám : …………………………………\n- Ngày điều trị nội trú gần nhất : …………………………………\n- Ngày khám ngoại trú gần nhất : …………………………………\nSố điểm đạt được:………(đ)",
-        "TN_TIEP_NHAN" or _ when isDirectReception => BuildDirectReceptionInstruction(patient, secondPatient, examDate),
+        "TC_TRA_CUU_BENH_SU" => isLienChuyenKhoa
+            ? $"Tra cứu lịch sử KCB/ Bệnh sử của bệnh nhân  {outLookupCase?.FullName ?? "Lê Cao Nguyên"}, Mã y tế : {outLookupCase?.MedicalCode ?? "21116310"}:  ({score:0} đ)\nĐợt khám bệnh gần nhất: ngày thực hiện:............ Nội dung:.....................\nCLS thực hiện gần nhất: ngày thực hiện:............ Nội dung:......................\nSố điểm đạt được : ……………"
+            : $"Tra cứu lịch sử khám chữa bệnh của bệnh nhân: {outLookupCase?.FullName ?? "Đỗ Phúc Huy"}, Mã y tế : {outLookupCase?.MedicalCode ?? "23000059"}.\n- Tổng số lượt khám : …………………………………\n- Ngày điều trị nội trú gần nhất : …………………………………\n- Ngày khám ngoại trú gần nhất : …………………………………\nSố điểm đạt được:………(đ)",
+        "TN_TIEP_NHAN" or _ when isDirectReception && code.StartsWith("TN_", StringComparison.OrdinalIgnoreCase) => BuildDirectReceptionInstruction(patient, secondPatient, examDate),
         "NT_NHAN_BENH_KHOA" => $"* {secondPatient.FullName} ; Mã y tế: {secondPatient.MedicalCode}\n* {patient.FullName} ; Mã y tế: {patient.MedicalCode}\n- SVV Bn VP       : ………………………………\n- SVV Bn BHYT : ……………………………….\nSố điểm đạt được:………(đ)",
         "NT_CAP_GIUONG" => "Cấp giường cho các bệnh nhân được tiếp nhận ở câu 1.\nSố điểm đạt được:………(đ)",
-        "KB_CHI_DINH_CLS" => BuildKbChiDinhClsInstruction(pickedXquang, pickedSieuAm),
-        "KB_BENH_AN_NGOAI_TRU" => name.Contains("Nhận bệnh", StringComparison.OrdinalIgnoreCase) || name.Contains("bệnh án", StringComparison.OrdinalIgnoreCase) && name.Contains("nội dung", StringComparison.OrdinalIgnoreCase)
-            ? $"Nhận bệnh nhân vào khoa - tạo Bệnh án ngoại trú, nhập nội dung bệnh án ({score:0}đ):\n\t* {patient.FullName}; Mã y tế: {patient.MedicalCode}\n- Số bệnh án : ………………………………………………………………………………………\nSố điểm đạt được:………(đ)"
-            : "Chỉ định điều trị ngoại trú và lập bệnh án ngoại trú cho bệnh nhân : ……………………………………, Mã Y tế : …………………… (2 đ)\n- Số bệnh án ngoại trú : …………………………………………………\nSố điểm đạt được:………(đ)",
-        "KB_CHI_DINH_NOI_TRU" => $"Chỉ định nhập viện điều trị nội trú cho bệnh nhân : ……………………………………, Mã y tế : …………………… (1 đ)\n- Nhập khoa : {targetTransferDept}\n- Số bệnh án nội trú : ……………………………………………………\nSố điểm đạt được:………(đ)",
+        "KB_CHI_DINH_CLS" => isLienChuyenKhoa
+            ? $"Trên màn hình khám bệnh - Chỉ định CLS – Thủ thuật cho bệnh nhân : {patient.FullName}, Mã Y tế : {patient.MedicalCode} ({score:0} đ)\n{pickedSpecialtyCls?.Name ?? "Chụp đáy mắt không huỳnh quang"}   -   {pickedSpecialtyThuThuat?.Name ?? "Rạch áp xe mi"}\nSố điểm đạt được : ……………"
+            : BuildKbChiDinhClsInstruction(pickedXquang, pickedSieuAm),
+        "KB_BENH_AN_NGOAI_TRU" => isLienChuyenKhoa
+            ? $"Chỉ định điều trị ngoại trú và lập bệnh án ngoại trú cho bệnh nhân {secondPatient.FullName}, Mã Y tế : {secondPatient.MedicalCode}. ({score:0} đ)\nSố bệnh án ngoại trú : …………………………………………………\nSố điểm đạt được : ……………"
+            : (name.Contains("Nhận bệnh", StringComparison.OrdinalIgnoreCase) || name.Contains("bệnh án", StringComparison.OrdinalIgnoreCase) && name.Contains("nội dung", StringComparison.OrdinalIgnoreCase)
+                ? $"Nhận bệnh nhân vào khoa - tạo Bệnh án ngoại trú, nhập nội dung bệnh án ({score:0}đ):\n\t* {patient.FullName}; Mã y tế: {patient.MedicalCode}\n- Số bệnh án : ………………………………………………………………………………………\nSố điểm đạt được:………(đ)"
+                : "Chỉ định điều trị ngoại trú và lập bệnh án ngoại trú cho bệnh nhân : ……………………………………, Mã Y tế : …………………… (2 đ)\n- Số bệnh án ngoại trú : …………………………………………………\nSố điểm đạt được:………(đ)"),
+        "KB_CHI_DINH_NOI_TRU" => isLienChuyenKhoa
+            ? $"Chỉ định nhập viện điều trị nội trú cho bệnh nhân : {advanceCase1?.FullName ?? "Trần Thị Phụng"}, Mã y tế : {advanceCase1?.MedicalCode ?? "22087283"} ({score:0} đ)\nNhập khoa : Khoa phẫu thuật GMHS\nSố bệnh án nội trú : ……………………………………………………\nSố điểm đạt được : ……………"
+            : $"Chỉ định nhập viện điều trị nội trú cho bệnh nhân : ……………………………………, Mã y tế : …………………… (1 đ)\n- Nhập khoa : {targetTransferDept}\n- Số bệnh án nội trú : ……………………………………………………\nSố điểm đạt được:………(đ)",
         "HC_TRA_CUU_THANH_TOAN" => name.Contains("đang nằm viện", StringComparison.OrdinalIgnoreCase) || name.Contains("viện phí", StringComparison.OrdinalIgnoreCase)
             ? $"Kiểm tra viện phí của bệnh nhân đang nằm viện ({score:0}đ):\n- Tìm 01 bệnh nhân bất kỳ đang nằm điều ngoại trú thuộc {deptName}, có thời gian nhập viện trong khoảng từ ngày 01/03/{examDate.Year} đến ngày 05/03/{examDate.Year}.\n- Tra cứu chi tiết viện phí và ghi lại các thông tin sau:\n+ Họ và tên bệnh nhân                : ………………………………………………………………………………………\n+ Mã y tế / Số bệnh án               : ………………………………………………………………………………………\n+ Tổng chi phí điều trị đến hiện tại  : ………………………………………………………………………………… đồng\n+ Số tiền đã tạm ứng                  : ………………………………………………………………………………… đồng\n+ Số tiền còn phải thanh toán/hoàn trả: ………………………………………………………………………………… đồng\nSố điểm đạt được:………(đ)"
             : $"Kiểm tra thông tin thanh toán cho bệnh nhân : {inLookupCase?.FullName ?? "................"}, Mã y tế : {inLookupCase?.MedicalCode ?? "................"}\n- Số bệnh án nội trú : {inLookupCase?.SoBenhAn ?? "…………………………………………"}\n- Số tiền người bệnh đã thanh toán : ……………………………………………………\n- Số tiền người bệnh đã tạm ứng : ……………………………………………………\n- Số tiền còn phải thu người bệnh : ……………………………………………………\n- Tổng số tiền người bệnh trả : ……………\nSố điểm đạt được:………(đ)",
-        "TT_TUONG_TRINH_PTTT" => $"Nhập nội dung tường trình PT-TT cho các dịch vụ đã chỉ định cho bệnh nhân {patient.FullName} ({patient.MedicalCode}/NG) ({score:0}đ)\nSố điểm đạt được:………(đ)",
+        "TT_TUONG_TRINH_PTTT" => isLienChuyenKhoa
+            ? $"Viết  tường trình cho thủ thuật {pickedSpecialtyThuThuat?.Name ?? "Rạch áp xe mi"} cho bệnh nhân ở câu 1 ({score:0}đ)\nSố điểm đạt được : ……………"
+            : $"Nhập nội dung tường trình PT-TT cho các dịch vụ đã chỉ định cho bệnh nhân {patient.FullName} ({patient.MedicalCode}/NG) ({score:0}đ)\nSố điểm đạt được:………(đ)",
         "YL_CHI_DINH_CLS" => q2Instruction,
-        "YL_CHI_DINH_THUOC_VTYT" => isGmhs || deptName.Contains("Gây mê", StringComparison.OrdinalIgnoreCase) || score >= 5
-            ? (isGmhs || deptName.Contains("Gây mê", StringComparison.OrdinalIgnoreCase)
-                ? $"Thực hiện thao tác lên các loại Dược – VTYT cần thiết cho bệnh nhân {patient.FullName} có  Số vào viện :{surgeryPatientAdmissionNumber ?? patient.MedicalCode}  sau phẫu thuật:  {surgeryName ?? "Phẫu thuật lấy thai lần đầu [gây tê]"}, ngày yêu cầu {examDate:dd/MM/yyyy} (có danh mục Dược – VTYT đính kèm)(3 đ)\nThực hiện thao tác:\n- Lập phiếu lĩnh dược (2đ)  …………\n- Nhập dược nội bộ (2đ) ……………\n- Xuất sử dụng thuốc - VTYT cho bệnh nhân (số vào viện ở câu 1) (1đ)\n(Lưu ý : khi thực hiện phải yêu cầu nhân viên vi tính hỗ trợ thao tác xuất dược nội bộ)\nSố điểm đạt được:………(đ)"
-                : "Thực hiện thao tác lên các loại Dược – VTYT cần thiết cho bệnh nhân sau phẫu thuật (có danh mục Dược – VTYT đính kèm) (3đ)\nThực hiện thao tác:\n- Lập phiếu lĩnh dược (2đ)  …………\n- Nhập dược nội bộ (2đ) ……………\n- Xuất sử dụng thuốc - VTYT cho bệnh nhân (số vào viện ở câu 1) (1đ)\n(Lưu ý : khi thực hiện phải yêu cầu nhân viên vi tính hỗ trợ thao tác xuất dược nội bộ)\nSố điểm đạt được:………(đ)")
-            : "Lên y lệnh(có D/S Thuốc, VTYT đính kèm)(1.5đ)\nLập  phiếu lĩnh dược(0.5đ)\nNhập nội bộ(0.5đ)\nXuất sử dụng thuốc cho bệnh nhân(0.5đ)\nSố điểm đạt được:………(đ)",
+        "YL_CHI_DINH_THUOC_VTYT" => isLienChuyenKhoa
+            ? $"Lên phiếu lĩnh cơ số Dược/ VTYT:  ({score:0} đ)\nLập phiếu\nNhập Nội Bộ\nXuất sử dụng (Xuất khác toàn bộ nội dung phiếu lĩnh vừa nhận)\nSố điểm đạt được : ……………"
+            : (isGmhs || deptName.Contains("Gây mê", StringComparison.OrdinalIgnoreCase) || score >= 5
+                ? (isGmhs || deptName.Contains("Gây mê", StringComparison.OrdinalIgnoreCase)
+                    ? $"Thực hiện thao tác lên các loại Dược – VTYT cần thiết cho bệnh nhân {patient.FullName} có  Số vào viện :{surgeryPatientAdmissionNumber ?? patient.MedicalCode}  sau phẫu thuật:  {surgeryName ?? "Phẫu thuật lấy thai lần đầu [gây tê]"}, ngày yêu cầu {examDate:dd/MM/yyyy} (có danh mục Dược – VTYT đính kèm)(3 đ)\nThực hiện thao tác:\n- Lập phiếu lĩnh dược (2đ)  …………\n- Nhập dược nội bộ (2đ) ……………\n- Xuất sử dụng thuốc - VTYT cho bệnh nhân (số vào viện ở câu 1) (1đ)\n(Lưu ý : khi thực hiện phải yêu cầu nhân viên vi tính hỗ trợ thao tác xuất dược nội bộ)\nSố điểm đạt được:………(đ)"
+                    : "Thực hiện thao tác lên các loại Dược – VTYT cần thiết cho bệnh nhân sau phẫu thuật (có danh mục Dược – VTYT đính kèm) (3đ)\nThực hiện thao tác:\n- Lập phiếu lĩnh dược (2đ)  …………\n- Nhập dược nội bộ (2đ) ……………\n- Xuất sử dụng thuốc - VTYT cho bệnh nhân (số vào viện ở câu 1) (1đ)\n(Lưu ý : khi thực hiện phải yêu cầu nhân viên vi tính hỗ trợ thao tác xuất dược nội bộ)\nSố điểm đạt được:………(đ)")
+                : "Lên y lệnh(có D/S Thuốc, VTYT đính kèm)(1.5đ)\nLập  phiếu lĩnh dược(0.5đ)\nNhập nội bộ(0.5đ)\nXuất sử dụng thuốc cho bệnh nhân(0.5đ)\nSố điểm đạt được:………(đ)"),
         "YL_TRA_THUOC" => $"Bệnh nhân trả thuốc và tổng hợp phiếu trả.(Chỉ thao tác trên bệnh nhân BHYT có số vào viện ở câu 1), thuốc cần trả {drugReturn?.ReturnedDrug.Name ?? "thuốc"}, số lượng trả : {drugReturn?.ReturnQuantity ?? 1} {drugReturn?.ReturnedDrug.Unit ?? "viên"}.\nSố điểm đạt được:………(đ)",
         "YL_DOI_THEM_DICH_VU" => $"Đổi dịch vụ {serviceChange?.CanceledService.Name ?? "Dịch vụ CLS 1"} thành dịch vụ {serviceChange?.NewService.Name ?? "Dịch vụ CLS 2"} thêm 01 dịch vụ: {(serviceChange?.AddedService?.Name ?? "Chụp Xquang ngực thẳng [Số hóa 1 phim]")}. (Bệnh nhân BHYT câu 1)\nSố điểm đạt được:………(đ)",
         "TK_KIEM_TON_KHO" => isGmhs
