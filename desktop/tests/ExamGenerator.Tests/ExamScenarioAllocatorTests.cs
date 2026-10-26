@@ -812,4 +812,117 @@ public class ExamScenarioAllocatorTests : IDisposable
         try { File.Delete(tempExamDocx); } catch { }
         try { File.Delete(tempKeyDocx); } catch { }
     }
+
+    [Fact]
+    public async Task Ktv_gmhs_template_allocates_inpatient_and_active_surgery_and_in_stock_supplies()
+    {
+        await SetupSyncedCatalogAsync();
+
+        // 1. Setup GMHS department, warehouse, users
+        await _database.SaveDepartmentConfigurationAsync("GMHS", "Khoa Gây mê hồi sức", "KHO-GMHS", "Kho Gây mê");
+        await _database.ReplaceSnapshotUsersAsync(new[]
+        {
+            new SnapshotUserRow("u_gmhs", "gmhs_user", "KTV. Phan Thị Phương", "GMHS", "Khoa Gây mê hồi sức")
+        });
+        await _database.SaveDepartmentUserMappingsAsync("GMHS", "Khoa Gây mê hồi sức", new[]
+        {
+            ("u_gmhs", "gmhs_user", "KTV. Phan Thị Phương")
+        });
+
+        // 2. Active surgical services in catalog
+        await _database.ReplaceCatalogAsync("Services", new (string Id, string Code, string Name, string? ParentId)[]
+        {
+            ("s_pt1", "PT_THAI", "Phẫu thuật lấy thai lần đầu [gây tê]", "Phẫu thuật"),
+            ("s_pt2", "PT_RUOTTHUA", "Phẫu thuật cắt ruột thừa nội soi", "Phẫu thuật")
+        });
+
+        // 3. Inpatient currently in hospital
+        await _database.ReplaceSnapshotInpatientsAsync(new[]
+        {
+            new SnapshotInpatientRow(
+                "ba_gmhs_1",
+                "22.000173",
+                "22000173",
+                "Lê Thị Hồng",
+                "Nữ",
+                "1990",
+                "Buôn Ma Thuột",
+                "GMHS",
+                "Khoa Gây mê hồi sức",
+                "P_MO",
+                "Phòng mổ 1",
+                "G01",
+                "Tầng 2",
+                "2026-06-20",
+                "2026-06-20 08:00:00",
+                "2026-06-20 08:30:00",
+                "2026-06-20",
+                4,
+                "",
+                "Hậu phẫu",
+                "BS. Phẫu Thuật"
+            )
+        });
+
+        // 4. In-stock drugs & supplies in GMHS warehouse
+        await _database.ReplaceSnapshotDrugsAsync(new[]
+        {
+            new SnapshotDrugRow("d_dao", "LuDV14", "Lưỡi dao mổ số 10", "Cái", "KHO-GMHS", "Kho Gây mê", "Viện phí", 50),
+            new SnapshotDrugRow("d_chi", "ChCV3", "Chỉ Chromic Catgut 2/0", "Tép", "KHO-GMHS", "Kho Gây mê", "Viện phí", 100),
+            new SnapshotDrugRow("d_gac", "GaPV3", "Gạc PT 10x10x12 lớp", "Miếng", "KHO-GMHS", "Kho Gây mê", "Viện phí", 200),
+            new SnapshotDrugRow("d_gang", "GaTV12", "Găng tay y tế khám", "Đôi", "KHO-GMHS", "Kho Gây mê", "Viện phí", 80),
+            new SnapshotDrugRow("d_ao", "aoPV", "Áo phẫu thuật dùng một lần", "Cái", "KHO-GMHS", "Kho Gây mê", "Viện phí", 30),
+            new SnapshotDrugRow("d_kim", "KimG18", "Kim tiêm nhựa G18", "Cái", "KHO-GMHS", "Kho Gây mê", "Viện phí", 500)
+        });
+
+        var allocator = new ExamScenarioAllocator(_database);
+        var candidates = new[]
+        {
+            new CandidateInput("Phan Thị Phương", "GMHS01", "Khoa Gây mê hồi sức", "tpl-ktv-gmhs")
+        };
+
+        var scenarios = await allocator.AllocateBatchScenariosAsync("DotThi_GMHS_2026", new DateOnly(2026, 6, 24), candidates);
+        Assert.Single(scenarios);
+
+        var sc = scenarios[0];
+        Assert.Equal(2, sc.Questions.Count);
+        Assert.Equal(10.0, sc.TotalScore);
+
+        // Bệnh nhân là bệnh nhân đang nằm trong khoa: Lê Thị Hồng
+        Assert.Equal("Lê Thị Hồng", sc.Patient.FullName);
+
+        // Câu 1 (8đ): Lên Dược - VTYT cho bệnh nhân phẫu thuật + Lĩnh Nhập Xuất
+        var q1 = sc.Questions[0];
+        Assert.Equal("YL_CHI_DINH_THUOC_VTYT", q1.ActionCode);
+        Assert.Equal(8.0, q1.Score);
+        Assert.Contains("Lê Thị Hồng", q1.Instruction);
+        Assert.Contains("22.000173", q1.Instruction);
+        Assert.Contains("sau phẫu thuật:", q1.Instruction);
+        Assert.Contains("ngày yêu cầu 24/06/2026", q1.Instruction);
+        Assert.Contains("Lập phiếu lĩnh dược", q1.Instruction);
+        Assert.Contains("Nhập dược nội bộ", q1.Instruction);
+        Assert.Contains("Xuất sử dụng thuốc - VTYT cho bệnh nhân", q1.Instruction);
+
+        // Danh mục Dược - VTYT được cấp phát: có tồn kho trong kho Gây mê
+        Assert.NotEmpty(sc.OrderedDrugs);
+        foreach (var d in sc.OrderedDrugs)
+        {
+            Assert.Equal("Kho Gây mê", d.WarehouseName);
+            Assert.True(d.Quantity >= 1);
+        }
+
+        // Câu 2 (2đ): Báo tồn kho
+        var q2 = sc.Questions[1];
+        Assert.Equal("TK_KIEM_TON_KHO", q2.ActionCode);
+        Assert.Equal(2.0, q2.Score);
+        Assert.Contains("Kho Gây mê", q2.Instruction);
+        Assert.Contains("Viện phí", q2.Instruction);
+
+        // Test Word document generation
+        var tempDocx = Path.Combine(Path.GetTempPath(), $"DeThi_GMHS_{Guid.NewGuid():N}.docx");
+        var writer = new WordExamWriter();
+        writer.Create(tempDocx, sc);
+        Assert.True(File.Exists(tempDocx));
+        try { File.Delete(tempDocx); } catch { }
+    }
 }
