@@ -98,6 +98,21 @@ $ExeStandalonePath = Join-Path $PublishStandaloneDir "ExamGenerator.Desktop.exe"
 $ExeItem = Get-Item $ExePath
 $ExeSizeKb = [Math]::Round($ExeItem.Length / 1024, 1)
 
+$ClientExePath = Join-Path $PublishClientDir "ExamGenerator.Client.exe"
+$ClientExeStandalonePath = Join-Path $PublishClientStandaloneDir "ExamGenerator.Client.exe"
+
+$ClientExeSizeKb = 0
+if (Test-Path $ClientExePath) {
+    $ClientExeItem = Get-Item $ClientExePath
+    $ClientExeSizeKb = [Math]::Round($ClientExeItem.Length / 1024, 1)
+}
+
+$ClientExeStandaloneSizeKb = 0
+if (Test-Path $ClientExeStandalonePath) {
+    $ClientExeStandaloneItem = Get-Item $ClientExeStandalonePath
+    $ClientExeStandaloneSizeKb = [Math]::Round($ClientExeStandaloneItem.Length / 1024, 1)
+}
+
 $ExeStandaloneItem = Get-Item $ExeStandalonePath
 $ExeStandaloneSizeKb = [Math]::Round($ExeStandaloneItem.Length / 1024, 1)
 
@@ -112,11 +127,14 @@ try {
 $LogEntry = @"
 
 ### Build [$Timestamp] - Commit [$GitCommit]
-- **Trang thai:** Thanh cong (34/34 Tests Passed)
+- **Trang thai:** Thanh cong (55/55 Tests Passed)
 - **Cau hinh:** .NET 8 LTS (Release) + Standalone (Self-Contained win-x64)
-- **Duong dan chay:**
+- **Duong dan chay ExamOperationsDesktop (Hoi dong / Giam khao):**
   - Tieu chuan: ``desktop/publish/ExamOperationsDesktop/ExamGenerator.Desktop.exe`` ($ExeSizeKb KB)
   - Standalone: ``desktop/publish/ExamOperationsDesktop-Standalone/ExamGenerator.Desktop.exe`` ($ExeStandaloneSizeKb KB)
+- **Duong dan chay ExamClient (May tram Thi sinh):**
+  - Tieu chuan: ``desktop/publish/ExamClient/ExamGenerator.Client.exe`` ($ClientExeSizeKb KB)
+  - Standalone: ``desktop/publish/ExamClient-Standalone/ExamGenerator.Client.exe`` ($ClientExeStandaloneSizeKb KB)
 - **Ghi chu thay doi:** $Note
 "@
 
@@ -126,7 +144,9 @@ if (-not (Test-Path $BuildHistoryFile)) {
 $LogEntry | Out-File -FilePath $BuildHistoryFile -Append -Encoding utf8
 
 Write-Host "==========================================================" -ForegroundColor Cyan
-Write-Host "  BUILD HOAN TAT THANH CONG CA 2 PHIEN BAN!" -ForegroundColor Green
-Write-Host "  1. Ban Tieu chuan: $PublishDir" -ForegroundColor White
-Write-Host "  2. Ban Standalone (Self-Contained): $PublishStandaloneDir" -ForegroundColor White
+Write-Host "  BUILD HOAN TAT THANH CONG CAC PHIEN BAN!" -ForegroundColor Green
+Write-Host "  1. Desktop Tieu chuan: $PublishDir" -ForegroundColor White
+Write-Host "  2. Desktop Standalone: $PublishStandaloneDir" -ForegroundColor White
+Write-Host "  3. Client Tieu chuan: $PublishClientDir" -ForegroundColor White
+Write-Host "  4. Client Standalone: $PublishClientStandaloneDir" -ForegroundColor White
 Write-Host "==========================================================" -ForegroundColor Cyan

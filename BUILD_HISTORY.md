@@ -243,3 +243,14 @@
   - Phần mềm thi Thí sinh: `1_CHAY_PHAN_MEM_THI.bat` hoặc `1_CHAY_PHAN_MEM_THI.ps1`
   - Phần mềm Quản trị & Chấm thi: `2_CHAY_PHAN_MEM_CHAM_THI.bat` hoặc `2_CHAY_PHAN_MEM_CHAM_THI.ps1`
 - **Ghi chu thay doi:** Tra soát toàn diện và tự động hóa khung điền đáp án trên phần mềm thi cho tất cả các câu hỏi có yêu cầu viết kết quả sau khi thực thi HIS (Tồn kho, Tra cứu thông tin, Tạo thẻ tạm BHYT, Bệnh án ngoại trú, Bệnh án nội trú, Tra cứu thanh toán, Bệnh sử, Nhận bệnh vào khoa...). Cung cấp script launcher 1-click (.bat và .ps1) tiện lợi.
+
+### Build [2026-10-26 08:37:53] - Commit [a803902]
+- **Trang thai:** Thanh cong (55/55 Tests Passed)
+- **Cau hinh:** .NET 8 LTS (Release) + Standalone (Self-Contained win-x64)
+- **Duong dan chay ExamOperationsDesktop (Hoi dong / Giam khao):**
+  - Tieu chuan: `desktop/publish/ExamOperationsDesktop/ExamGenerator.Desktop.exe` (148.5 KB)
+  - Standalone: `desktop/publish/ExamOperationsDesktop-Standalone/ExamGenerator.Desktop.exe` (148.5 KB)
+- **Duong dan chay ExamClient (May tram Thi sinh):**
+  - Tieu chuan: `desktop/publish/ExamClient/ExamGenerator.Client.exe` (148.5 KB)
+  - Standalone: `desktop/publish/ExamClient-Standalone/ExamGenerator.Client.exe` (148.5 KB)
+- **Ghi chu thay doi:** Phat hanh ban build dong goi moi nhat sau khi tra soat toan bo de thi va cau hoi
