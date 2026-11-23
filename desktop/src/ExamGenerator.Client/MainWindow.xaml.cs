@@ -15,6 +15,7 @@ namespace ExamGenerator.Client;
 public partial class MainWindow : Window, INotifyPropertyChanged
 {
     private readonly DispatcherTimer _timer;
+    private ClientWorkstationSettings _clientSettings = new();
     private ClientExamPackage? _currentPackage;
     private DateTime _startedAt;
     private DateTime _submittedAt;
@@ -57,19 +58,126 @@ public partial class MainWindow : Window, INotifyPropertyChanged
 
     private void MainWindow_Loaded(object sender, RoutedEventArgs e)
     {
+        _clientSettings = ExamPackageService.LoadClientSettings();
+        ClientExamsDirTextBox.Text = _clientSettings.ExamPackagesDirectory;
+        ClientSubmissionsDirTextBox.Text = _clientSettings.SubmissionsDirectory;
+        UpdateClientFolderStatusDisplay();
         ScanAndLoadExamPackages();
+    }
+
+    private void UpdateClientFolderStatusDisplay()
+    {
+        ClientFolderStatusTextBlock.Text = $"📁 Lấy đề từ: {_clientSettings.ExamPackagesDirectory}   |   📥 Nộp bài về: {_clientSettings.SubmissionsDirectory}";
+    }
+
+    private void ToggleClientSettings_Click(object sender, RoutedEventArgs e)
+    {
+        ClientSettingsBorder.Visibility = ClientSettingsBorder.Visibility == Visibility.Visible
+            ? Visibility.Collapsed
+            : Visibility.Visible;
+    }
+
+    private void RefreshExamPackages_Click(object sender, RoutedEventArgs e)
+    {
+        ScanAndLoadExamPackages();
+    }
+
+    private void BrowseClientExamsDir_Click(object sender, RoutedEventArgs e)
+    {
+        var dialog = new OpenFolderDialog
+        {
+            Title = "Chọn thư mục truy xuất đề thi (.exam_pkg)"
+        };
+        if (Directory.Exists(_clientSettings.ExamPackagesDirectory))
+        {
+            dialog.InitialDirectory = _clientSettings.ExamPackagesDirectory;
+        }
+        if (dialog.ShowDialog() == true && !string.IsNullOrWhiteSpace(dialog.FolderName))
+        {
+            ClientExamsDirTextBox.Text = dialog.FolderName;
+        }
+    }
+
+    private void BrowseClientSubmissionsDir_Click(object sender, RoutedEventArgs e)
+    {
+        var dialog = new OpenFolderDialog
+        {
+            Title = "Chọn thư mục gửi bài đã làm để chấm (.sub_pkg)"
+        };
+        if (Directory.Exists(_clientSettings.SubmissionsDirectory))
+        {
+            dialog.InitialDirectory = _clientSettings.SubmissionsDirectory;
+        }
+        if (dialog.ShowDialog() == true && !string.IsNullOrWhiteSpace(dialog.FolderName))
+        {
+            ClientSubmissionsDirTextBox.Text = dialog.FolderName;
+        }
+    }
+
+    private void SaveClientSettings_Click(object sender, RoutedEventArgs e)
+    {
+        try
+        {
+            var examsDir = ClientExamsDirTextBox.Text?.Trim();
+            var subsDir = ClientSubmissionsDirTextBox.Text?.Trim();
+
+            if (!string.IsNullOrWhiteSpace(examsDir))
+                _clientSettings.ExamPackagesDirectory = examsDir;
+            if (!string.IsNullOrWhiteSpace(subsDir))
+                _clientSettings.SubmissionsDirectory = subsDir;
+
+            ExamPackageService.SaveClientSettings(_clientSettings);
+            UpdateClientFolderStatusDisplay();
+            ScanAndLoadExamPackages();
+            ClientSettingsBorder.Visibility = Visibility.Collapsed;
+
+            MessageBox.Show(
+                $"Đã lưu cấu hình thư mục máy trạm thành công!\n\n" +
+                $"• Thư mục lấy đề (.exam_pkg):\n  {_clientSettings.ExamPackagesDirectory}\n\n" +
+                $"• Thư mục nộp bài (.sub_pkg):\n  {_clientSettings.SubmissionsDirectory}",
+                "Lưu cấu hình thành công",
+                MessageBoxButton.OK,
+                MessageBoxImage.Information);
+        }
+        catch (Exception ex)
+        {
+            MessageBox.Show($"Không thể lưu cấu hình: {ex.Message}", "Lỗi", MessageBoxButton.OK, MessageBoxImage.Error);
+        }
+    }
+
+    private void MainWindow_Closing(object? sender, CancelEventArgs e)
+    {
+        if (_isExamActive)
+        {
+            var res = MessageBox.Show(
+                "Bài thi đang diễn ra và chưa được nộp!\n\nBạn có chắc chắn muốn đóng phần mềm ngay lúc này không?",
+                "Cảnh báo thoát giữa giờ thi",
+                MessageBoxButton.YesNo,
+                MessageBoxImage.Warning);
+
+            if (res != MessageBoxResult.Yes)
+            {
+                e.Cancel = true;
+            }
+        }
     }
 
     private void ScanAndLoadExamPackages()
     {
         var candidates = new List<CandidatePackageItem>();
-        var searchDirs = new List<string>
+        var searchDirs = new List<string>();
+        if (!string.IsNullOrWhiteSpace(_clientSettings.ExamPackagesDirectory))
+        {
+            searchDirs.Add(_clientSettings.ExamPackagesDirectory);
+        }
+        searchDirs.AddRange(new[]
         {
             Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "exams"),
+            Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "data", "exams"),
             AppDomain.CurrentDomain.BaseDirectory,
             Path.Combine(Directory.GetCurrentDirectory(), "exams"),
             Directory.GetCurrentDirectory()
-        };
+        });
 
         var seenFiles = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
@@ -235,15 +343,15 @@ public partial class MainWindow : Window, INotifyPropertyChanged
 
         if (_remainingSeconds > 300)
         {
-            CountdownTimerTextBlock.Foreground = (Brush)FindResource("SuccessGreen");
+            CountdownTimerTextBlock.Foreground = TryFindResource("SuccessGreen") as Brush ?? Brushes.Green;
         }
         else if (_remainingSeconds > 60)
         {
-            CountdownTimerTextBlock.Foreground = (Brush)FindResource("WarningAmber");
+            CountdownTimerTextBlock.Foreground = TryFindResource("WarningAmber") as Brush ?? Brushes.DarkOrange;
         }
         else
         {
-            CountdownTimerTextBlock.Foreground = (Brush)FindResource("DangerRed");
+            CountdownTimerTextBlock.Foreground = TryFindResource("DangerRed") as Brush ?? Brushes.Red;
         }
     }
 
@@ -252,7 +360,7 @@ public partial class MainWindow : Window, INotifyPropertyChanged
         IsExamActive = false;
         TimeoutWarningBanner.Visibility = Visibility.Visible;
         CountdownTimerTextBlock.Text = "00:00";
-        CountdownTimerTextBlock.Foreground = (Brush)FindResource("DangerRed");
+        CountdownTimerTextBlock.Foreground = TryFindResource("DangerRed") as Brush ?? Brushes.Red;
     }
 
     private void AddExtraTimeButton_Click(object sender, RoutedEventArgs e)
@@ -343,27 +451,36 @@ public partial class MainWindow : Window, INotifyPropertyChanged
             Status = "Submitted"
         };
 
-        // Save submission locally in ./submissions/
-        var localDir = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "submissions");
+        // 1. Always save local backup copy in ./data/submissions/ and ./submissions/
+        var localBackupDir = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "data", "submissions");
         var safeCandidate = string.IsNullOrWhiteSpace(submission.CandidateId) ? "NO_SBD" : submission.CandidateId.Trim();
         var fileName = $"{safeCandidate}_{submission.PaperCode}_{DateTime.Now:yyyyMMdd_HHmmss}.sub_pkg";
-        var localPath = Path.Combine(localDir, fileName);
+        var localBackupPath = Path.Combine(localBackupDir, fileName);
+
+        var configuredTargetDir = !string.IsNullOrWhiteSpace(_clientSettings.SubmissionsDirectory)
+            ? _clientSettings.SubmissionsDirectory.Trim()
+            : Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "submissions");
+        var targetPath = Path.Combine(configuredTargetDir, fileName);
+        var savedDisplayPath = targetPath;
 
         try
         {
-            ExamPackageService.SaveSubmission(submission, localPath);
+            ExamPackageService.SaveSubmission(submission, localBackupPath);
 
-            // Also copy to parent shared submissions folder if exists
-            var sharedDir = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "..", "submissions");
-            if (Directory.Exists(sharedDir))
+            if (!string.Equals(Path.GetFullPath(localBackupPath), Path.GetFullPath(targetPath), StringComparison.OrdinalIgnoreCase))
             {
-                var sharedPath = Path.Combine(sharedDir, fileName);
-                File.Copy(localPath, sharedPath, true);
+                ExamPackageService.SaveSubmission(submission, targetPath);
             }
         }
         catch (Exception ex)
         {
-            MessageBox.Show($"Cảnh báo lưu file: {ex.Message}", "Lỗi lưu file", MessageBoxButton.OK, MessageBoxImage.Warning);
+            savedDisplayPath = $"{localBackupPath} (Dự phòng cục bộ)";
+            MessageBox.Show(
+                $"Đã lưu bản dự phòng an toàn trên máy trạm tại:\n{localBackupPath}\n\n" +
+                $"Cảnh báo khi gửi tới thư mục chấm '{configuredTargetDir}':\n{ex.Message}",
+                "Lưu bài dự phòng",
+                MessageBoxButton.OK,
+                MessageBoxImage.Warning);
         }
 
         // Show Summary
@@ -372,6 +489,7 @@ public partial class MainWindow : Window, INotifyPropertyChanged
         SummarySubmittedAtTextBlock.Text = _submittedAt.ToString("HH:mm:ss dd/MM/yyyy");
         SummaryExtraMinutesTextBlock.Text = _totalExtraMinutes > 0 ? $"+{_totalExtraMinutes} phút" : "Không có";
         SummarySubmissionIdTextBlock.Text = submission.SubmissionId[..12].ToUpperInvariant();
+        SummarySavedPathTextBlock.Text = savedDisplayPath;
 
         WorkstationPanel.Visibility = Visibility.Collapsed;
         SubmittedPanel.Visibility = Visibility.Visible;

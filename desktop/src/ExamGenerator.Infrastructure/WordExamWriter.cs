@@ -249,7 +249,7 @@ public sealed class WordExamWriter
                     ? $" | HOẶC Tra cứu BN ngoại trú: {s.OutpatientLookupCase.FullName} (Mã: {s.OutpatientLookupCase.MedicalCode}, Số BA: {s.OutpatientLookupCase.SoBenhAn}, Khoa: {s.OutpatientLookupCase.DepartmentName})"
                     : ""),
 
-            "LT_THANH_TOAN_RA_VIEN" =>
+            "LT_THANH_TOAN_RA_VIEN" or "TC_THANH_TOAN_RA_VIEN" =>
                 s.DischargeCase is not null
                     ? $"• Thanh toán viện phí ra viện BN: {s.DischargeCase.FullName} (BA: {s.DischargeCase.SoBenhAn}, Khoa: {s.DischargeCase.DepartmentName}, Vào viện: {s.DischargeCase.AdmissionDate})"
                     : "• Thanh toán ra viện bệnh nhân nội trú theo đề bài",
@@ -259,6 +259,21 @@ public sealed class WordExamWriter
 
             "KB_CHI_DINH_CLS" =>
                 $"• BN: {s.Patient.FullName} (Mã: {s.Patient.MedicalCode}) | Chỉ định CLS & Thủ thuật theo đề bài",
+
+            "YL_CHI_DINH_CLS" =>
+                $"• BN BHYT: {s.Patient.FullName} (Mã: {s.Patient.MedicalCode}) | CLS chỉ định ({s.OrderedServices.Count} DV): " +
+                (s.OrderedServices.Count > 0 ? string.Join("; ", s.OrderedServices.Select(sv => sv.Name)) : "Theo đề bài"),
+
+            "YL_DOI_THEM_DICH_VU" =>
+                s.ServiceChange is not null
+                    ? $"• BN BHYT: {s.Patient.FullName} (Mã: {s.Patient.MedicalCode}) | Hủy DV: {s.ServiceChange.CanceledService.Name} -> Đổi sang: {s.ServiceChange.NewService.Name}" +
+                      (s.ServiceChange.AddedService is not null ? $" | Thêm mới: {s.ServiceChange.AddedService.Name}" : "")
+                    : $"• BN BHYT: {s.Patient.FullName} (Mã: {s.Patient.MedicalCode}) | Đổi/thêm dịch vụ CLS theo đề bài",
+
+            "YL_TRA_THUOC" =>
+                s.DrugReturn is not null
+                    ? $"• BN BHYT: {s.Patient.FullName} (Mã: {s.Patient.MedicalCode}) | Trả thuốc: {s.DrugReturn.ReturnedDrug.Name} (SL trả: {s.DrugReturn.ReturnQuantity} {s.DrugReturn.ReturnedDrug.Unit})"
+                    : $"• BN BHYT: {s.Patient.FullName} (Mã: {s.Patient.MedicalCode}) | Trả thuốc theo đề bài",
 
             "TT_TUONG_TRINH_PTTT" =>
                 $"• BN: {s.Patient.FullName} (Mã: {s.Patient.MedicalCode}) | Viết nội dung tường trình thủ thuật đã chỉ định",
@@ -278,10 +293,16 @@ public sealed class WordExamWriter
 
             "TK_KIEM_TON_KHO" =>
                 s.InventoryCheckPeriod is not null
-                    ? $"• Kiểm tồn kho: {s.InventoryCheckPeriod.DrugName} (Từ {s.InventoryCheckPeriod.FromDate:dd/MM/yyyy} đến {s.InventoryCheckPeriod.ToDate:dd/MM/yyyy}, Kho: {s.InventoryCheckPeriod.WarehouseName}, Nguồn: {s.InventoryCheckPeriod.FundingSource}) -> Tồn cuối kỳ: {s.InventoryCheckPeriod.ClosingStock:N0} {s.InventoryCheckPeriod.Unit}"
+                    ? $"• Kiểm tồn kho: {s.InventoryCheckPeriod.DrugName} (Mã: {s.InventoryCheckPeriod.DrugCode}, Từ {s.InventoryCheckPeriod.FromDate:dd/MM/yyyy} đến {s.InventoryCheckPeriod.ToDate:dd/MM/yyyy}, Kho: {s.InventoryCheckPeriod.WarehouseName}, Nguồn: {s.InventoryCheckPeriod.FundingSource}) -> ĐÁP ÁN TỒN KHO CUỐI KỲ: {s.InventoryCheckPeriod.ClosingStock:N0} {s.InventoryCheckPeriod.Unit}"
                     : (s.InventoryCheckDrug is not null
-                        ? $"• Kiểm tồn kho: {s.InventoryCheckDrug.Name} (Kho: {s.InventoryCheckDrug.WarehouseName}, Nguồn: {s.InventoryCheckDrug.FundingSource})"
+                        ? $"• Kiểm tồn kho: {s.InventoryCheckDrug.Name} (Mã: {s.InventoryCheckDrug.Code}, Kho: {s.InventoryCheckDrug.WarehouseName}, Nguồn: {s.InventoryCheckDrug.FundingSource}, tại thời điểm ngày thi {s.ExamDate:dd/MM/yyyy}) -> ĐÁP ÁN TỒN KHO HIỆN TẠI: {s.InventoryCheckDrug.Quantity:N0} {s.InventoryCheckDrug.Unit}"
                         : "• Kiểm tra tồn kho dược cơ số theo đề bài"),
+
+            "CK_CHUYEN_KHOA" =>
+                $"• Chuyển khoa BN nội trú (nhập viện trước {s.CutoffDate:dd/MM/yyyy}): Từ {s.DepartmentName} -> Chuyển đến: {s.TargetTransferDepartment}",
+
+            "RV_CHO_RA_VIEN" =>
+                $"• Cho bệnh nhân nội trú ra viện (nhập viện trước {s.CutoffDate:dd/MM/yyyy}) tại {s.DepartmentName}",
 
             _ =>
                 $"• BN: {s.Patient.FullName} (Mã: {s.Patient.MedicalCode})"

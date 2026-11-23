@@ -183,6 +183,15 @@ public sealed class ExamPackageService
                 }
                 break;
 
+            case "LT_THANH_TOAN_RA_VIEN" or "TC_THANH_TOAN_RA_VIEN":
+                if (scenario.DischargeCase is not null)
+                {
+                    var dc = scenario.DischargeCase;
+                    sb.AppendLine("THÔNG TIN BỆNH NHÂN CẦN THU THANH TOÁN RA VIỆN:");
+                    sb.AppendLine($"• Họ và tên: {dc.FullName} | Số bệnh án / Số vào viện: {dc.SoBenhAn} | Khoa: {dc.DepartmentName}");
+                }
+                break;
+
             case "LT_BAN_PHIEU_KHAM":
                 var p1 = scenario.SecondPatient ?? scenario.Patient;
                 var p2 = scenario.Patient;
@@ -224,7 +233,7 @@ public sealed class ExamPackageService
                     ? $" | Tra cứu BN ngoại trú: {scenario.OutpatientLookupCase.FullName} (Mã: {scenario.OutpatientLookupCase.MedicalCode}, Số BA: {scenario.OutpatientLookupCase.SoBenhAn}, Khoa: {scenario.OutpatientLookupCase.DepartmentName})"
                     : ""),
 
-            "LT_THANH_TOAN_RA_VIEN" =>
+            "LT_THANH_TOAN_RA_VIEN" or "TC_THANH_TOAN_RA_VIEN" =>
                 scenario.DischargeCase is not null
                     ? $"• Thanh toán viện phí ra viện BN: {scenario.DischargeCase.FullName} (BA: {scenario.DischargeCase.SoBenhAn}, Khoa: {scenario.DischargeCase.DepartmentName}, Vào viện: {scenario.DischargeCase.AdmissionDate})"
                     : "• Thanh toán ra viện bệnh nhân nội trú theo đề bài",
@@ -232,16 +241,37 @@ public sealed class ExamPackageService
             "LT_TAO_THE_TAM_BHYT" =>
                 $"• Cấp thẻ tạm BHYT: Bé gái (Sinh {scenario.ExamDate.AddMonths(-1):dd/MM/yyyy}) | Mã BHYT tạm: TE1... | Hạn thẻ: 30 ngày",
 
+            "YL_CHI_DINH_CLS" =>
+                $"• BN BHYT: {scenario.Patient.FullName} (Mã: {scenario.Patient.MedicalCode}) | CLS chỉ định ({scenario.OrderedServices.Count} DV): " +
+                (scenario.OrderedServices.Count > 0 ? string.Join("; ", scenario.OrderedServices.Select(sv => sv.Name)) : "Theo đề bài"),
+
+            "YL_DOI_THEM_DICH_VU" =>
+                scenario.ServiceChange is not null
+                    ? $"• BN BHYT: {scenario.Patient.FullName} (Mã: {scenario.Patient.MedicalCode}) | Hủy DV: {scenario.ServiceChange.CanceledService.Name} -> Đổi sang: {scenario.ServiceChange.NewService.Name}" +
+                      (scenario.ServiceChange.AddedService is not null ? $" | Thêm mới: {scenario.ServiceChange.AddedService.Name}" : "")
+                    : $"• BN BHYT: {scenario.Patient.FullName} (Mã: {scenario.Patient.MedicalCode}) | Đổi/thêm dịch vụ CLS theo đề bài",
+
+            "YL_TRA_THUOC" =>
+                scenario.DrugReturn is not null
+                    ? $"• BN BHYT: {scenario.Patient.FullName} (Mã: {scenario.Patient.MedicalCode}) | Trả thuốc: {scenario.DrugReturn.ReturnedDrug.Name} (SL trả: {scenario.DrugReturn.ReturnQuantity} {scenario.DrugReturn.ReturnedDrug.Unit})"
+                    : $"• BN BHYT: {scenario.Patient.FullName} (Mã: {scenario.Patient.MedicalCode}) | Trả thuốc theo đề bài",
+
             "YL_CHI_DINH_THUOC_VTYT" =>
                 $"• BN: {scenario.Patient.FullName} | Thuốc: " +
                 (scenario.OrderedDrugs.Count > 0 ? string.Join("; ", scenario.OrderedDrugs.Select(d => $"{d.Name} ({d.Code}, SL:{d.Quantity})")) : "Theo chỉ định"),
 
             "TK_KIEM_TON_KHO" =>
                 scenario.InventoryCheckPeriod is not null
-                    ? $"• Kiểm tồn kho: {scenario.InventoryCheckPeriod.DrugName} (Từ {scenario.InventoryCheckPeriod.FromDate:dd/MM/yyyy} đến {scenario.InventoryCheckPeriod.ToDate:dd/MM/yyyy}, Kho: {scenario.InventoryCheckPeriod.WarehouseName}) -> TỒN CUỐI KỲ CHUẨN: {scenario.InventoryCheckPeriod.ClosingStock:N0} {scenario.InventoryCheckPeriod.Unit}"
+                    ? $"• Kiểm tồn kho: {scenario.InventoryCheckPeriod.DrugName} (Mã: {scenario.InventoryCheckPeriod.DrugCode}, Từ {scenario.InventoryCheckPeriod.FromDate:dd/MM/yyyy} đến {scenario.InventoryCheckPeriod.ToDate:dd/MM/yyyy}, Kho: {scenario.InventoryCheckPeriod.WarehouseName}) -> TỒN CUỐI KỲ CHUẨN: {scenario.InventoryCheckPeriod.ClosingStock:N0} {scenario.InventoryCheckPeriod.Unit}"
                     : (scenario.InventoryCheckDrug is not null
-                        ? $"• Kiểm tồn kho: {scenario.InventoryCheckDrug.Name} (Kho: {scenario.InventoryCheckDrug.WarehouseName})"
+                        ? $"• Kiểm tồn kho: {scenario.InventoryCheckDrug.Name} (Mã: {scenario.InventoryCheckDrug.Code}, Kho: {scenario.InventoryCheckDrug.WarehouseName}, tại thời điểm ngày thi {scenario.ExamDate:dd/MM/yyyy}) -> TỒN KHO HIỆN TẠI CHUẨN: {scenario.InventoryCheckDrug.Quantity:N0} {scenario.InventoryCheckDrug.Unit}"
                         : "• Kiểm tra tồn kho theo đề bài"),
+
+            "CK_CHUYEN_KHOA" =>
+                $"• Chuyển khoa BN nội trú (nhập viện trước {scenario.CutoffDate:dd/MM/yyyy}): Từ {scenario.DepartmentName} -> Chuyển đến: {scenario.TargetTransferDepartment}",
+
+            "RV_CHO_RA_VIEN" =>
+                $"• Cho bệnh nhân nội trú ra viện (nhập viện trước {scenario.CutoffDate:dd/MM/yyyy}) tại {scenario.DepartmentName}",
 
             "KB_BENH_AN_NGOAI_TRU" =>
                 $"• Lập bệnh án ngoại trú cho BN: {scenario.Patient.FullName} (Mã: {scenario.Patient.MedicalCode}) | Thí sinh điền Số bệnh án ngoại trú",
@@ -340,5 +370,58 @@ public sealed class ExamPackageService
         File.WriteAllText(Path.Combine(outputDirectory, "exams_manifest.json"), manifestJson, Encoding.UTF8);
 
         return exportedFiles;
+    }
+
+    public static ClientWorkstationSettings LoadClientSettings(string? baseDirectory = null)
+    {
+        var root = baseDirectory ?? AppDomain.CurrentDomain.BaseDirectory;
+        var dataDir = Path.Combine(root, "data");
+        var settingsPath = Path.Combine(dataDir, "client_settings.json");
+        var legacyPath = Path.Combine(root, "client_settings.json");
+
+        var defaultExamsDir = Path.Combine(root, "exams");
+        var defaultSubsDir = Path.Combine(root, "submissions");
+
+        try
+        {
+            var pathToRead = File.Exists(settingsPath) ? settingsPath : (File.Exists(legacyPath) ? legacyPath : null);
+            if (pathToRead is not null)
+            {
+                var json = File.ReadAllText(pathToRead, Encoding.UTF8);
+                var loaded = JsonSerializer.Deserialize<ClientWorkstationSettings>(json, JsonOptions);
+                if (loaded is not null)
+                {
+                    if (string.IsNullOrWhiteSpace(loaded.ExamPackagesDirectory))
+                        loaded.ExamPackagesDirectory = defaultExamsDir;
+                    if (string.IsNullOrWhiteSpace(loaded.SubmissionsDirectory))
+                        loaded.SubmissionsDirectory = defaultSubsDir;
+                    return loaded;
+                }
+            }
+        }
+        catch
+        {
+            // Ignore and return default
+        }
+
+        return new ClientWorkstationSettings
+        {
+            ExamPackagesDirectory = defaultExamsDir,
+            SubmissionsDirectory = defaultSubsDir
+        };
+    }
+
+    public static void SaveClientSettings(ClientWorkstationSettings settings, string? baseDirectory = null)
+    {
+        var root = baseDirectory ?? AppDomain.CurrentDomain.BaseDirectory;
+        var dataDir = Path.Combine(root, "data");
+        if (!Directory.Exists(dataDir))
+        {
+            Directory.CreateDirectory(dataDir);
+        }
+
+        var settingsPath = Path.Combine(dataDir, "client_settings.json");
+        var json = JsonSerializer.Serialize(settings, JsonOptions);
+        File.WriteAllText(settingsPath, json, Encoding.UTF8);
     }
 }

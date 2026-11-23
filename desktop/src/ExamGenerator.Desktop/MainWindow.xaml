@@ -624,6 +624,45 @@
                             </StackPanel>
                         </Border>
 
+                        <!-- Exam Packages & Submissions Directories Card -->
+                        <Border Style="{StaticResource CardBorder}" Margin="0,12,0,0">
+                            <StackPanel>
+                                <TextBlock Text="Cấu hình Thư mục Đề thi (.exam_pkg) &amp; Bài đã làm để chấm (.sub_pkg)" FontSize="16" FontWeight="SemiBold" Margin="0,0,0,4"/>
+                                <TextBlock Text="Thiết lập thư mục cục bộ hoặc thư mục chia sẻ mạng LAN (\\Server\...) để tự động xuất đề cho ExamClient và thu nhận bài làm về chấm." Foreground="{StaticResource TextSecondary}" FontSize="12" Margin="0,0,0,10"/>
+
+                                <Grid Margin="0,0,0,8">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="260"/>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="Auto"/>
+                                        <ColumnDefinition Width="Auto"/>
+                                    </Grid.ColumnDefinitions>
+                                    <TextBlock Grid.Column="0" Text="📁 Thư mục chứa đề thi (.exam_pkg):" FontWeight="SemiBold" VerticalAlignment="Center" Foreground="{StaticResource BrandNavy}"/>
+                                    <TextBox Grid.Column="1" x:Name="ExamPackagesDirTextBox" Margin="8,0"/>
+                                    <Button Grid.Column="2" Content="📂 Chọn thư mục..." Style="{StaticResource SecondaryButton}" Click="BrowseExamPackagesDir_Click"/>
+                                    <Button Grid.Column="3" Content="Mở" Style="{StaticResource SecondaryButton}" Margin="6,0,0,0" Click="OpenExamPackagesDir_Click"/>
+                                </Grid>
+
+                                <Grid Margin="0,0,0,8">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="260"/>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="Auto"/>
+                                        <ColumnDefinition Width="Auto"/>
+                                    </Grid.ColumnDefinitions>
+                                    <TextBlock Grid.Column="0" Text="📥 Thư mục bài đã làm để chấm (.sub_pkg):" FontWeight="SemiBold" VerticalAlignment="Center" Foreground="{StaticResource BrandTealDark}"/>
+                                    <TextBox Grid.Column="1" x:Name="SubmissionsDirTextBox" Margin="8,0"/>
+                                    <Button Grid.Column="2" Content="📂 Chọn thư mục..." Style="{StaticResource SecondaryButton}" Click="BrowseSubmissionsDir_Click"/>
+                                    <Button Grid.Column="3" Content="Mở" Style="{StaticResource SecondaryButton}" Margin="6,0,0,0" Click="OpenSubmissionsDir_Click"/>
+                                </Grid>
+
+                                <Grid Margin="0,8,0,0">
+                                    <TextBlock x:Name="DirectoriesStatusText" Text="Đang sử dụng thư mục cấu hình." Foreground="{StaticResource TextSecondary}" VerticalAlignment="Center"/>
+                                    <Button Content="💾 Lưu Cấu Hình Thư Mục" Style="{StaticResource PrimaryButton}" HorizontalAlignment="Right" Click="SaveDirectoriesConfig_Click"/>
+                                </Grid>
+                            </StackPanel>
+                        </Border>
+
                         <!-- Local Snapshot Status Card -->
                         <Border Style="{StaticResource CardBorder}" Margin="0,12,0,0">
                             <StackPanel>
@@ -750,17 +789,20 @@
                                 <ColumnDefinition Width="*"/>
                                 <ColumnDefinition Width="Auto"/>
                             </Grid.ColumnDefinitions>
-                            <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                                <TextBlock Text="Chấm thi Đối soát (Assisted Grading)" FontSize="16" FontWeight="SemiBold"/>
-                                <Border Background="{StaticResource BrandTealSoft}" CornerRadius="10" Padding="8,2" Margin="10,0">
-                                    <TextBlock x:Name="GradingSummaryBadge" Text="0 bài nộp" Foreground="{StaticResource BrandTealDark}" FontSize="12" FontWeight="SemiBold"/>
-                                </Border>
-                                <TextBlock Text="Đối soát bài làm so với đáp án và vết HIS - Nhập điểm &amp; nhận xét cho từng câu." Foreground="{StaticResource TextSecondary}" FontSize="12" VerticalAlignment="Center" Margin="10,0,0,0"/>
+                            <StackPanel VerticalAlignment="Center">
+                                <StackPanel Orientation="Horizontal">
+                                    <TextBlock Text="Chấm thi Đối soát (Assisted Grading)" FontSize="16" FontWeight="SemiBold"/>
+                                    <Border Background="{StaticResource BrandTealSoft}" CornerRadius="10" Padding="8,2" Margin="10,0">
+                                        <TextBlock x:Name="GradingSummaryBadge" Text="0 bài nộp" Foreground="{StaticResource BrandTealDark}" FontSize="12" FontWeight="SemiBold"/>
+                                    </Border>
+                                </StackPanel>
+                                <TextBlock x:Name="GradingSubmissionsPathTextBlock" Text="Thư mục chấm: .\data\submissions" Foreground="{StaticResource TextSecondary}" FontSize="11.5" Margin="0,3,0,0"/>
                             </StackPanel>
-                            <StackPanel Grid.Column="1" Orientation="Horizontal" HorizontalAlignment="Right">
+                            <StackPanel Grid.Column="1" Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center">
                                 <Button Content="📂 Chọn thư mục bài nộp..." Style="{StaticResource SecondaryButton}" Click="BrowseSubmissionsDirectory_Click"/>
-                                <Button Content="🔄 Làm mới bài nộp" Style="{StaticResource SecondaryButton}" Click="ReloadSubmissions_Click"/>
-                                <Button Content="🔍 Truy vấn vết HIS" Style="{StaticResource AccentButton}" Click="QueryHisAuditTrail_Click"/>
+                                <Button Content="📁 Mở thư mục" Style="{StaticResource SecondaryButton}" Margin="6,0,0,0" Click="OpenSubmissionsDir_Click"/>
+                                <Button Content="🔄 Làm mới bài nộp" Style="{StaticResource SecondaryButton}" Margin="6,0,0,0" Click="ReloadSubmissions_Click"/>
+                                <Button Content="🔍 Truy vấn vết HIS" Style="{StaticResource AccentButton}" Margin="6,0,0,0" Click="QueryHisAuditTrail_Click"/>
                             </StackPanel>
                         </Grid>
                     </Border>

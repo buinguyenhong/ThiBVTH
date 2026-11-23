@@ -108,8 +108,44 @@ public sealed class HisCatalogSynchronizer
         var basicDefinitions = new Dictionary<string, string>
         {
             ["Warehouses"] = "SELECT CAST(KhoDuoc_Id AS varchar(50)), ISNULL(MaKho, CAST(KhoDuoc_Id AS varchar(50))), ISNULL(TenKho, N'Kho dược'), CAST(PhongBan_Id AS varchar(50)) FROM dbo.DM_KhoDuoc WITH (NOLOCK) WHERE ISNULL(TamNgung, 0) = 0 ORDER BY TenKho",
-            ["ServiceGroups"] = "SELECT CAST(NhomDichVu_Id AS varchar(50)), ISNULL(MaNhomDichVu, CAST(NhomDichVu_Id AS varchar(50))), ISNULL(TenNhomDichVu, N'Nhóm dịch vụ'), NULL FROM dbo.DM_NhomDichVu WITH (NOLOCK) WHERE ISNULL(TamNgung, 0) = 0 ORDER BY TenNhomDichVu",
-            ["Services"] = "SELECT CAST(d.DichVu_Id AS varchar(50)), ISNULL(d.MaDichVu, CAST(d.DichVu_Id AS varchar(50))), ISNULL(d.TenDichVu, N'Dịch vụ kỹ thuật'), CAST(d.NhomDichVu_Id AS varchar(50)) FROM dbo.DM_DichVu d WITH (NOLOCK) WHERE ISNULL(d.TamNgung, 0) = 0 AND (d.Cap = 1 OR d.Cap IS NULL) ORDER BY d.TenDichVu"
+            ["ServiceGroups"] = """
+                SELECT
+                    CAST(nhom.NhomDichVu_Id AS varchar(50)),
+                    ISNULL(nhom.MaNhomDichVu, CAST(nhom.NhomDichVu_Id AS varchar(50))),
+                    LTRIM(RTRIM(ISNULL(NULLIF(nhom.TenNhomDichVu, ''), ISNULL(NULLIF(loai.TenLoaiDichVu, ''), N'Nhóm dịch vụ')))),
+                    NULL
+                FROM dbo.DM_NhomDichVu nhom WITH (NOLOCK)
+                LEFT JOIN dbo.DM_LoaiDichVu loai WITH (NOLOCK) ON loai.LoaiDichVu_Id = nhom.LoaiDichVu_Id
+                WHERE ISNULL(nhom.TamNgung, 0) = 0
+                ORDER BY nhom.TenNhomDichVu
+                """,
+            ["Services"] = """
+                SELECT
+                    CAST(d.DichVu_Id AS varchar(50)),
+                    ISNULL(NULLIF(LTRIM(RTRIM(d.MaDichVu)), ''), CAST(d.DichVu_Id AS varchar(50))),
+                    LTRIM(RTRIM(ISNULL(d.TenDichVu, N'Dịch vụ kỹ thuật'))),
+                    CAST(d.NhomDichVu_Id AS varchar(50))
+                FROM dbo.DM_DichVu d WITH (NOLOCK)
+                WHERE ISNULL(d.TamNgung, 0) = 0
+                  AND ISNULL(d.CoGiaDichVu, 0) = 1
+                  AND NULLIF(LTRIM(RTRIM(d.TenDichVu)), N'') IS NOT NULL
+                  AND d.TenDichVu NOT LIKE N'%[[]NGƯNG]%'
+                  AND d.TenDichVu NOT LIKE N'%[[]KHÔNG DÙNG]%'
+                  AND d.TenDichVu NOT LIKE N'%[[]BỎ]%'
+                  AND d.TenDichVu NOT LIKE N'%[[]HỦY]%'
+                  AND d.TenDichVu NOT LIKE N'%(NGƯNG)%'
+                  AND d.TenDichVu NOT LIKE N'%(K DÙNG)%'
+                  AND d.TenDichVu NOT LIKE N'%(KHÔNG DÙNG)%'
+                  AND d.TenDichVu NOT LIKE N'%*NGƯNG*%'
+                  AND EXISTS (
+                      SELECT 1
+                      FROM dbo.DM_PhongBan_DichVu noi WITH (NOLOCK)
+                      JOIN dbo.DM_PhongBan pb WITH (NOLOCK) ON pb.PhongBan_Id = noi.PhongBan_Id
+                      WHERE noi.DichVu_Id = d.DichVu_Id
+                        AND ISNULL(pb.TamNgung, 0) = 0
+                  )
+                ORDER BY d.TenDichVu
+                """
         };
 
         foreach (var (catalogType, query) in basicDefinitions)
@@ -202,12 +238,24 @@ public sealed class HisCatalogSynchronizer
                 FundingSource = CASE WHEN duoc.BHYT = 1 THEN 'BHYT' ELSE 'Viện phí' END,
                 QuantityOnHand = CAST(ton.SoLuongTon AS float),
                 DepartmentCode = ISNULL(phong.MaPhongBan, CAST(phong.PhongBan_Id AS varchar(50))),
-                DepartmentName = LTRIM(RTRIM(phong.TenPhongBan))
+                DepartmentName = LTRIM(RTRIM(phong.TenPhongBan)),
+                ItemType = CASE
+                    WHEN LTRIM(RTRIM(ld.LoaiVatTu_Id)) = 'V' THEN 'VTYT'
+                    WHEN LTRIM(RTRIM(ld.LoaiVatTu_Id)) = 'T' THEN 'THUOC'
+                    WHEN LTRIM(RTRIM(ld.LoaiVatTu_Id)) = 'H' THEN 'HOACHAT'
+                    WHEN LTRIM(RTRIM(ld.LoaiVatTu_Id)) = 'I' THEN 'VACCINE'
+                    WHEN LTRIM(RTRIM(ld.LoaiVatTu_Id)) = 'K' THEN 'KINH'
+                    WHEN LTRIM(RTRIM(ld.LoaiVatTu_Id)) = 'P' THEN 'MAU'
+                    WHEN LTRIM(RTRIM(ld.LoaiVatTu_Id)) = 'N' THEN 'TTBYT'
+                    ELSE 'KHAC'
+                END
             FROM TonTheoKho ton
             JOIN dbo.DM_Duoc duoc WITH (NOLOCK) ON duoc.Duoc_Id = ton.Duoc_Id
+            LEFT JOIN dbo.DM_LoaiDuoc ld WITH (NOLOCK) ON ld.LoaiDuoc_Id = duoc.LoaiDuoc_Id
             JOIN dbo.DM_KhoDuoc kho WITH (NOLOCK) ON kho.KhoDuoc_Id = ton.KhoDuoc_Id
             LEFT JOIN dbo.DM_PhongBan phong WITH (NOLOCK) ON phong.PhongBan_Id = kho.PhongBan_Id
             WHERE ISNULL(duoc.TamNgung, 0) = 0
+              AND ISNULL(duoc.TamNgungDuTru, 0) = 0
               AND ISNULL(kho.TamNgung, 0) = 0
             ORDER BY WarehouseName, DrugName;
             """;
@@ -229,7 +277,8 @@ public sealed class HisCatalogSynchronizer
                     SafeGetString(reader, 6, "Viện phí"),
                     SafeGetDouble(reader, 7),
                     reader.IsDBNull(8) ? null : SafeGetString(reader, 8),
-                    reader.IsDBNull(9) ? null : SafeGetString(reader, 9)
+                    reader.IsDBNull(9) ? null : SafeGetString(reader, 9),
+                    reader.IsDBNull(10) ? null : SafeGetString(reader, 10)
                 ));
             }
         }
@@ -300,7 +349,7 @@ public sealed class HisCatalogSynchronizer
                     SafeGetString(reader, 3, "1990-01-01"),
                     SafeGetString(reader, 4, "Nam"),
                     SafeGetString(reader, 5, "Đắk Lắk"),
-                    reader.IsDBNull(6) ? null : SafeGetString(reader, 6),
+                    ScenarioPatient.NormalizeInsuranceNumber(reader.IsDBNull(6) ? null : SafeGetString(reader, 6)),
                     SafeGetString(reader, 7, "Khám bệnh"),
                     SafeGetString(reader, 8, "Viện phí")
                 ));
@@ -506,7 +555,8 @@ public sealed class HisCatalogSynchronizer
             ("P1_2026_01A", "01/01/2026 đến 15/01/2026", "2026-01-01", "2026-01-15 23:59:59", "2026-01-01", 1, 2026),
             ("P2_2026_01B", "16/01/2026 đến 31/01/2026", "2026-01-16", "2026-01-31 23:59:59", "2026-01-01", 1, 2026),
             ("P3_2026_02A", "01/02/2026 đến 15/02/2026", "2026-02-01", "2026-02-15 23:59:59", "2026-02-01", 2, 2026),
-            ("P4_2026_02B", "16/02/2026 đến 28/02/2026", "2026-02-16", "2026-02-28 23:59:59", "2026-02-01", 2, 2026)
+            ("P4_2026_02B", "16/02/2026 đến 28/02/2026", "2026-02-16", "2026-02-28 23:59:59", "2026-02-01", 2, 2026),
+            ("P5_2026_02", "01/02/2026 đến 28/02/2026", "2026-02-01", "2026-02-28 23:59:59", "2026-02-01", 2, 2026)
         };
 
         foreach (var p in definedPeriods)
@@ -559,6 +609,7 @@ public sealed class HisCatalogSynchronizer
                 LEFT JOIN dbo.DM_PhongBan pb WITH (NOLOCK) ON pb.PhongBan_Id = k.PhongBan_Id
                 WHERE c.ClosingStock > 0
                   AND ISNULL(d.TamNgung, 0) = 0
+                  AND ISNULL(d.TamNgungDuTru, 0) = 0
                   AND ISNULL(k.TamNgung, 0) = 0
                 ORDER BY WarehouseName, DrugName;
                 """;
@@ -595,32 +646,6 @@ public sealed class HisCatalogSynchronizer
             catch
             {
                 // Fallback nếu CSDL staging chưa khóa sổ hoặc thiếu bảng DuocTonDauKy
-            }
-        }
-
-        // Fallback an toàn nếu DB test chưa có dữ liệu giao dịch kỳ
-        if (periodRows.Count == 0 && drugRows.Count > 0)
-        {
-            foreach (var p in definedPeriods)
-            {
-                foreach (var d in drugRows.Take(100))
-                {
-                    periodRows.Add(new SnapshotInventoryPeriodRow(
-                        p.Code,
-                        p.Name,
-                        p.FromDate,
-                        p.ToDate,
-                        d.WarehouseCode,
-                        d.WarehouseName,
-                        d.DepartmentCode ?? "",
-                        d.DepartmentName ?? "",
-                        d.DrugCode,
-                        d.DrugName,
-                        d.Unit,
-                        d.QuantityOnHand,
-                        d.FundingSource
-                    ));
-                }
             }
         }
 

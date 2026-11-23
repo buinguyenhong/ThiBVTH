@@ -478,4 +478,48 @@ public sealed class ExamClientPackageAndGradingTests
             try { if (Directory.Exists(tempDir)) Directory.Delete(tempDir, true); } catch { }
         }
     }
+
+    [Fact]
+    public async Task DirectoryConfiguration_IsPersisted_ForBothDesktopAndClient()
+    {
+        var tempDir = Path.Combine(Path.GetTempPath(), $"DirCfg_{Guid.NewGuid():N}");
+        Directory.CreateDirectory(tempDir);
+
+        try
+        {
+            // 1. Desktop ApplicationSettings persistence
+            var storage = new LocalApplicationStorage(tempDir);
+            var settingsStore = new JsonApplicationSettingsStore(storage);
+            var customExamsDir = @"\\192.168.1.10\PhongThi\DeThi";
+            var customSubsDir = @"\\192.168.1.10\PhongThi\BaiNop";
+
+            var desktopSettings = new ApplicationSettings(
+                "exam-generator.sqlite",
+                Array.Empty<SqlServerConnectionProfile>(),
+                null,
+                customExamsDir,
+                customSubsDir);
+
+            await settingsStore.SaveAsync(desktopSettings);
+            var loadedDesktop = await settingsStore.LoadAsync();
+            Assert.Equal(customExamsDir, loadedDesktop.ExamPackagesDirectory);
+            Assert.Equal(customSubsDir, loadedDesktop.SubmissionsDirectory);
+
+            // 2. ClientWorkstationSettings persistence
+            var clientSettings = new ClientWorkstationSettings
+            {
+                ExamPackagesDirectory = customExamsDir,
+                SubmissionsDirectory = customSubsDir
+            };
+            ExamPackageService.SaveClientSettings(clientSettings, tempDir);
+
+            var loadedClient = ExamPackageService.LoadClientSettings(tempDir);
+            Assert.Equal(customExamsDir, loadedClient.ExamPackagesDirectory);
+            Assert.Equal(customSubsDir, loadedClient.SubmissionsDirectory);
+        }
+        finally
+        {
+            try { if (Directory.Exists(tempDir)) Directory.Delete(tempDir, true); } catch { }
+        }
+    }
 }

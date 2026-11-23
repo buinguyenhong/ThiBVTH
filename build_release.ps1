@@ -71,18 +71,18 @@ if not exist "%TARGET_DIR%" (
 )
 
 echo.
-echo Dang sao chep file chay moi (TU DONG BO QUA: thu muc data, database, cau hinh va output)...
-robocopy "%~dp0." "%TARGET_DIR%" /E /XF "exam-generator.sqlite*" "appsettings.local.json" "credentials.local.bin" "CapNhat_KhongMatDuLieu.bat" /XD "data" "output" /NP /R:1 /W:1
+echo Dang sao chep file chay moi (TU DONG BO QUA: thu muc data, exams, submissions, database, cau hinh va output)...
+robocopy "%~dp0." "%TARGET_DIR%" /E /XF "exam-generator.sqlite*" "appsettings.local.json" "client_settings.json" "credentials.local.bin" "CapNhat_KhongMatDuLieu.bat" /XD "data" "output" "exams" "submissions" /NP /R:1 /W:1
 
 echo.
 echo ========================================================
 echo  HOAN TAT CAP NHAT AN TOAN!
-echo  Toan bo thu muc data/ (Mapping, Mau de, CSDL va Lich su) da duoc giu nguyen 100%%.
+echo  Toan bo thu muc data/, exams/, submissions/ va cau hinh da duoc giu nguyen 100%%.
 echo ========================================================
 pause
 "@
 
-foreach ($targetDir in @($PublishDir, $PublishStandaloneDir)) {
+foreach ($targetDir in @($PublishDir, $PublishStandaloneDir, $PublishClientDir, $PublishClientStandaloneDir)) {
     $stale = Join-Path $targetDir "data"
     if (Test-Path $stale) {
         Remove-Item $stale -Recurse -Force -ErrorAction SilentlyContinue
@@ -127,7 +127,7 @@ try {
 $LogEntry = @"
 
 ### Build [$Timestamp] - Commit [$GitCommit]
-- **Trang thai:** Thanh cong (56/56 Tests Passed)
+- **Trang thai:** Thanh cong (62/62 Tests Passed)
 - **Cau hinh:** .NET 8 LTS (Release) + Standalone (Self-Contained win-x64)
 - **Duong dan chay ExamOperationsDesktop (Hoi dong / Giam khao):**
   - Tieu chuan: ``desktop/publish/ExamOperationsDesktop/ExamGenerator.Desktop.exe`` ($ExeSizeKb KB)

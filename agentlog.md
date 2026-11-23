@@ -2,6 +2,47 @@
 
 Nhật ký ghi lại các thay đổi, quyết định thiết kế và tiến trình thực thi của Antigravity Coding Assistant trong suốt phiên làm việc.
 
+## [2026-10-30] Phân loại Thuốc vs Vật tư y tế Chuẩn xác 100% theo Danh mục eHospital `DM_LoaiDuoc` (Issue 2.3)
+
+### 1. Phân loại Chuẩn hóa Dựa trên CSDL eHospital Thực tế:
+* **Tích hợp bảng `dbo.DM_LoaiDuoc`:**
+  - `DM_Duoc.LoaiDuoc_Id` được JOIN với `DM_LoaiDuoc.LoaiDuoc_Id` để phân loại mặt hàng qua cột `LoaiVatTu_Id`:
+    + `LoaiVatTu_Id = 'T'` $\rightarrow$ `THUOC` (Thuốc viên, thuốc tiêm truyền, hướng thần, gây nghiện,...)
+    + `LoaiVatTu_Id = 'V'` $\rightarrow$ `VTYT` (Vật tư y tế, ống thông, bơm kim tiêm, catheter,...)
+    + `LoaiVatTu_Id = 'H'` $\rightarrow$ `HOACHAT` (Hóa chất xét nghiệm, X-Quang,...)
+    + `LoaiVatTu_Id = 'I'` $\rightarrow$ `VACCINE` (Vắc xin, sinh phẩm)
+    + `LoaiVatTu_Id = 'N'` $\rightarrow$ `TTBYT` (Trang thiết bị y tế, thực phẩm, mỹ phẩm)
+    + `LoaiVatTu_Id = 'K'` $\rightarrow$ `KINH` (Tròng, gọng kính)
+    + `LoaiVatTu_Id = 'P'` $\rightarrow$ `MAU` (Máu, chế phẩm máu)
+* **Lưu trữ CSDL SQLite Snapshot:**
+  - Bổ sung cột `ItemType TEXT NULL` vào bảng `SnapshotDrug` (kèm migration an toàn `ALTER TABLE SnapshotDrug ADD COLUMN ItemType TEXT NULL`).
+  - Mở rộng `SnapshotDrugRow` với thuộc tính `string? ItemType = null` (tương thích ngược hoàn toàn với dữ liệu cũ).
+  - Cập nhật các phương thức `ReplaceSnapshotDrugsAsync`, `GetWarehouseDrugsAsync`, `GetAllSnapshotDrugsAsync`, và `SearchInventoryAsync` để lưu trữ và truy vấn `ItemType`.
+
+### 2. Phân bổ Chỉ định Dược & Vật tư Y tế (ExamScenarioAllocator):
+* **Phương thức `IsMedicalSupplyItem`:**
+  - Kiểm tra ưu tiên số 1: Dựa vào `item.ItemType` chuẩn xác từ eHospital (`VTYT`, `TTBYT`, `HOACHAT` $\rightarrow$ `true`; `THUOC`, `VACCINE` $\rightarrow$ `false`).
+  - Giữ lại nhận diện kho lẻ và heuristic tên/đơn vị tính làm fallback dự phòng khi dữ liệu mock không có `ItemType`.
+* **Phân bổ Slot trong `AllocateCandidateDrugs` & `PickDrugWithCentralWarehouseCheck`:**
+  - Loại bỏ hoàn toàn đoạn mã chết (dead code) không thể kích hoạt do điều kiện logic mâu thuẫn.
+  - Sử dụng cờ `expectSupply` và `isSupplySlot` để bảo đảm slot chỉ định Thuốc (slot 0, 1, 2) chỉ chọn mặt hàng Thuốc, slot chỉ định VTYT (slot 3, 4) chỉ chọn mặt hàng Vật tư y tế.
+  - Cơ chế fallback linh hoạt nới lỏng kiểm tra khi kho thi chỉ có một loại mặt hàng, bảo đảm bài thi không bị crash ngay cả trong môi trường dữ liệu thử nghiệm tối thiểu.
+
+### 3. Kiểm thử & Đóng gói Phát hành:
+* **Unit Tests:**
+  - Bổ sung test case `IsMedicalSupplyItem_strictly_distinguishes_by_ItemType_from_DM_LoaiDuoc`.
+  - Bổ sung test case `Drug_order_allocation_strictly_respects_ItemType_for_drug_and_supply_slots`.
+  - Toàn bộ **69/69 Unit Tests PASSED 100%**.
+* **Biên dịch & Xuất bản (Release & Standalone):**
+  - Chạy thành công quy trình `build_release.ps1`.
+  - Cập nhật đầy đủ cả 4 bản phân phối tại:
+    + `desktop/publish/ExamOperationsDesktop/`
+    + `desktop/publish/ExamOperationsDesktop-Standalone/` (win-x64)
+    + `desktop/publish/ExamClient/`
+    + `desktop/publish/ExamClient-Standalone/` (win-x64)
+
+---
+
 ## [2026-10-17] Hoàn thành Xây dựng Phân hệ ExamClient và Tab 7 Chấm thi Đối soát (Assisted Grading)
 
 ### 1. Phân hệ Máy trạm Thí sinh `ExamGenerator.Client` (Độc lập, Bảo mật, Đơn giản, Rõ ràng):
@@ -886,3 +927,67 @@ Nhật ký ghi lại các thay đổi, quyết định thiết kế và tiến t
   * `desktop/publish/ExamOperationsDesktop/`
   * `desktop/publish/ExamOperationsDesktop-Standalone/`
 * Lịch sử build tự động cập nhật trong `BUILD_HISTORY.md`.
+
+---
+
+## [2026-10-30] Hoàn thiện Nghiệp vụ Chuyển khoa Nội trú, Tồn kho Thực tế và Phiếu lĩnh Dược - VTYT qua Kho lẻ
+
+### 1. Công việc đã thực hiện:
+* **Nâng cấp Câu Chuyển khoa Bệnh nhân Nội trú (`CK_CHUYEN_KHOA`):**
+  * Định nghĩa danh sách 7 khoa nội trú chuẩn: `Khoa Nội`, `Khoa Ngoại tổng hợp`, `Khoa Chấn thương chỉnh hình`, `Khoa Thần kinh`, `Gây mê hồi sức`, `Hồi sức tích cực`, `Khoa Tim mạch`.
+  * Xây dựng hàm `PickTargetTransferDepartment` và `IsSameInpatientDepartment`: Tự động loại trừ khoa hiện tại của thí sinh (xử lý chuẩn hóa không dấu và các biến thể tên khoa như `Khoa Nội`, `Nội tổng hợp`, `Khoa Thần kinh`, `Khoa Gây mê hồi sức`, `Khoa Hồi sức tích cực`), chọn ngẫu nhiên 1 trong các khoa còn lại trong danh sách 7 khoa cho từng thí sinh.
+  * Thêm thông tin đáp án chuyển khoa vào bảng đối soát của file Word đáp án (`_DapAn_CoiThi_ChamThi_*.docx`) và giao diện chấm thi Client.
+
+* **Chuẩn hóa Kiểm tra Tồn kho Dược / VTYT (`TK_KIEM_TON_KHO`):**
+  * Đảm bảo câu hỏi kiểm tra tồn kho chỉ lấy dược/vật tư có số liệu thực tế tại đúng kho thi của khoa dự thi (`targetWh`), tuyệt đối không fallback sang kho của khoa khác.
+  * Ưu tiên chọn các mặt hàng không nằm trong danh sách vừa lên y lệnh ở Câu 3 để tránh biến động số lượng tồn trong lúc thi.
+  * Tự động điền số lượng tồn thực tế vào `ClosingStock` của `inventoryPeriodItem` và `Quantity` của `inventoryCheckDrug`.
+  * Ghi rõ số lượng tồn kho chuẩn vào đáp án: `-> ĐÁP ÁN TỒN KHO: {Quantity:N0} {Unit}` trong file Word đáp án và `-> TỒN KHO CHUẨN: {Quantity:N0} {Unit}` trên hệ thống chấm thi Client.
+  * Bổ sung điều kiện loại bỏ thuốc tạm ngưng dự trù (`ISNULL(duoc.TamNgungDuTru, 0) = 0`) trong câu truy vấn đồng bộ HIS `HisCatalogSynchronizer.cs`.
+
+* **Kiểm tra Tồn kho Xuất Phiếu lĩnh Dược / VTYT (`YL_CHI_DINH_THUOC_VTYT`):**
+  * Nhận diện tự động kho trung tâm xuất phiếu lĩnh: **Kho lẻ thuốc nội trú** (cho Thuốc) và **Kho lẻ vật tư** (cho Vật tư y tế) qua tên/mã kho.
+  * Khi phân bổ y lệnh cho thí sinh:
+    * Các vị trí Thuốc bắt buộc phải có đủ tồn kho tại **Kho lẻ thuốc nội trú**.
+    * Các vị trí Vật tư y tế bắt buộc phải có đủ tồn kho tại **Kho lẻ vật tư**.
+    * Trừ hao tồn kho lũy kế đồng thời trên cả kho của khoa và kho lẻ trung tâm qua từng thí sinh.
+    * Ném ngoại lệ cảnh báo preflight rõ ràng, chi tiết nếu kho lẻ thuốc nội trú hoặc kho lẻ vật tư không đủ cơ số xuất cho toàn bộ thí sinh trong đợt thi.
+
+### 2. Kiểm thử & Đóng gói:
+* Bổ sung 3 bài unit test chuyên sâu trong `ExamScenarioAllocatorTests.cs`.
+* Toàn bộ **65/65 Unit Tests PASSED (100%)**.
+* Đóng gói và phát hành thành công cả 4 phiên bản:
+  * `desktop/publish/ExamOperationsDesktop/` (Bản tiêu chuẩn)
+  * `desktop/publish/ExamOperationsDesktop-Standalone/` (Bản Standalone win-x64)
+  * `desktop/publish/ExamClient/` (Bản Client tiêu chuẩn)
+  * `desktop/publish/ExamClient-Standalone/` (Bản Client Standalone win-x64)
+
+---
+
+## [2026-10-30] Khắc phục Triệt để Lệch Kỳ Tồn kho và Chặn Dữ liệu Giả Hard-code khi Thiếu Bệnh án
+
+### 1. Khắc phục Lệch Kỳ Hỏi và Số Đáp án Tồn kho (`TK_KIEM_TON_KHO`):
+* **Nguyên nhân gốc rễ:**
+  * Trước đây khi kho chưa có dữ liệu giao dịch kỳ, hệ thống gán nhãn kỳ tháng 2/2026 (`01/02/2026 đến 28/02/2026`) nhưng lại lấy số lượng tồn hiện tại (`QuantityOnHand`). Khi thí sinh vào eHospital tra cứu báo cáo kỳ tháng 2/2026, eHospital trả về số tồn lịch sử tháng 2/2026, không khớp với đáp án hiện tại của hệ thống.
+* **Giải pháp xử lý:**
+  * Bổ sung kỳ tháng 2 nguyên tháng `P5_2026_02` (`01/02/2026 đến 28/02/2026`) vào `definedPeriods` trong `HisCatalogSynchronizer.cs` để truy vấn chính xác số tồn cuối kỳ tháng 2 từ chứng từ HIS.
+  * Loại bỏ hoàn toàn việc gán kỳ giả mạo vào `QuantityOnHand` trong `HisCatalogSynchronizer.cs`.
+  * Trong `ExamScenarioAllocator.cs`:
+    * Nếu kho có dữ liệu kỳ chốt chuẩn từ HIS (`SnapshotInventoryPeriod`): Đề thi hỏi chính xác khoảng thời gian kỳ (`từ ngày {FromDate:dd/MM/yyyy} đến ngày {ToDate:dd/MM/yyyy}`), đáp án là `ClosingStock` (`-> ĐÁP ÁN TỒN KHO CUỐI KỲ: ...` / `-> TỒN CUỐI KỲ CHUẨN: ...`).
+    * Nếu kho chưa có dữ liệu kỳ: Đề thi hỏi chính xác tồn kho hiện tại tại ngày thi (`tại thời điểm hiện tại / ngày thi {examDate:dd/MM/yyyy}`), đáp án là tồn hiện tại `QuantityOnHand` (`-> ĐÁP ÁN TỒN KHO HIỆN TẠI: ...` / `-> TỒN KHO HIỆN TẠI CHUẨN: ...`).
+    * Khớp hoàn toàn giữa câu hỏi trong đề thi và dữ liệu tra cứu trên HIS.
+
+### 2. Chặn Dữ liệu Giả Hard-code khi Thiếu Bệnh án (Preflight Fail-Fast):
+* **Nguyên nhân gốc rễ:**
+  * Khi snapshot CSDL chưa có hồ sơ bệnh án nội trú hoặc ngoại trú, hệ thống trước đây fallback tạo các số bệnh án giả lập hard-code (`21.004865`, `21.004266`, `Lê Văn Dũng`...). Khi thí sinh thực hiện trên server HIS thật, các số bệnh án này không tồn tại khiến thí sinh không thao tác được.
+* **Giải pháp xử lý:**
+  * Thêm kiểm tra preflight fail-fast trong `ExamScenarioAllocator.cs`: Nếu mẫu đề yêu cầu nghiệp vụ nội trú (`LT_THU_TAM_UNG`, `TC_THU_TAM_UNG`, `LT_THANH_TOAN_RA_VIEN`, `TC_THANH_TOAN_RA_VIEN`, `LT_TRA_CUU_THONG_TIN`, `HC_TRA_CUU_THANH_TOAN`, hoặc GMHS) mà CSDL chưa có bệnh án nội trú, hệ thống báo lỗi rõ ràng yêu cầu đồng bộ.
+  * Tương tự với bệnh án ngoại trú (`LT_THU_TAM_UNG_NOI_TRU`, `LT_TRA_CUU_THONG_TIN`, `TC_TRA_CUU_BENH_SU`).
+  * Loại bỏ toàn bộ các chuỗi hard-code dữ liệu giả trong mã nguồn production.
+
+### 3. Kiểm thử & Đóng gói:
+* Bổ sung 2 bài unit test kiểm tra preflight fail-fast khi thiếu bệnh án.
+* Cập nhật unit test kiểm tra câu tồn kho theo đúng ngày thi khi kho chưa có kỳ chốt.
+* Toàn bộ **67/67 Unit Tests PASSED (100%)**.
+* Đóng gói lại thành công cả 4 phiên bản Standard và Standalone win-x64 cho `ExamOperationsDesktop` và `ExamClient`.
+

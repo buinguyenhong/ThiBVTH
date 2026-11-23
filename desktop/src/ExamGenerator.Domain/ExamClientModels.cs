@@ -112,3 +112,12 @@ public sealed class CandidateGradingRecord
     public DateTime? GradedAt { get; set; }
     public List<ExamGradingItem> Items { get; set; } = new();
 }
+
+/// <summary>
+/// Cấu hình thư mục lấy đề thi (.exam_pkg) và nộp bài làm (.sub_pkg) trên máy trạm ExamClient
+/// </summary>
+public sealed class ClientWorkstationSettings
+{
+    public string ExamPackagesDirectory { get; set; } = string.Empty;
+    public string SubmissionsDirectory { get; set; } = string.Empty;
+}

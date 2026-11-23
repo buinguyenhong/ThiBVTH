@@ -11,7 +11,9 @@ public sealed record SqlServerConnectionProfile(
 public sealed record ApplicationSettings(
     string SqliteDatabaseFileName,
     IReadOnlyList<SqlServerConnectionProfile> SqlServerProfiles,
-    string? ActiveSqlServerProfileName = null)
+    string? ActiveSqlServerProfileName = null,
+    string? ExamPackagesDirectory = null,
+    string? SubmissionsDirectory = null)
 {
     public static ApplicationSettings Default => new(
         "exam-generator.sqlite",

@@ -31,6 +31,10 @@ public sealed class SqlScriptGenerator
         sb.AppendLine("   ============================================================================ */");
         sb.AppendLine();
 
+        var hasDischargePayment = scenario.Questions.Any(q =>
+            q.ActionCode.StartsWith("LT_THANH_TOAN_RA_VIEN", StringComparison.OrdinalIgnoreCase) ||
+            q.ActionCode.StartsWith("TC_THANH_TOAN_RA_VIEN", StringComparison.OrdinalIgnoreCase));
+
         if (scenario.RequiresDirectReception)
         {
             sb.AppendLine("-- [QUY TRÌNH TIẾP NHẬN TRỰC TIẾP]");
@@ -38,6 +42,13 @@ public sealed class SqlScriptGenerator
             sb.AppendLine("-- Hệ thống KHÔNG tạo sẵn ca bệnh trên máy chủ để đảm bảo đánh giá đúng kỹ năng của thí sinh.");
             sb.AppendLine($"PRINT N'Chuẩn bị tài khoản [{scenario.HisUserCode}] cho thí sinh [{scenario.CandidateName}] tại [{scenario.DepartmentName}]. Sẵn sàng cho phần thi Tiếp nhận trực tiếp.';");
             sb.AppendLine("GO");
+
+            if (hasDischargePayment)
+            {
+                sb.AppendLine();
+                AppendDischargePreparationSql(sb, scenario);
+            }
+
             return sb.ToString();
         }
 
@@ -46,6 +57,13 @@ public sealed class SqlScriptGenerator
             sb.AppendLine("-- Đề thi chuyên môn/văn phòng không yêu cầu nạp dữ liệu ca bệnh vào hàng chờ khoa.");
             sb.AppendLine($"PRINT N'Tài khoản [{scenario.HisUserCode}] của thí sinh [{scenario.CandidateName}] đã sẵn sàng.';");
             sb.AppendLine("GO");
+
+            if (hasDischargePayment)
+            {
+                sb.AppendLine();
+                AppendDischargePreparationSql(sb, scenario);
+            }
+
             return sb.ToString();
         }
 
@@ -61,7 +79,67 @@ public sealed class SqlScriptGenerator
             sb.AppendLine(rendered2);
         }
 
+        if (hasDischargePayment)
+        {
+            sb.AppendLine("GO");
+            sb.AppendLine();
+            AppendDischargePreparationSql(sb, scenario);
+        }
+
         return sb.ToString();
+    }
+
+    public string GenerateMerged(IReadOnlyList<ExamScenario> scenarios)
+    {
+        ArgumentNullException.ThrowIfNull(scenarios);
+        if (scenarios.Count == 0) return string.Empty;
+
+        var first = scenarios[0];
+        var sb = new StringBuilder();
+        sb.AppendLine("/* ============================================================================");
+        sb.AppendLine("   BỆNH VIỆN ĐA KHOA THIỆN HẠNH - HỘI ĐỒNG TUYỂN DỤNG");
+        sb.AppendLine($"   SCRIPT TỔNG HỢP TOÀN ĐỢT THI: {first.BatchName} - NGÀY THI: {first.ExamDate:dd/MM/yyyy}");
+        sb.AppendLine($"   TỔNG SỐ THÍ SINH: {scenarios.Count}");
+        sb.AppendLine("   ============================================================================ */");
+        sb.AppendLine();
+
+        for (var i = 0; i < scenarios.Count; i++)
+        {
+            if (i > 0)
+            {
+                sb.AppendLine();
+            }
+
+            sb.AppendLine($"-- ############################################################################");
+            sb.AppendLine($"-- THÍ SINH {i + 1}/{scenarios.Count}: {scenarios[i].CandidateName} (SBD: {scenarios[i].CandidateId})");
+            sb.AppendLine($"-- ############################################################################");
+            sb.AppendLine(Generate(scenarios[i]).TrimEnd());
+            sb.AppendLine();
+        }
+
+        return sb.ToString();
+    }
+
+    private static void AppendDischargePreparationSql(StringBuilder sb, ExamScenario scenario)
+    {
+        var soVaoVien = !string.IsNullOrWhiteSpace(scenario.DischargeCase?.SoBenhAn)
+            ? scenario.DischargeCase.SoBenhAn.Trim()
+            : "21.004266";
+
+        sb.AppendLine("-- [CHUẨN BỊ DỮ LIỆU CÂU THU THANH TOÁN RA VIỆN]");
+        sb.AppendLine($"-- Cập nhật chỉ định ra viện cho bệnh nhân: {scenario.DischargeCase?.FullName ?? "Bệnh nhân Ra Viện"} (Số vào viện / Số bệnh án: {soVaoVien})");
+        sb.AppendLine($"DECLARE @SoVaoVien VARCHAR(50) = '{EscapeSql(soVaoVien)}';");
+        sb.AppendLine();
+        sb.AppendLine("DECLARE @ThoiDiemRaVien DATETIME = GETDATE();");
+        sb.AppendLine();
+        sb.AppendLine("UPDATE BenhAn");
+        sb.AppendLine("SET");
+        sb.AppendLine("    TrangThai = N'daxuatvien',");
+        sb.AppendLine("    NgayRaVien = CAST(@ThoiDiemRaVien AS DATE),");
+        sb.AppendLine("    ThoiGianRaVien = @ThoiDiemRaVien");
+        sb.AppendLine("WHERE SoVaoVien = @SoVaoVien");
+        sb.AppendLine("  AND TrangThai = N'dangdieutri';");
+        sb.AppendLine("GO");
     }
 
     private string RenderAdmissionScript(ExamScenario scenario, ScenarioPatient p)
@@ -105,7 +183,7 @@ public sealed class SqlScriptGenerator
 
         if (isBhyt)
         {
-            var insNum = p.InsuranceNumber ?? string.Empty;
+            var insNum = ScenarioPatient.NormalizeInsuranceNumber(p.InsuranceNumber) ?? string.Empty;
             script = SetSqlVariable(script, "SoBHYT", "varchar(30)", $"'{EscapeSql(insNum)}'");
             script = SetSqlVariable(script, "BHYTTuNgay", "smalldatetime", $"'{cardFrom:yyyy-MM-dd}'");
             script = SetSqlVariable(script, "BHYTDenNgay", "smalldatetime", $"'{cardTo:yyyy-MM-dd}'");

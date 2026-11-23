@@ -1,3 +1,5 @@
+using System.Globalization;
+using System.Text;
 using ExamGenerator.Domain;
 
 namespace ExamGenerator.Infrastructure;
@@ -6,6 +8,17 @@ public sealed record CandidateInput(string Name, string Id, string Department, s
 
 public sealed class ExamScenarioAllocator
 {
+    public static readonly IReadOnlyList<string> AllowedInpatientTransferDepartments = new[]
+    {
+        "Khoa Nội",
+        "Khoa Ngoại tổng hợp",
+        "Khoa Chấn thương chỉnh hình",
+        "Khoa Thần kinh",
+        "Gây mê hồi sức",
+        "Hồi sức tích cực",
+        "Khoa Tim mạch"
+    };
+
     private readonly SqliteDatabase _database;
 
     public ExamScenarioAllocator(SqliteDatabase database)
@@ -45,10 +58,33 @@ public sealed class ExamScenarioAllocator
         var allInpatients = (await _database.GetAvailableInpatientsAsync(cancellationToken: cancellationToken)).ToList();
         var allOutpatients = (await _database.GetAvailableOutpatientsAsync(cancellationToken: cancellationToken)).ToList();
         var allInventoryPeriods = (await _database.GetSnapshotInventoryPeriodsAsync(cancellationToken: cancellationToken)).ToList();
+        var allSnapshotDrugs = (await _database.GetAllSnapshotDrugsAsync(cancellationToken)).ToList();
+        var allCatalogWarehouses = (await _database.GetWarehousesWithDepartmentAsync(cancellationToken)).ToList();
+
+        // Detect Kho lẻ thuốc nội trú (for Thuốc) and Kho lẻ vật tư (for Vật tư y tế)
+        var allKhoLeThuocRows = allSnapshotDrugs.Where(d => IsKhoLeThuocNoiTru(d.WarehouseName, d.WarehouseCode)).ToList();
+        var allKhoLeVatTuRows = allSnapshotDrugs.Where(d => IsKhoLeVatTu(d.WarehouseName, d.WarehouseCode)).ToList();
+
+        var hasKhoLeThuocConfig = allKhoLeThuocRows.Count > 0 ||
+                                  allCatalogWarehouses.Any(w => IsKhoLeThuocNoiTru(w.Name, w.Code));
+        var hasKhoLeVatTuConfig = allKhoLeVatTuRows.Count > 0 ||
+                                  allCatalogWarehouses.Any(w => IsKhoLeVatTu(w.Name, w.Code));
+
+        var khoLeThuocDrugs = allKhoLeThuocRows.Where(d => d.QuantityOnHand >= 1).ToList();
+        var khoLeVatTuDrugs = allKhoLeVatTuRows.Where(d => d.QuantityOnHand >= 1).ToList();
+
+        var khoLeThuocStockMap = khoLeThuocDrugs
+            .GroupBy(d => d.DrugCode, StringComparer.OrdinalIgnoreCase)
+            .ToDictionary(g => g.Key, g => g.Sum(x => x.QuantityOnHand), StringComparer.OrdinalIgnoreCase);
+
+        var khoLeVatTuStockMap = khoLeVatTuDrugs
+            .GroupBy(d => d.DrugCode, StringComparer.OrdinalIgnoreCase)
+            .ToDictionary(g => g.Key, g => g.Sum(x => x.QuantityOnHand), StringComparer.OrdinalIgnoreCase);
 
         // Cache warehouse drugs and remaining stock across candidates
         var warehouseDrugsCache = new Dictionary<string, IReadOnlyList<SnapshotDrugRow>>(StringComparer.OrdinalIgnoreCase);
         var warehouseStockMap = new Dictionary<string, Dictionary<string, double>>(StringComparer.OrdinalIgnoreCase);
+        var usedInpatientSoBenhAn = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
         // Group candidates by department to allocate distinct HIS users
         var candidatesByDept = candidates.GroupBy(c => c.Department, StringComparer.OrdinalIgnoreCase);
@@ -92,10 +128,6 @@ public sealed class ExamScenarioAllocator
                 throw new InvalidOperationException("Chưa có danh mục Dịch vụ kỹ thuật / CLS nào được đồng bộ từ HIS. Vui lòng đồng bộ danh mục trước khi sinh đề.");
             }
 
-            // Find target department for Question 7 transfer
-            var otherDept = mappingsByDeptName.Keys.FirstOrDefault(k => !k.Equals(deptName, StringComparison.OrdinalIgnoreCase));
-            var targetTransferDept = otherDept ?? (deptName.Contains("Nội", StringComparison.OrdinalIgnoreCase) ? "Khoa Ngoại tổng hợp" : "Khoa Nội");
-
             // Cutoff date for Q7 & Q8: default 10 days before examDate
             var cutoffDate = examDate.AddDays(-10);
 
@@ -105,14 +137,18 @@ public sealed class ExamScenarioAllocator
                 .ToDictionary(a => a.Code, a => a.Description, StringComparer.OrdinalIgnoreCase);
 
             var userIndex = 0;
-            var seed = Math.Abs(examDate.DayNumber ^ GetDeterministicHashCode(deptName));
+            var seed = Math.Abs(examDate.DayNumber ^ GetDeterministicHashCode(deptName) ^ GetDeterministicHashCode(batchName));
             var rng = new Random(seed);
             // Randomly shuffle mapped users so candidates receive random distinct users
             var shuffledUsers = deptUsers.OrderBy(_ => rng.Next()).ToList();
+            var usedClsCodesInDept = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
             foreach (var candidate in group)
             {
                 var assignedUser = shuffledUsers[userIndex++];
+
+                // Find target inpatient department for Question 7 transfer (must be in AllowedInpatientTransferDepartments and different from current deptName)
+                var targetTransferDept = PickTargetTransferDepartment(deptName, rng);
 
                 // Resolve candidate's warehouse
                 (string WarehouseCode, string WarehouseName) targetWh;
@@ -207,15 +243,22 @@ public sealed class ExamScenarioAllocator
                 SnapshotInpatientRow? gmhsInpatientRow = null;
                 if (isGmhs && allInpatients.Count > 0)
                 {
-                    gmhsInpatientRow = allInpatients.FirstOrDefault(ip => !string.IsNullOrWhiteSpace(ip.DepartmentName) && ip.DepartmentName.Contains(deptName, StringComparison.OrdinalIgnoreCase));
+                    var gmhsPool = allInpatients.Where(ip => !string.IsNullOrWhiteSpace(ip.SoBenhAn) && !usedInpatientSoBenhAn.Contains(ip.SoBenhAn)).ToList();
+                    if (gmhsPool.Count == 0) gmhsPool = allInpatients;
+
+                    gmhsInpatientRow = gmhsPool.FirstOrDefault(ip => !string.IsNullOrWhiteSpace(ip.DepartmentName) && ip.DepartmentName.Contains(deptName, StringComparison.OrdinalIgnoreCase));
                     if (gmhsInpatientRow == null)
                     {
-                        gmhsInpatientRow = allInpatients.FirstOrDefault(ip => !string.IsNullOrWhiteSpace(ip.DepartmentName) &&
+                        gmhsInpatientRow = gmhsPool.FirstOrDefault(ip => !string.IsNullOrWhiteSpace(ip.DepartmentName) &&
                             (ip.DepartmentName.Contains("Ngoại", StringComparison.OrdinalIgnoreCase) ||
                              ip.DepartmentName.Contains("Sản", StringComparison.OrdinalIgnoreCase) ||
                              ip.DepartmentName.Contains("Chấn thương", StringComparison.OrdinalIgnoreCase)));
                     }
-                    gmhsInpatientRow ??= allInpatients[rng.Next(allInpatients.Count)];
+                    gmhsInpatientRow ??= gmhsPool[rng.Next(gmhsPool.Count)];
+                    if (!string.IsNullOrWhiteSpace(gmhsInpatientRow.SoBenhAn))
+                    {
+                        usedInpatientSoBenhAn.Add(gmhsInpatientRow.SoBenhAn);
+                    }
                 }
 
                 if (isGmhs && gmhsInpatientRow != null)
@@ -242,7 +285,7 @@ public sealed class ExamScenarioAllocator
                     );
                 }
 
-                var gmhsAdmissionNumber = gmhsInpatientRow?.SoBenhAn ?? (isGmhs ? "22.000173" : patient.MedicalCode);
+                var gmhsAdmissionNumber = gmhsInpatientRow?.SoBenhAn ?? patient.MedicalCode;
 
                 // Phẫu thuật được chọn nằm trong danh mục phẫu thuật đang hoạt động
                 var surgeryServices = allServicesWithGroup
@@ -350,7 +393,7 @@ public sealed class ExamScenarioAllocator
                 }
 
                 // Allocate Clinical Services categorized by modality (Siêu âm, Xquang, CT/MRI, Xét nghiệm)
-                var (orderedServices, q2Instruction, serviceChange, pickedSieuAm, pickedXquang) = AllocateClinicalServices(allServicesWithGroup, rng);
+                var (orderedServices, q2Instruction, serviceChange, pickedSieuAm, pickedXquang) = AllocateClinicalServices(allServicesWithGroup, rng, usedClsCodesInDept);
 
                 // Check if template contains question for ordering drugs & supplies
                 var hasDrugOrderAction = actions.Any(a => a.Code.Equals("YL_CHI_DINH_THUOC_VTYT", StringComparison.OrdinalIgnoreCase));
@@ -361,7 +404,23 @@ public sealed class ExamScenarioAllocator
                 if (hasDrugOrderAction)
                 {
                     // Allocate Drugs: Standard 3 BH + 2 VP, or GMHS surgical supply list, or Specialty clinic supply list
-                    orderedDrugs = AllocateCandidateDrugs(inStockCandidateDrugs, remainingStock, targetWh.WarehouseName, deptName, group.Count(), rng, isGmhs, isLienChuyenKhoa);
+                    // Checks Kho lẻ thuốc nội trú (for Thuốc) and Kho lẻ vật tư (for Vật tư y tế) when configured
+                    orderedDrugs = AllocateCandidateDrugs(
+                        inStockCandidateDrugs,
+                        remainingStock,
+                        targetWh.WarehouseCode,
+                        targetWh.WarehouseName,
+                        deptName,
+                        group.Count(),
+                        rng,
+                        isGmhs,
+                        isLienChuyenKhoa,
+                        hasKhoLeThuocConfig,
+                        khoLeThuocDrugs,
+                        khoLeThuocStockMap,
+                        hasKhoLeVatTuConfig,
+                        khoLeVatTuDrugs,
+                        khoLeVatTuStockMap);
 
                     if (orderedDrugs.Count > 0 && !isGmhs && !isLienChuyenKhoa)
                     {
@@ -376,23 +435,30 @@ public sealed class ExamScenarioAllocator
                     drugReturn = null;
                 }
 
-                // Inventory check period item for Q6 / TK_KIEM_TON_KHO (Pre-calculated fixed periods before March 2026)
+                // Inventory check period item for Q6 / TK_KIEM_TON_KHO:
+                // Bắt buộc phải lấy số liệu thực tế ở đúng kho của khoa dự thi (targetWh), không lấy nhầm kho của khoa khác
+                var orderedDrugCodes = orderedDrugs.Select(d => d.Code).ToHashSet(StringComparer.OrdinalIgnoreCase);
+                var deptWarehouseDrugMap = inStockCandidateDrugs
+                    .GroupBy(d => d.DrugCode, StringComparer.OrdinalIgnoreCase)
+                    .ToDictionary(g => g.Key, g => g.First(), StringComparer.OrdinalIgnoreCase);
+
                 var deptPeriods = allInventoryPeriods
-                    .Where(p => (!string.IsNullOrWhiteSpace(p.WarehouseCode) && p.WarehouseCode.Equals(targetWh.WarehouseCode, StringComparison.OrdinalIgnoreCase)) ||
-                                (!string.IsNullOrWhiteSpace(p.DepartmentCode) && p.DepartmentCode.Equals(deptCode, StringComparison.OrdinalIgnoreCase)))
+                    .Where(p => !string.IsNullOrWhiteSpace(p.WarehouseCode) &&
+                                p.WarehouseCode.Equals(targetWh.WarehouseCode, StringComparison.OrdinalIgnoreCase) &&
+                                p.ClosingStock > 0 &&
+                                (deptWarehouseDrugMap.Count == 0 || deptWarehouseDrugMap.ContainsKey(p.DrugCode)))
                     .ToList();
-                if (deptPeriods.Count == 0 && allInventoryPeriods.Count > 0)
-                {
-                    deptPeriods = allInventoryPeriods.ToList();
-                }
 
                 InventoryCheckPeriodItem? inventoryPeriodItem = null;
                 ScenarioDrug inventoryCheckDrug;
 
                 if (deptPeriods.Count > 0)
                 {
-                    var vpPeriods = deptPeriods.Where(p => p.FundingSource.Equals("Viện phí", StringComparison.OrdinalIgnoreCase)).ToList();
-                    var pool = vpPeriods.Count > 0 ? vpPeriods : deptPeriods;
+                    // Ưu tiên dược/VTYT không nằm trong danh sách vừa lên y lệnh ở Câu 3 để tránh biến động tồn kho trong lúc thi
+                    var nonOrderedPeriods = deptPeriods.Where(p => !orderedDrugCodes.Contains(p.DrugCode)).ToList();
+                    var candidatePeriods = nonOrderedPeriods.Count > 0 ? nonOrderedPeriods : deptPeriods;
+                    var vpPeriods = candidatePeriods.Where(p => p.FundingSource.Equals("Viện phí", StringComparison.OrdinalIgnoreCase)).ToList();
+                    var pool = vpPeriods.Count > 0 ? vpPeriods : candidatePeriods;
                     var picked = pool[rng.Next(pool.Count)];
 
                     DateOnly.TryParse(picked.FromDate.Length >= 10 ? picked.FromDate[..10] : picked.FromDate, out var pFrom);
@@ -400,19 +466,22 @@ public sealed class ExamScenarioAllocator
                     if (pFrom == default) pFrom = new DateOnly(2026, 2, 1);
                     if (pTo == default) pTo = new DateOnly(2026, 2, 28);
 
+                    var actualStock = picked.ClosingStock;
+                    var actualQtyInt = (int)Math.Max(1, Math.Round(actualStock));
+
                     inventoryPeriodItem = new InventoryCheckPeriodItem(
                         picked.PeriodCode,
                         picked.PeriodName,
                         pFrom,
                         pTo,
-                        picked.WarehouseCode,
-                        picked.WarehouseName,
-                        picked.DepartmentCode,
-                        picked.DepartmentName,
+                        targetWh.WarehouseCode,
+                        targetWh.WarehouseName,
+                        deptCode,
+                        deptName,
                         picked.DrugCode,
                         picked.DrugName,
                         picked.Unit,
-                        picked.ClosingStock,
+                        actualStock,
                         picked.FundingSource
                     );
 
@@ -420,20 +489,39 @@ public sealed class ExamScenarioAllocator
                         picked.DrugCode,
                         picked.DrugName,
                         picked.Unit,
-                        0,
+                        actualQtyInt,
                         "",
-                        picked.WarehouseCode,
-                        picked.WarehouseName,
+                        targetWh.WarehouseCode,
+                        targetWh.WarehouseName,
                         picked.FundingSource
                     );
                 }
                 else
                 {
-                    // Fallback to warehouse stock if periods not populated yet
-                    var vpDrugsForCheck = warehouseDrugs.Where(d => d.FundingSource.Equals("Viện phí", StringComparison.OrdinalIgnoreCase)).ToList();
-                    var invPool = vpDrugsForCheck.Count > 0 ? vpDrugsForCheck : warehouseDrugs;
+                    // Lấy trực tiếp số liệu tồn kho thực tế từ kho của khoa (targetWh) tại thời điểm thi
+                    var basePool = inStockCandidateDrugs.Count > 0 ? inStockCandidateDrugs : warehouseDrugs;
+                    var nonOrderedDrugs = basePool.Where(d => !orderedDrugCodes.Contains(d.DrugCode)).ToList();
+                    var candidatePool = nonOrderedDrugs.Count > 0 ? nonOrderedDrugs : basePool;
+                    var vpDrugsForCheck = candidatePool.Where(d => d.FundingSource.Equals("Viện phí", StringComparison.OrdinalIgnoreCase)).ToList();
+                    var invPool = vpDrugsForCheck.Count > 0 ? vpDrugsForCheck : candidatePool;
                     var invDrugRow = invPool[rng.Next(invPool.Count)];
-                    inventoryCheckDrug = new ScenarioDrug(invDrugRow.DrugCode, invDrugRow.DrugName, invDrugRow.Unit, 0, "", invDrugRow.WarehouseCode, invDrugRow.WarehouseName, invDrugRow.FundingSource);
+
+                    var actualStock = invDrugRow.QuantityOnHand;
+                    var actualQtyInt = (int)Math.Max(1, Math.Round(actualStock));
+
+                    // Không gán kỳ giả mạo khi kho chưa có số liệu kỳ, để đề thi và đáp án thống nhất hỏi tồn kho hiện tại tại ngày thi
+                    inventoryPeriodItem = null;
+
+                    inventoryCheckDrug = new ScenarioDrug(
+                        invDrugRow.DrugCode,
+                        invDrugRow.DrugName,
+                        invDrugRow.Unit,
+                        actualQtyInt,
+                        "",
+                        targetWh.WarehouseCode,
+                        targetWh.WarehouseName,
+                        invDrugRow.FundingSource
+                    );
                 }
 
                 // Inpatient and outpatient cases for lookup / advance payment / discharge
@@ -444,21 +532,57 @@ public sealed class ExamScenarioAllocator
                 OutpatientCase? outLookupCase = null;
                 OutpatientCase? advanceOutpatientCase = null;
 
+                var needsAdvanceCase = actions.Any(a =>
+                    a.Code.StartsWith("LT_THU_TAM_UNG", StringComparison.OrdinalIgnoreCase) ||
+                    a.Code.StartsWith("TC_THU_TAM_UNG", StringComparison.OrdinalIgnoreCase) ||
+                    (isLienChuyenKhoa && a.Code.StartsWith("KB_CHI_DINH_NOI_TRU", StringComparison.OrdinalIgnoreCase)));
+                var needsInLookupCase = actions.Any(a =>
+                    a.Code.StartsWith("LT_TRA_CUU_THONG_TIN", StringComparison.OrdinalIgnoreCase) ||
+                    a.Code.StartsWith("HC_TRA_CUU_THANH_TOAN", StringComparison.OrdinalIgnoreCase));
+                var needsDischargeCase = actions.Any(a =>
+                    a.Code.StartsWith("LT_THANH_TOAN_RA_VIEN", StringComparison.OrdinalIgnoreCase) ||
+                    a.Code.StartsWith("TC_THANH_TOAN_RA_VIEN", StringComparison.OrdinalIgnoreCase));
+
+                var needsInpatientCases = isGmhs || needsAdvanceCase || needsInLookupCase || needsDischargeCase;
+                var needsOutpatientCases = actions.Any(a =>
+                    a.Code.StartsWith("LT_THU_TAM_UNG_NOI_TRU", StringComparison.OrdinalIgnoreCase) ||
+                    a.Code.StartsWith("LT_TRA_CUU_THONG_TIN", StringComparison.OrdinalIgnoreCase) ||
+                    a.Code.StartsWith("TC_TRA_CUU_BENH_SU", StringComparison.OrdinalIgnoreCase) ||
+                    (isLienChuyenKhoa && a.Code.StartsWith("KB_BENH_AN_NGOAI_TRU", StringComparison.OrdinalIgnoreCase)));
+
+                if (needsInpatientCases && allInpatients.Count == 0)
+                {
+                    throw new InvalidOperationException($"Mẫu đề '{tpl.Name}' có câu hỏi yêu cầu dữ liệu Bệnh án nội trú (Thu tạm ứng / Thanh toán ra viện / Tra cứu buồng giường / GMHS), nhưng CSDL chưa có dữ liệu Bệnh án nội trú nào. Vui lòng vào phân hệ 'Cài đặt & Danh mục HIS' và bấm 'Đồng bộ Catalog HIS'.");
+                }
+
+                if (needsOutpatientCases && allOutpatients.Count == 0)
+                {
+                    throw new InvalidOperationException($"Mẫu đề '{tpl.Name}' có câu hỏi yêu cầu dữ liệu Bệnh án ngoại trú (Tạm ứng ngoại trú / Tra cứu lịch sử KCB / Bệnh án ngoại trú), nhưng CSDL chưa có dữ liệu Bệnh án ngoại trú nào. Vui lòng vào phân hệ 'Cài đặt & Danh mục HIS' và bấm 'Đồng bộ Catalog HIS'.");
+                }
+
                 if (allInpatients.Count > 0)
                 {
                     var inPool = allInpatients.OrderBy(_ => rng.Next()).ToList();
-                    advanceCase1 = MapInpatientRow(inPool[0 % inPool.Count]);
-                    advanceCase2 = inPool.Count > 1 ? MapInpatientRow(inPool[1 % inPool.Count]) : advanceCase1;
-                    var withBed = inPool.FirstOrDefault(c => !string.IsNullOrWhiteSpace(c.BedCode) && !string.IsNullOrWhiteSpace(c.RoomName));
-                    inLookupCase = MapInpatientRow(withBed ?? inPool[2 % inPool.Count]);
-                    dischargeCase = MapInpatientRow(inPool[3 % inPool.Count]);
-                }
-                else
-                {
-                    advanceCase1 = new InpatientCase("mock_ba1", "21.004865", "21004865", "Bệnh nhân Tạm Ứng 1", "Nam", "1980", "Buôn Ma Thuột", deptCode, deptName, "P101", "Phòng 101", "G01", "Tầng 1", $"{examDate.Year}-01-10", null, null, null, 5, null, "Điều trị nội trú", null);
-                    advanceCase2 = new InpatientCase("mock_ba2", "21001726/NG", "21001726", "Bệnh nhân Tạm Ứng 2", "Nữ", "1985", "Buôn Ma Thuột", deptCode, deptName, "P102", "Phòng 102", "G02", "Tầng 1", $"{examDate.Year}-01-12", null, null, null, 3, null, "Điều trị ngoại trú", null);
-                    inLookupCase = new InpatientCase("mock_ba3", "21.001989", "21001989", "Lê Văn Dũng", "Nam", "1989", "Buôn Ma Thuột", deptCode, deptName, "P204", "Phòng 204", "G08", "Tầng 2", $"{examDate.Year}-02-01", null, null, null, 10, null, "Viêm ruột thừa", null);
-                    dischargeCase = new InpatientCase("mock_ba5", "21.004266", "21004266", "Bệnh nhân Ra Viện", "Nam", "1975", "Buôn Ma Thuột", deptCode, deptName, "P103", "Phòng 103", "G03", "Tầng 1", $"{examDate.Year}-01-05", null, null, null, 15, null, "Khỏi bệnh", null);
+                    var candidateUsedSoBenhAn = new HashSet<string>(usedInpatientSoBenhAn, StringComparer.OrdinalIgnoreCase);
+
+                    // Ưu tiên chọn bệnh án cho Câu 6 (Thanh toán ra viện) trước để đảm bảo hoàn toàn độc lập với mọi số bệnh án khác trong đợt thi
+                    var distinctDischargeRow = PickDistinctInpatient(inPool, candidateUsedSoBenhAn, markGlobal: needsDischargeCase ? usedInpatientSoBenhAn : null);
+                    dischargeCase = MapInpatientRow(distinctDischargeRow);
+
+                    var advRow1 = PickDistinctInpatient(inPool, candidateUsedSoBenhAn, markGlobal: needsAdvanceCase ? usedInpatientSoBenhAn : null);
+                    advanceCase1 = MapInpatientRow(advRow1);
+
+                    var advRow2 = inPool.Count > 1
+                        ? PickDistinctInpatient(inPool, candidateUsedSoBenhAn, markGlobal: needsAdvanceCase ? usedInpatientSoBenhAn : null)
+                        : advRow1;
+                    advanceCase2 = MapInpatientRow(advRow2);
+
+                    var lookupRow = PickDistinctInpatient(
+                        inPool,
+                        candidateUsedSoBenhAn,
+                        c => !string.IsNullOrWhiteSpace(c.BedCode) && !string.IsNullOrWhiteSpace(c.RoomName),
+                        markGlobal: needsInLookupCase ? usedInpatientSoBenhAn : null);
+                    inLookupCase = MapInpatientRow(lookupRow);
                 }
 
                 if (allOutpatients.Count > 0)
@@ -468,11 +592,6 @@ public sealed class ExamScenarioAllocator
                     advanceOutpatientCase = outPool.Count > 1
                         ? MapOutpatientRow(outPool[1 % outPool.Count])
                         : outLookupCase;
-                }
-                else
-                {
-                    outLookupCase = new OutpatientCase("mock_ba4", "21.001973", "21.0012", "21001973", "Đỗ Phúc Huy", "Nam", "1973", "23 Trần Phú , P.Thắng Lợi, Tp.BMT, Đắk Lắk", deptCode, deptName, null, null, null, "10/01/2026", "15/02/2026", "10/01/2026", 35, null, "Viêm phế quản mãn", null);
-                    advanceOutpatientCase = new OutpatientCase("mock_bant_adv", "21001726/NG", "21001726", "21001726", "Bệnh nhân Tạm Ứng Ngoại Trú", "Nữ", "1985", "Buôn Ma Thuột", deptCode, deptName, null, null, null, "12/01/2026", "20/01/2026", "12/01/2026", 3, null, "Điều trị ngoại trú", null);
                 }
 
                 // Build Questions with detailed instructions and dotted lines
@@ -514,7 +633,8 @@ public sealed class ExamScenarioAllocator
                         isGmhs,
                         isLienChuyenKhoa,
                         pickedSpecialtyCls,
-                        pickedSpecialtyThuThuat);
+                        pickedSpecialtyThuThuat,
+                        orderedServices);
 
                     questions.Add(new ScenarioQuestion(aIdx + 1, act.Code, act.Name, instruction, act.Score));
                 }
@@ -563,67 +683,197 @@ public sealed class ExamScenarioAllocator
     private static List<ScenarioDrug> AllocateCandidateDrugs(
         IReadOnlyList<SnapshotDrugRow> allWarehouseDrugs,
         Dictionary<string, double> remainingStock,
+        string warehouseCode,
         string warehouseName,
         string departmentName,
         int totalCandidates,
         Random rng,
         bool isGmhs = false,
-        bool isLienChuyenKhoa = false)
+        bool isLienChuyenKhoa = false,
+        bool hasKhoLeThuocConfig = false,
+        IReadOnlyList<SnapshotDrugRow>? khoLeThuocDrugs = null,
+        Dictionary<string, double>? khoLeThuocStockMap = null,
+        bool hasKhoLeVatTuConfig = false,
+        IReadOnlyList<SnapshotDrugRow>? khoLeVatTuDrugs = null,
+        Dictionary<string, double>? khoLeVatTuStockMap = null)
     {
         var orderedDrugs = new List<ScenarioDrug>();
         var alreadyPickedCodes = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
-        // Pattern for allocation: GMHS uses surgical consumables, Liên chuyên khoa uses specialty clinic consumables (Viện phí VP)
-        (string PreferredSource, int DesiredQty)[] preferredSlots;
+        // Pattern for allocation:
+        // - Standard inpatient/clinical: 3 BHYT (Thuốc - Kho lẻ thuốc nội trú) + 2 Viện phí (VTYT - Kho lẻ vật tư)
+        // - GMHS: 3 Thuốc + 3 VTYT (hoặc theo kho lẻ khả dụng)
+        // - Liên chuyên khoa: 4 Thuốc + 4 VTYT (hoặc theo kho lẻ khả dụng)
+        (string PreferredSource, int DesiredQty, bool IsSupplySlot)[] preferredSlots;
         if (isGmhs)
         {
-            preferredSlots = new (string PreferredSource, int DesiredQty)[]
+            preferredSlots = new (string PreferredSource, int DesiredQty, bool IsSupplySlot)[]
             {
-                ("Viện phí", 1),
-                ("Viện phí", 1),
-                ("Viện phí", 2),
-                ("Viện phí", 5),
-                ("Viện phí", 2),
-                ("Viện phí", 2)
+                ("Viện phí", 1, false),
+                ("Viện phí", 1, false),
+                ("Viện phí", 2, false),
+                ("Viện phí", 5, true),
+                ("Viện phí", 2, true),
+                ("Viện phí", 2, true)
             };
         }
         else if (isLienChuyenKhoa)
         {
-            preferredSlots = new (string PreferredSource, int DesiredQty)[]
+            preferredSlots = new (string PreferredSource, int DesiredQty, bool IsSupplySlot)[]
             {
-                ("Viện phí", 1),
-                ("Viện phí", 1),
-                ("Viện phí", 1),
-                ("Viện phí", 1),
-                ("Viện phí", 1),
-                ("Viện phí", 1),
-                ("Viện phí", 1),
-                ("Viện phí", 1)
+                ("Viện phí", 1, false),
+                ("Viện phí", 1, false),
+                ("Viện phí", 1, false),
+                ("Viện phí", 1, false),
+                ("Viện phí", 1, true),
+                ("Viện phí", 1, true),
+                ("Viện phí", 1, true),
+                ("Viện phí", 1, true)
             };
         }
         else
         {
-            preferredSlots = new (string PreferredSource, int DesiredQty)[]
+            preferredSlots = new (string PreferredSource, int DesiredQty, bool IsSupplySlot)[]
             {
-                ("BHYT", 1),
-                ("BHYT", 2),
-                ("BHYT", 1),
-                ("Viện phí", 2),
-                ("Viện phí", 2)
+                ("BHYT", 1, false),
+                ("BHYT", 2, false),
+                ("BHYT", 1, false),
+                ("Viện phí", 2, true),
+                ("Viện phí", 2, true)
             };
         }
 
-        var targetCount = Math.Min(preferredSlots.Length, allWarehouseDrugs.Count);
+        var availablePoolCount = allWarehouseDrugs.Count;
+        if (hasKhoLeThuocConfig && khoLeThuocDrugs is not null)
+        {
+            availablePoolCount = Math.Max(availablePoolCount, khoLeThuocDrugs.Count + (khoLeVatTuDrugs?.Count ?? 0));
+        }
+        else if (hasKhoLeVatTuConfig && khoLeVatTuDrugs is not null)
+        {
+            availablePoolCount = Math.Max(availablePoolCount, khoLeVatTuDrugs.Count + allWarehouseDrugs.Count);
+        }
+
+        var targetCount = Math.Min(preferredSlots.Length, Math.Max(1, availablePoolCount));
 
         for (var slotIdx = 0; slotIdx < targetCount; slotIdx++)
         {
-            var (prefSource, desiredQty) = preferredSlots[slotIdx];
+            var (prefSource, desiredQty, isSupplySlot) = preferredSlots[slotIdx];
 
-            // 1. Try finding available items in preferred funding source with remaining stock >= desiredQty
+            // Determine if this slot must be verified against Kho lẻ thuốc nội trú (Thuốc) or Kho lẻ vật tư (VTYT)
+            var checkKhoLeThuoc = !isSupplySlot && hasKhoLeThuocConfig;
+            var checkKhoLeVatTu = isSupplySlot && hasKhoLeVatTuConfig;
+
+            if (checkKhoLeThuoc)
+            {
+                if (khoLeThuocDrugs == null || khoLeThuocStockMap == null || khoLeThuocDrugs.Count == 0)
+                {
+                    throw new InvalidOperationException(
+                        $"Kho lẻ thuốc nội trú không có tồn kho thuốc khả dụng để xuất phiếu lĩnh cho khoa '{departmentName}'. Vui lòng kiểm tra/bổ sung tồn kho tại Kho lẻ thuốc nội trú trên HIS.");
+                }
+
+                var chosen = PickDrugWithCentralWarehouseCheck(
+                    allWarehouseDrugs,
+                    remainingStock,
+                    khoLeThuocDrugs,
+                    khoLeThuocStockMap,
+                    alreadyPickedCodes,
+                    prefSource,
+                    desiredQty,
+                    expectSupply: false,
+                    rng);
+
+                if (chosen is null)
+                {
+                    throw new InvalidOperationException(
+                        $"Kho lẻ thuốc nội trú không đủ tồn kho thuốc khả dụng để xuất phiếu lĩnh cho {totalCandidates} thí sinh khoa '{departmentName}'. Vui lòng cập nhật/bổ sung thêm tồn kho tại Kho lẻ thuốc nội trú trên HIS.");
+                }
+
+                var centralAvail = khoLeThuocStockMap.GetValueOrDefault(chosen.DrugCode, 0);
+                var localAvail = remainingStock.TryGetValue(chosen.DrugCode, out var lRem) ? lRem : centralAvail;
+                var avail = Math.Min(centralAvail, localAvail > 0 ? localAvail : centralAvail);
+                var actualQty = avail >= desiredQty ? desiredQty : (int)Math.Max(1, avail);
+
+                khoLeThuocStockMap[chosen.DrugCode] = Math.Max(0, centralAvail - actualQty);
+                if (remainingStock.ContainsKey(chosen.DrugCode))
+                {
+                    remainingStock[chosen.DrugCode] = Math.Max(0, remainingStock[chosen.DrugCode] - actualQty);
+                }
+                alreadyPickedCodes.Add(chosen.DrugCode);
+
+                orderedDrugs.Add(CreateScenarioDrugItem(chosen, actualQty, warehouseCode, warehouseName, isGmhs, isLienChuyenKhoa));
+                continue;
+            }
+
+            if (checkKhoLeVatTu)
+            {
+                if (khoLeVatTuDrugs == null || khoLeVatTuStockMap == null || khoLeVatTuDrugs.Count == 0)
+                {
+                    throw new InvalidOperationException(
+                        $"Kho lẻ vật tư không có tồn kho vật tư y tế khả dụng để xuất phiếu lĩnh cho khoa '{departmentName}'. Vui lòng kiểm tra/bổ sung tồn kho tại Kho lẻ vật tư trên HIS.");
+                }
+
+                var chosen = PickDrugWithCentralWarehouseCheck(
+                    allWarehouseDrugs,
+                    remainingStock,
+                    khoLeVatTuDrugs,
+                    khoLeVatTuStockMap,
+                    alreadyPickedCodes,
+                    prefSource,
+                    desiredQty,
+                    expectSupply: true,
+                    rng);
+
+                if (chosen is null)
+                {
+                    throw new InvalidOperationException(
+                        $"Kho lẻ vật tư không đủ tồn kho vật tư y tế khả dụng để xuất phiếu lĩnh cho {totalCandidates} thí sinh khoa '{departmentName}'. Vui lòng cập nhật/bổ sung thêm tồn kho tại Kho lẻ vật tư trên HIS.");
+                }
+
+                var centralAvail = khoLeVatTuStockMap.GetValueOrDefault(chosen.DrugCode, 0);
+                var localAvail = remainingStock.TryGetValue(chosen.DrugCode, out var lRem) ? lRem : centralAvail;
+                var avail = Math.Min(centralAvail, localAvail > 0 ? localAvail : centralAvail);
+                var actualQty = avail >= desiredQty ? desiredQty : (int)Math.Max(1, avail);
+
+                khoLeVatTuStockMap[chosen.DrugCode] = Math.Max(0, centralAvail - actualQty);
+                if (remainingStock.ContainsKey(chosen.DrugCode))
+                {
+                    remainingStock[chosen.DrugCode] = Math.Max(0, remainingStock[chosen.DrugCode] - actualQty);
+                }
+                alreadyPickedCodes.Add(chosen.DrugCode);
+
+                orderedDrugs.Add(CreateScenarioDrugItem(chosen, actualQty, warehouseCode, warehouseName, isGmhs, isLienChuyenKhoa));
+                continue;
+            }
+
+            // Fallback when central Kho lẻ thuốc nội trú / Kho lẻ vật tư is not configured for this slot:
+            // Still verify if an item in targetWh belongs to a configured central warehouse
+            bool MatchesSlotType(SnapshotDrugRow d) => IsMedicalSupplyItem(d) == isSupplySlot;
+
+            bool IsEligibleInTargetWh(SnapshotDrugRow d, int minQty, bool enforceType = true)
+            {
+                if (enforceType && !MatchesSlotType(d))
+                    return false;
+
+                if (!remainingStock.TryGetValue(d.DrugCode, out var rem) || rem < minQty)
+                    return false;
+
+                var isSupply = IsMedicalSupplyItem(d);
+                if (isSupply && hasKhoLeVatTuConfig)
+                {
+                    return khoLeVatTuStockMap != null && khoLeVatTuStockMap.TryGetValue(d.DrugCode, out var cRem) && cRem >= minQty;
+                }
+                if (!isSupply && hasKhoLeThuocConfig)
+                {
+                    return khoLeThuocStockMap != null && khoLeThuocStockMap.TryGetValue(d.DrugCode, out var cRem) && cRem >= minQty;
+                }
+                return true;
+            }
+
+            // 1. Try finding available items in preferred funding source with remaining stock >= desiredQty matching slot type
             var candidateItems = allWarehouseDrugs
                 .Where(d => !alreadyPickedCodes.Contains(d.DrugCode)
                             && d.FundingSource.Equals(prefSource, StringComparison.OrdinalIgnoreCase)
-                            && remainingStock.TryGetValue(d.DrugCode, out var rem) && rem >= desiredQty)
+                            && IsEligibleInTargetWh(d, desiredQty, enforceType: true))
                 .ToList();
 
             // 2. If no item has >= desiredQty, try items in preferred source with remaining stock >= 1
@@ -632,7 +882,7 @@ public sealed class ExamScenarioAllocator
                 candidateItems = allWarehouseDrugs
                     .Where(d => !alreadyPickedCodes.Contains(d.DrugCode)
                                 && d.FundingSource.Equals(prefSource, StringComparison.OrdinalIgnoreCase)
-                                && remainingStock.TryGetValue(d.DrugCode, out var rem) && rem >= 1)
+                                && IsEligibleInTargetWh(d, 1, enforceType: true))
                     .ToList();
             }
 
@@ -641,7 +891,7 @@ public sealed class ExamScenarioAllocator
             {
                 candidateItems = allWarehouseDrugs
                     .Where(d => !alreadyPickedCodes.Contains(d.DrugCode)
-                                && remainingStock.TryGetValue(d.DrugCode, out var rem) && rem >= desiredQty)
+                                && IsEligibleInTargetWh(d, desiredQty, enforceType: true))
                     .ToList();
             }
 
@@ -650,15 +900,23 @@ public sealed class ExamScenarioAllocator
             {
                 candidateItems = allWarehouseDrugs
                     .Where(d => !alreadyPickedCodes.Contains(d.DrugCode)
-                                && remainingStock.TryGetValue(d.DrugCode, out var rem) && rem >= 1)
+                                && IsEligibleInTargetWh(d, 1, enforceType: true))
                     .ToList();
             }
 
-            // 5. If all warehouse items were already picked by this candidate, allow reuse if remaining stock >= 1
+            // 5. If all warehouse items matching type were already picked by this candidate, allow reuse if remaining stock >= 1
             if (candidateItems.Count == 0)
             {
                 candidateItems = allWarehouseDrugs
-                    .Where(d => remainingStock.TryGetValue(d.DrugCode, out var rem) && rem >= 1)
+                    .Where(d => IsEligibleInTargetWh(d, 1, enforceType: true))
+                    .ToList();
+            }
+
+            // 6. Relax type matching if pool has no items of that specific type (backward compatibility fallback)
+            if (candidateItems.Count == 0)
+            {
+                candidateItems = allWarehouseDrugs
+                    .Where(d => IsEligibleInTargetWh(d, 1, enforceType: false))
                     .ToList();
             }
 
@@ -668,41 +926,359 @@ public sealed class ExamScenarioAllocator
             }
 
             // Pick an item (randomized to spread among candidates if multiple items exist)
-            var chosen = candidateItems[rng.Next(candidateItems.Count)];
-            var avail = remainingStock[chosen.DrugCode];
-            var actualQty = avail >= desiredQty ? desiredQty : (int)Math.Max(1, avail);
+            var fallbackChosen = candidateItems[rng.Next(candidateItems.Count)];
+            var fallbackAvail = remainingStock[fallbackChosen.DrugCode];
+            if (hasKhoLeThuocConfig && khoLeThuocStockMap != null && khoLeThuocStockMap.TryGetValue(fallbackChosen.DrugCode, out var ktRem))
+            {
+                fallbackAvail = Math.Min(fallbackAvail, ktRem);
+            }
+            if (hasKhoLeVatTuConfig && khoLeVatTuStockMap != null && khoLeVatTuStockMap.TryGetValue(fallbackChosen.DrugCode, out var kvRem))
+            {
+                fallbackAvail = Math.Min(fallbackAvail, kvRem);
+            }
+
+            var fallbackActualQty = fallbackAvail >= desiredQty ? desiredQty : (int)Math.Max(1, fallbackAvail);
 
             // Deduct from remaining stock so subsequent candidates will never exceed QuantityOnHand
-            remainingStock[chosen.DrugCode] -= actualQty;
-            alreadyPickedCodes.Add(chosen.DrugCode);
+            remainingStock[fallbackChosen.DrugCode] -= fallbackActualQty;
+            if (khoLeThuocStockMap != null && khoLeThuocStockMap.ContainsKey(fallbackChosen.DrugCode))
+            {
+                khoLeThuocStockMap[fallbackChosen.DrugCode] = Math.Max(0, khoLeThuocStockMap[fallbackChosen.DrugCode] - fallbackActualQty);
+            }
+            if (khoLeVatTuStockMap != null && khoLeVatTuStockMap.ContainsKey(fallbackChosen.DrugCode))
+            {
+                khoLeVatTuStockMap[fallbackChosen.DrugCode] = Math.Max(0, khoLeVatTuStockMap[fallbackChosen.DrugCode] - fallbackActualQty);
+            }
+            alreadyPickedCodes.Add(fallbackChosen.DrugCode);
 
-            var usage = isGmhs
-                ? "Dùng trong phẫu thuật"
-                : (isLienChuyenKhoa
-                    ? "Cơ số tủ trực"
-                    : (chosen.Unit.Contains("Chai", StringComparison.OrdinalIgnoreCase)
-                        ? "Truyền tĩnh mạch XL giọt/phút"
-                        : (chosen.Unit.Contains("Lọ", StringComparison.OrdinalIgnoreCase) || chosen.Unit.Contains("Ống", StringComparison.OrdinalIgnoreCase)
-                            ? "Tiêm bắp 01 ống lúc 08h00"
-                            : "Sáng 1 viên, chiều 1 viên sau ăn")));
-
-            orderedDrugs.Add(new ScenarioDrug(
-                chosen.DrugCode,
-                chosen.DrugName,
-                chosen.Unit,
-                actualQty,
-                usage,
-                chosen.WarehouseCode,
-                chosen.WarehouseName,
-                chosen.FundingSource));
+            orderedDrugs.Add(CreateScenarioDrugItem(fallbackChosen, fallbackActualQty, warehouseCode, warehouseName, isGmhs, isLienChuyenKhoa));
         }
 
         return orderedDrugs;
     }
 
+    private static SnapshotDrugRow? PickDrugWithCentralWarehouseCheck(
+        IReadOnlyList<SnapshotDrugRow> departmentWarehouseDrugs,
+        Dictionary<string, double> departmentStockMap,
+        IReadOnlyList<SnapshotDrugRow> centralWarehouseDrugs,
+        Dictionary<string, double> centralStockMap,
+        HashSet<string> alreadyPickedCodes,
+        string preferredSource,
+        int desiredQty,
+        bool expectSupply,
+        Random rng)
+    {
+        bool MatchesType(SnapshotDrugRow d) => IsMedicalSupplyItem(d) == expectSupply;
+
+        bool HasCentralAndDeptStock(SnapshotDrugRow d, int minQty, bool enforceType = true) =>
+            (!enforceType || MatchesType(d)) &&
+            centralStockMap.TryGetValue(d.DrugCode, out var cRem) && cRem >= minQty &&
+            departmentStockMap.TryGetValue(d.DrugCode, out var dRem) && dRem >= minQty;
+
+        bool HasCentralStock(SnapshotDrugRow d, int minQty, bool enforceType = true) =>
+            (!enforceType || MatchesType(d)) &&
+            centralStockMap.TryGetValue(d.DrugCode, out var cRem) && cRem >= minQty;
+
+        // 1. Prefer items present in BOTH department warehouse and central Kho lẻ with preferred source and stock >= desiredQty
+        var candidates = departmentWarehouseDrugs
+            .Where(d => !alreadyPickedCodes.Contains(d.DrugCode) &&
+                        d.FundingSource.Equals(preferredSource, StringComparison.OrdinalIgnoreCase) &&
+                        HasCentralAndDeptStock(d, desiredQty, enforceType: true))
+            .ToList();
+
+        // 2. Items in central Kho lẻ with preferred source and stock >= desiredQty
+        if (candidates.Count == 0)
+        {
+            candidates = centralWarehouseDrugs
+                .Where(d => !alreadyPickedCodes.Contains(d.DrugCode) &&
+                            d.FundingSource.Equals(preferredSource, StringComparison.OrdinalIgnoreCase) &&
+                            HasCentralStock(d, desiredQty, enforceType: true))
+                .ToList();
+        }
+
+        // 3. Items in BOTH department warehouse and central Kho lẻ with stock >= desiredQty (any source)
+        if (candidates.Count == 0)
+        {
+            candidates = departmentWarehouseDrugs
+                .Where(d => !alreadyPickedCodes.Contains(d.DrugCode) &&
+                            HasCentralAndDeptStock(d, desiredQty, enforceType: true))
+                .ToList();
+        }
+
+        // 4. Items in central Kho lẻ with stock >= desiredQty (any source)
+        if (candidates.Count == 0)
+        {
+            candidates = centralWarehouseDrugs
+                .Where(d => !alreadyPickedCodes.Contains(d.DrugCode) &&
+                            HasCentralStock(d, desiredQty, enforceType: true))
+                .ToList();
+        }
+
+        // 5. Items in BOTH or central Kho lẻ with stock >= 1 (preferred source, then any source)
+        if (candidates.Count == 0)
+        {
+            candidates = departmentWarehouseDrugs
+                .Where(d => !alreadyPickedCodes.Contains(d.DrugCode) &&
+                            d.FundingSource.Equals(preferredSource, StringComparison.OrdinalIgnoreCase) &&
+                            HasCentralAndDeptStock(d, 1, enforceType: true))
+                .ToList();
+        }
+        if (candidates.Count == 0)
+        {
+            candidates = centralWarehouseDrugs
+                .Where(d => !alreadyPickedCodes.Contains(d.DrugCode) &&
+                            d.FundingSource.Equals(preferredSource, StringComparison.OrdinalIgnoreCase) &&
+                            HasCentralStock(d, 1, enforceType: true))
+                .ToList();
+        }
+        if (candidates.Count == 0)
+        {
+            candidates = centralWarehouseDrugs
+                .Where(d => !alreadyPickedCodes.Contains(d.DrugCode) &&
+                            HasCentralStock(d, 1, enforceType: true))
+                .ToList();
+        }
+
+        // 6. Allow reuse if all distinct items in central Kho lẻ were already picked by this candidate
+        if (candidates.Count == 0)
+        {
+            candidates = centralWarehouseDrugs
+                .Where(d => HasCentralStock(d, 1, enforceType: true))
+                .ToList();
+        }
+
+        // 7. Fallback relaxation if central warehouse has stock but no items strictly matching expectSupply
+        if (candidates.Count == 0)
+        {
+            candidates = centralWarehouseDrugs
+                .Where(d => HasCentralStock(d, 1, enforceType: false))
+                .ToList();
+        }
+
+        if (candidates.Count == 0)
+        {
+            return null;
+        }
+
+        return candidates[rng.Next(candidates.Count)];
+    }
+
+    private static ScenarioDrug CreateScenarioDrugItem(
+        SnapshotDrugRow chosen,
+        int actualQty,
+        string targetWarehouseCode,
+        string targetWarehouseName,
+        bool isGmhs,
+        bool isLienChuyenKhoa)
+    {
+        var usage = isGmhs
+            ? "Dùng trong phẫu thuật"
+            : (isLienChuyenKhoa
+                ? "Cơ số tủ trực"
+                : (chosen.Unit.Contains("Chai", StringComparison.OrdinalIgnoreCase)
+                    ? "Truyền tĩnh mạch XL giọt/phút"
+                    : (chosen.Unit.Contains("Lọ", StringComparison.OrdinalIgnoreCase) || chosen.Unit.Contains("Ống", StringComparison.OrdinalIgnoreCase)
+                        ? "Tiêm bắp 01 ống lúc 08h00"
+                        : "Sáng 1 viên, chiều 1 viên sau ăn")));
+
+        var whCode = !string.IsNullOrWhiteSpace(targetWarehouseCode) ? targetWarehouseCode : chosen.WarehouseCode;
+        var whName = !string.IsNullOrWhiteSpace(targetWarehouseName) ? targetWarehouseName : chosen.WarehouseName;
+
+        return new ScenarioDrug(
+            chosen.DrugCode,
+            chosen.DrugName,
+            chosen.Unit,
+            actualQty,
+            usage,
+            whCode,
+            whName,
+            chosen.FundingSource);
+    }
+
+    public static string PickTargetTransferDepartment(string currentDeptName, Random rng)
+    {
+        var validTargets = AllowedInpatientTransferDepartments
+            .Where(target => !IsSameInpatientDepartment(currentDeptName, target))
+            .ToList();
+
+        if (validTargets.Count == 0)
+        {
+            validTargets = AllowedInpatientTransferDepartments.ToList();
+        }
+
+        return validTargets[rng.Next(validTargets.Count)];
+    }
+
+    public static bool IsSameInpatientDepartment(string? currentDeptName, string? targetDeptName)
+    {
+        if (string.IsNullOrWhiteSpace(currentDeptName) || string.IsNullOrWhiteSpace(targetDeptName))
+            return false;
+
+        var cur = NormalizeComparableText(currentDeptName);
+        var tgt = NormalizeComparableText(targetDeptName);
+
+        if (cur.Equals(tgt, StringComparison.Ordinal))
+            return true;
+
+        var curCore = StripDepartmentPrefix(cur);
+        var tgtCore = StripDepartmentPrefix(tgt);
+
+        if (curCore.Equals(tgtCore, StringComparison.Ordinal))
+            return true;
+
+        // Check specific inpatient department aliases
+        return tgtCore switch
+        {
+            "noi" => curCore is "noi" or "noi tong hop" or "noi khoa" || curCore.StartsWith("noi ", StringComparison.Ordinal) && !curCore.Contains("than kinh", StringComparison.Ordinal) && !curCore.Contains("tim mach", StringComparison.Ordinal),
+            "ngoai tong hop" => curCore is "ngoai" or "ngoai tong hop" or "ngoai chung" || (curCore.StartsWith("ngoai ", StringComparison.Ordinal) && !curCore.Contains("than kinh", StringComparison.Ordinal) && !curCore.Contains("chan thuong", StringComparison.Ordinal)),
+            "chan thuong chinh hinh" => curCore.Contains("chan thuong", StringComparison.Ordinal) || curCore.Contains("chinh hinh", StringComparison.Ordinal) || curCore is "ctch",
+            "than kinh" => curCore.Contains("than kinh", StringComparison.Ordinal),
+            "gay me hoi suc" => curCore.Contains("gay me", StringComparison.Ordinal) || curCore is "gmhs",
+            "hoi suc tich cuc" => curCore.Contains("hoi suc tich cuc", StringComparison.Ordinal) || curCore.Contains("tich cuc", StringComparison.Ordinal) || curCore is "hstc" or "hs tc" or "hs-tc",
+            "tim mach" => curCore.Contains("tim mach", StringComparison.Ordinal),
+            _ => false
+        };
+    }
+
+    public static bool IsKhoLeThuocNoiTru(string? warehouseName, string? warehouseCode = null)
+    {
+        var name = NormalizeComparableText(warehouseName);
+        var code = NormalizeComparableText(warehouseCode);
+
+        if (name.Contains("kho le thuoc noi tru", StringComparison.Ordinal) ||
+            name.Contains("le thuoc noi tru", StringComparison.Ordinal) ||
+            name.Contains("thuoc le noi tru", StringComparison.Ordinal) ||
+            (name.Contains("kho le", StringComparison.Ordinal) && name.Contains("thuoc", StringComparison.Ordinal) && name.Contains("noi tru", StringComparison.Ordinal)))
+        {
+            return true;
+        }
+
+        return code is "klnt" or "kltnt" or "kho_le_thuoc_noi_tru" or "kholethuocnoitru" ||
+               code.Contains("kholethuocnoitru", StringComparison.Ordinal) ||
+               code.Contains("lethuocnoitru", StringComparison.Ordinal);
+    }
+
+    public static bool IsKhoLeVatTu(string? warehouseName, string? warehouseCode = null)
+    {
+        var name = NormalizeComparableText(warehouseName);
+        var code = NormalizeComparableText(warehouseCode);
+
+        if (name.Contains("kho le vat tu", StringComparison.Ordinal) ||
+            name.Contains("le vat tu", StringComparison.Ordinal) ||
+            name.Contains("kho le vtyt", StringComparison.Ordinal) ||
+            name.Contains("vat tu le", StringComparison.Ordinal) ||
+            (name.Contains("kho le", StringComparison.Ordinal) && (name.Contains("vat tu", StringComparison.Ordinal) || name.Contains("vtyt", StringComparison.Ordinal))))
+        {
+            return true;
+        }
+
+        return code is "klvt" or "klvtyt" or "kho_le_vat_tu" or "kholevattu" ||
+               code.Contains("kholevattu", StringComparison.Ordinal) ||
+               code.Contains("levattu", StringComparison.Ordinal) ||
+               code.Contains("kholevtyt", StringComparison.Ordinal);
+    }
+
+    public static bool IsMedicalSupplyItem(SnapshotDrugRow item)
+    {
+        // 1. Deterministic classification via eHospital DM_LoaiDuoc.LoaiVatTu_Id
+        if (!string.IsNullOrWhiteSpace(item.ItemType))
+        {
+            if (item.ItemType.Equals("VTYT", StringComparison.OrdinalIgnoreCase) ||
+                item.ItemType.Equals("TTBYT", StringComparison.OrdinalIgnoreCase) ||
+                item.ItemType.Equals("HOACHAT", StringComparison.OrdinalIgnoreCase))
+            {
+                return true;
+            }
+            if (item.ItemType.Equals("THUOC", StringComparison.OrdinalIgnoreCase) ||
+                item.ItemType.Equals("VACCINE", StringComparison.OrdinalIgnoreCase))
+            {
+                return false;
+            }
+        }
+
+        // 2. Warehouse identification
+        if (IsKhoLeVatTu(item.WarehouseName, item.WarehouseCode))
+            return true;
+        if (IsKhoLeThuocNoiTru(item.WarehouseName, item.WarehouseCode))
+            return false;
+
+        // 3. Heuristic fallback by Item Name and Unit (for backward compatibility / mock data)
+        var name = NormalizeComparableText(item.DrugName);
+        var unit = NormalizeComparableText(item.Unit);
+
+        if (name.Contains("bom tiem", StringComparison.Ordinal) ||
+            name.Contains("kim tiem", StringComparison.Ordinal) ||
+            name.Contains("kim luon", StringComparison.Ordinal) ||
+            name.Contains("day truyen", StringComparison.Ordinal) ||
+            name.Contains("day dich truyen", StringComparison.Ordinal) ||
+            name.Contains("day garo", StringComparison.Ordinal) ||
+            name.Contains("gang tay", StringComparison.Ordinal) ||
+            name.Contains("bong ", StringComparison.Ordinal) ||
+            name.StartsWith("gac ", StringComparison.Ordinal) ||
+            name.Contains(" gac ", StringComparison.Ordinal) ||
+            name.Contains("bang cuon", StringComparison.Ordinal) ||
+            name.Contains("bang dinh", StringComparison.Ordinal) ||
+            name.Contains("chi phau thuat", StringComparison.Ordinal) ||
+            name.StartsWith("chi ", StringComparison.Ordinal) ||
+            name.Contains("luoi dao", StringComparison.Ordinal) ||
+            name.Contains("ao phau thuat", StringComparison.Ordinal) ||
+            name.Contains("catheter", StringComparison.Ordinal) ||
+            name.Contains("sonde", StringComparison.Ordinal) ||
+            name.Contains("ong thong", StringComparison.Ordinal) ||
+            name.Contains("ong hut", StringComparison.Ordinal) ||
+            name.Contains("ong noi khi quan", StringComparison.Ordinal) ||
+            name.Contains("mask ", StringComparison.Ordinal) ||
+            name.Contains("mat na", StringComparison.Ordinal) ||
+            name.Contains("dien cuc", StringComparison.Ordinal) ||
+            name.Contains("tui nuoc tieu", StringComparison.Ordinal) ||
+            name.Contains("vat tu", StringComparison.Ordinal) ||
+            name.Contains("vtyt", StringComparison.Ordinal))
+        {
+            return true;
+        }
+
+        return unit is "cai" or "bo" or "doi" or "cuon" or "mieng" or "tep" or "soi";
+    }
+
+    private static string StripDepartmentPrefix(string normalizedDept)
+    {
+        var s = normalizedDept.Trim();
+        if (s.StartsWith("khoa phau thuat ", StringComparison.Ordinal))
+            return s["khoa phau thuat ".Length..].Trim();
+        if (s.StartsWith("khoa ", StringComparison.Ordinal))
+            return s["khoa ".Length..].Trim();
+        return s;
+    }
+
+    private static string NormalizeComparableText(string? input)
+    {
+        if (string.IsNullOrWhiteSpace(input))
+            return string.Empty;
+
+        var normalized = input.Trim().Normalize(NormalizationForm.FormD);
+        var sb = new StringBuilder(normalized.Length);
+        foreach (var c in normalized)
+        {
+            var category = CharUnicodeInfo.GetUnicodeCategory(c);
+            if (category == UnicodeCategory.NonSpacingMark)
+                continue;
+
+            var mapped = c switch
+            {
+                'đ' => 'd',
+                'Đ' => 'd',
+                _ => char.ToLowerInvariant(c)
+            };
+            sb.Append(mapped);
+        }
+
+        return string.Join(' ', sb.ToString().Split(new[] { ' ', '\t', '\r', '\n', '_', '-' }, StringSplitOptions.RemoveEmptyEntries));
+    }
+
     private static (List<ScenarioService> OrderedServices, string Q2Instruction, ScenarioServiceChange ServiceChange, ScenarioService? PickedSieuAm, ScenarioService? PickedXquang) AllocateClinicalServices(
         IReadOnlyList<(string Code, string Name, string GroupName)> allServices,
-        Random rng)
+        Random rng,
+        HashSet<string>? usedClsCodesInDept = null)
     {
         var sieuAmPool = new List<ScenarioService>();
         var xquangPool = new List<ScenarioService>();
@@ -714,6 +1290,12 @@ public sealed class ExamScenarioAllocator
         {
             var name = s.Name.Trim();
             var grp = s.GroupName.Trim();
+
+            if (IsExcludedFromRoutineCls(name, grp))
+            {
+                continue;
+            }
+
             var item = new ScenarioService(s.Code, name, grp);
 
             if (name.Contains("Siêu âm", StringComparison.OrdinalIgnoreCase) ||
@@ -736,29 +1318,24 @@ public sealed class ExamScenarioAllocator
             }
             else if (name.Contains("Cắt lớp", StringComparison.OrdinalIgnoreCase) ||
                      name.Contains("Cat lop", StringComparison.OrdinalIgnoreCase) ||
+                     name.Contains("CLVT", StringComparison.OrdinalIgnoreCase) ||
                      name.Contains("CT ", StringComparison.OrdinalIgnoreCase) ||
                      name.Contains("CT-", StringComparison.OrdinalIgnoreCase) ||
                      name.Contains("CT,", StringComparison.OrdinalIgnoreCase) ||
                      name.Contains("Cộng hưởng từ", StringComparison.OrdinalIgnoreCase) ||
                      name.Contains("MRI", StringComparison.OrdinalIgnoreCase) ||
                      grp.Contains("Cắt lớp", StringComparison.OrdinalIgnoreCase) ||
+                     grp.Contains("CLVT", StringComparison.OrdinalIgnoreCase) ||
+                     grp.Contains("Cộng hưởng từ", StringComparison.OrdinalIgnoreCase) ||
                      grp.Contains("MRI", StringComparison.OrdinalIgnoreCase) ||
-                     grp.Contains("CT", StringComparison.OrdinalIgnoreCase))
+                     grp.Equals("CT", StringComparison.OrdinalIgnoreCase) ||
+                     grp.StartsWith("CT ", StringComparison.OrdinalIgnoreCase) ||
+                     grp.StartsWith("CT/", StringComparison.OrdinalIgnoreCase) ||
+                     grp.StartsWith("CT-", StringComparison.OrdinalIgnoreCase))
             {
                 ctMriPool.Add(item);
             }
-            else if (name.Contains("Định lượng", StringComparison.OrdinalIgnoreCase) ||
-                     name.Contains("Tổng phân tích", StringComparison.OrdinalIgnoreCase) ||
-                     name.Contains("Nhóm máu", StringComparison.OrdinalIgnoreCase) ||
-                     name.Contains("Điện giải", StringComparison.OrdinalIgnoreCase) ||
-                     name.Contains("Xét nghiệm", StringComparison.OrdinalIgnoreCase) ||
-                     name.Contains("Đo hoạt độ", StringComparison.OrdinalIgnoreCase) ||
-                     name.Contains("Huyết đồ", StringComparison.OrdinalIgnoreCase) ||
-                     name.Contains("Kháng sinh đồ", StringComparison.OrdinalIgnoreCase) ||
-                     grp.Contains("Xét nghiệm", StringComparison.OrdinalIgnoreCase) ||
-                     grp.Contains("Huyết học", StringComparison.OrdinalIgnoreCase) ||
-                     grp.Contains("Sinh hóa", StringComparison.OrdinalIgnoreCase) ||
-                     grp.Contains("Vi sinh", StringComparison.OrdinalIgnoreCase))
+            else if (IsLaboratoryService(name, grp))
             {
                 xetNghiemPool.Add(item);
             }
@@ -768,11 +1345,13 @@ public sealed class ExamScenarioAllocator
             }
         }
 
-        // Pick random items per category
-        var pickedSieuAm = sieuAmPool.Count > 0 ? sieuAmPool[rng.Next(sieuAmPool.Count)] : null;
-        var pickedXquang = xquangPool.Count > 0 ? xquangPool[rng.Next(xquangPool.Count)] : null;
-        var pickedCtMri = ctMriPool.Count > 0 ? ctMriPool[rng.Next(ctMriPool.Count)] : null;
-        var pickedXetNghiem = xetNghiemPool.OrderBy(_ => rng.Next()).Take(Math.Min(6, xetNghiemPool.Count)).ToList();
+        // Pick random items per category (preferring services not yet assigned to previous candidates in the same batch/department)
+        var pickedSieuAm = PickDistinctFromPool(sieuAmPool, rng, usedClsCodesInDept);
+        var pickedXquang = PickDistinctFromPool(xquangPool, rng, usedClsCodesInDept);
+        var pickedCtMri = PickDistinctFromPool(ctMriPool, rng, usedClsCodesInDept);
+
+        var targetXnCount = Math.Min(6, xetNghiemPool.Count);
+        var pickedXetNghiem = PickMultipleDistinctFromPool(xetNghiemPool, targetXnCount, rng, usedClsCodesInDept);
 
         var orderedServices = new List<ScenarioService>();
         if (pickedSieuAm is not null) orderedServices.Add(pickedSieuAm);
@@ -780,12 +1359,21 @@ public sealed class ExamScenarioAllocator
         if (pickedCtMri is not null) orderedServices.Add(pickedCtMri);
         orderedServices.AddRange(pickedXetNghiem);
 
-        // If total ordered services < 3 (e.g. limited test catalog), fill from otherPool or all
-        while (orderedServices.Count < 3 && allServices.Count > orderedServices.Count)
+        // If total ordered services < 3 (e.g. limited test catalog), fill from otherPool or allServices
+        if (orderedServices.Count < 3)
         {
-            var extra = allServices.FirstOrDefault(s => !orderedServices.Any(o => o.Code == s.Code));
-            if (extra.Code is null) break;
-            orderedServices.Add(new ScenarioService(extra.Code, extra.Name, extra.GroupName));
+            var fallbackCandidates = otherPool
+                .Concat(allServices.Select(s => new ScenarioService(s.Code, s.Name.Trim(), s.GroupName.Trim())))
+                .Where(s => !orderedServices.Any(o => o.Code.Equals(s.Code, StringComparison.OrdinalIgnoreCase)))
+                .ToList();
+
+            while (orderedServices.Count < 3 && fallbackCandidates.Count > 0)
+            {
+                var idx = rng.Next(fallbackCandidates.Count);
+                var extra = fallbackCandidates[idx];
+                orderedServices.Add(extra);
+                fallbackCandidates.RemoveAt(idx);
+            }
         }
 
         // Build Q2 instruction with clear categorized bullet points
@@ -826,30 +1414,36 @@ public sealed class ExamScenarioAllocator
         else canceledService = orderedServices[0];
 
         ScenarioService newService;
-        var availSieuAm = sieuAmPool.Where(s => !orderedServices.Any(o => o.Code == s.Code)).ToList();
+        var availSieuAm = sieuAmPool.Where(s => !orderedServices.Any(o => o.Code.Equals(s.Code, StringComparison.OrdinalIgnoreCase))).ToList();
         if (availSieuAm.Count > 0)
         {
             newService = availSieuAm[rng.Next(availSieuAm.Count)];
         }
         else
         {
-            var availOther = allServices.Where(s => !orderedServices.Any(o => o.Code == s.Code)).ToList();
+            var availOther = otherPool
+                .Concat(allServices.Select(s => new ScenarioService(s.Code, s.Name.Trim(), s.GroupName.Trim())))
+                .Where(s => !orderedServices.Any(o => o.Code.Equals(s.Code, StringComparison.OrdinalIgnoreCase)))
+                .ToList();
             newService = availOther.Count > 0
-                ? new ScenarioService(availOther[0].Code, availOther[0].Name, availOther[0].GroupName)
+                ? availOther[rng.Next(availOther.Count)]
                 : new ScenarioService("SA_BUNG", "Siêu âm bụng tổng quát", "Chẩn đoán hình ảnh");
         }
 
         ScenarioService addedService;
-        var availXquang = xquangPool.Where(s => !orderedServices.Any(o => o.Code == s.Code) && s.Code != newService.Code).ToList();
+        var availXquang = xquangPool.Where(s => !orderedServices.Any(o => o.Code.Equals(s.Code, StringComparison.OrdinalIgnoreCase)) && !s.Code.Equals(newService.Code, StringComparison.OrdinalIgnoreCase)).ToList();
         if (availXquang.Count > 0)
         {
             addedService = availXquang[rng.Next(availXquang.Count)];
         }
         else
         {
-            var availOther = allServices.Where(s => !orderedServices.Any(o => o.Code == s.Code) && s.Code != newService.Code).ToList();
+            var availOther = otherPool
+                .Concat(allServices.Select(s => new ScenarioService(s.Code, s.Name.Trim(), s.GroupName.Trim())))
+                .Where(s => !orderedServices.Any(o => o.Code.Equals(s.Code, StringComparison.OrdinalIgnoreCase)) && !s.Code.Equals(newService.Code, StringComparison.OrdinalIgnoreCase))
+                .ToList();
             addedService = availOther.Count > 0
-                ? new ScenarioService(availOther[0].Code, availOther[0].Name, availOther[0].GroupName)
+                ? availOther[rng.Next(availOther.Count)]
                 : new ScenarioService("XQ_COCHAN", "Chụp Xquang xương cổ chân thẳng, nghiêng [Số hóa 2 phim]", "Chẩn đoán hình ảnh");
         }
 
@@ -857,9 +1451,151 @@ public sealed class ExamScenarioAllocator
         return (orderedServices, q2Instruction, serviceChange, pickedSieuAm, pickedXquang);
     }
 
+    private static bool IsExcludedFromRoutineCls(string name, string groupName)
+    {
+        if (string.IsNullOrWhiteSpace(name)) return true;
+
+        if (name.Contains("[NGƯNG]", StringComparison.OrdinalIgnoreCase) ||
+            name.Contains("(NGƯNG)", StringComparison.OrdinalIgnoreCase) ||
+            name.Contains("[KHÔNG DÙNG]", StringComparison.OrdinalIgnoreCase) ||
+            name.Contains("(KHÔNG DÙNG)", StringComparison.OrdinalIgnoreCase) ||
+            name.Contains("(K DÙNG)", StringComparison.OrdinalIgnoreCase) ||
+            name.Contains("[BỎ]", StringComparison.OrdinalIgnoreCase) ||
+            name.Contains("[HỦY]", StringComparison.OrdinalIgnoreCase) ||
+            name.Contains("*NGƯNG*", StringComparison.OrdinalIgnoreCase))
+        {
+            return true;
+        }
+
+        if (groupName.Contains("Phẫu thuật", StringComparison.OrdinalIgnoreCase) ||
+            groupName.Contains("Công khám", StringComparison.OrdinalIgnoreCase) ||
+            groupName.Contains("Khám bệnh", StringComparison.OrdinalIgnoreCase) ||
+            groupName.Contains("Giường", StringComparison.OrdinalIgnoreCase) ||
+            name.StartsWith("Phẫu thuật ", StringComparison.OrdinalIgnoreCase) ||
+            name.StartsWith("Khám ", StringComparison.OrdinalIgnoreCase) ||
+            name.StartsWith("Giường ", StringComparison.OrdinalIgnoreCase) ||
+            name.StartsWith("Ngày giường", StringComparison.OrdinalIgnoreCase))
+        {
+            return true;
+        }
+
+        return false;
+    }
+
+    private static bool IsLaboratoryService(string name, string grp)
+    {
+        return name.Contains("Định lượng", StringComparison.OrdinalIgnoreCase) ||
+               name.Contains("Tổng phân tích", StringComparison.OrdinalIgnoreCase) ||
+               name.Contains("Nhóm máu", StringComparison.OrdinalIgnoreCase) ||
+               name.Contains("Điện giải", StringComparison.OrdinalIgnoreCase) ||
+               name.Contains("Xét nghiệm", StringComparison.OrdinalIgnoreCase) ||
+               name.Contains("Đo hoạt độ", StringComparison.OrdinalIgnoreCase) ||
+               name.Contains("Huyết đồ", StringComparison.OrdinalIgnoreCase) ||
+               name.Contains("Kháng sinh đồ", StringComparison.OrdinalIgnoreCase) ||
+               name.Contains("Tìm ký sinh trùng", StringComparison.OrdinalIgnoreCase) ||
+               name.Contains("Ký sinh trùng", StringComparison.OrdinalIgnoreCase) ||
+               name.Contains("Nước tiểu", StringComparison.OrdinalIgnoreCase) ||
+               name.Contains("Đông máu", StringComparison.OrdinalIgnoreCase) ||
+               name.Contains("Miễn dịch", StringComparison.OrdinalIgnoreCase) ||
+               name.Contains("Soi tươi", StringComparison.OrdinalIgnoreCase) ||
+               name.Contains("Nhuộm soi", StringComparison.OrdinalIgnoreCase) ||
+               name.Contains("Nuôi cấy", StringComparison.OrdinalIgnoreCase) ||
+               name.Contains("Thời gian máu chảy", StringComparison.OrdinalIgnoreCase) ||
+               name.Contains("Thời gian máu đông", StringComparison.OrdinalIgnoreCase) ||
+               name.Contains("Prothrombin", StringComparison.OrdinalIgnoreCase) ||
+               name.Contains("Fibrinogen", StringComparison.OrdinalIgnoreCase) ||
+               name.Contains("Glucose", StringComparison.OrdinalIgnoreCase) ||
+               name.Contains("HbA1c", StringComparison.OrdinalIgnoreCase) ||
+               name.Contains("Creatinin", StringComparison.OrdinalIgnoreCase) ||
+               name.Contains("Ure", StringComparison.OrdinalIgnoreCase) ||
+               name.Contains("Cholesterol", StringComparison.OrdinalIgnoreCase) ||
+               name.Contains("Triglycerid", StringComparison.OrdinalIgnoreCase) ||
+               grp.Contains("Xét nghiệm", StringComparison.OrdinalIgnoreCase) ||
+               grp.Contains("Huyết học", StringComparison.OrdinalIgnoreCase) ||
+               grp.Contains("Sinh hóa", StringComparison.OrdinalIgnoreCase) ||
+               grp.Contains("Hóa sinh", StringComparison.OrdinalIgnoreCase) ||
+               grp.Contains("Vi sinh", StringComparison.OrdinalIgnoreCase) ||
+               grp.Contains("Miễn dịch", StringComparison.OrdinalIgnoreCase) ||
+               grp.Contains("Ký sinh trùng", StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static ScenarioService? PickDistinctFromPool(
+        IReadOnlyList<ScenarioService> pool,
+        Random rng,
+        HashSet<string>? usedCodes)
+    {
+        if (pool.Count == 0) return null;
+
+        if (usedCodes is not null)
+        {
+            var unused = pool.Where(s => !usedCodes.Contains(s.Code)).ToList();
+            if (unused.Count > 0)
+            {
+                var chosen = unused[rng.Next(unused.Count)];
+                usedCodes.Add(chosen.Code);
+                return chosen;
+            }
+        }
+
+        var fallback = pool[rng.Next(pool.Count)];
+        usedCodes?.Add(fallback.Code);
+        return fallback;
+    }
+
+    private static List<ScenarioService> PickMultipleDistinctFromPool(
+        IReadOnlyList<ScenarioService> pool,
+        int count,
+        Random rng,
+        HashSet<string>? usedCodes)
+    {
+        if (pool.Count == 0 || count <= 0) return new List<ScenarioService>();
+
+        var result = new List<ScenarioService>(count);
+        var chosenInThisCall = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+        if (usedCodes is not null)
+        {
+            var unused = pool
+                .Where(s => !usedCodes.Contains(s.Code))
+                .OrderBy(_ => rng.Next())
+                .ToList();
+
+            foreach (var item in unused)
+            {
+                if (result.Count >= count) break;
+                if (chosenInThisCall.Add(item.Code))
+                {
+                    result.Add(item);
+                    usedCodes.Add(item.Code);
+                }
+            }
+        }
+
+        if (result.Count < count)
+        {
+            var remaining = pool
+                .Where(s => !chosenInThisCall.Contains(s.Code))
+                .OrderBy(_ => rng.Next())
+                .ToList();
+
+            foreach (var item in remaining)
+            {
+                if (result.Count >= count) break;
+                if (chosenInThisCall.Add(item.Code))
+                {
+                    result.Add(item);
+                    usedCodes?.Add(item.Code);
+                }
+            }
+        }
+
+        return result;
+    }
+
     private static ScenarioPatient MapPatientRow(SnapshotPatientRow pRow, DateOnly examDate, PatientPaymentType defaultPayment)
     {
-        var isTe1 = pRow.InsuranceNumber?.StartsWith("TE1", StringComparison.OrdinalIgnoreCase) == true;
+        var normalizedInsurance = ScenarioPatient.NormalizeInsuranceNumber(pRow.InsuranceNumber);
+        var isTe1 = normalizedInsurance?.StartsWith("TE1", StringComparison.OrdinalIgnoreCase) == true;
         var insurancePeriod = InsurancePeriod.ForExamYear(examDate.Year, isTe1);
         var age = 35;
         DateOnly? birthDate = null;
@@ -880,7 +1616,7 @@ public sealed class ExamScenarioAllocator
             age,
             pRow.Gender,
             pRow.Address,
-            pRow.InsuranceNumber,
+            normalizedInsurance,
             insurancePeriod,
             "66232",
             pRow.Diagnosis,
@@ -922,20 +1658,21 @@ public sealed class ExamScenarioAllocator
         bool isGmhs = false,
         bool isLienChuyenKhoa = false,
         ScenarioService? pickedSpecialtyCls = null,
-        ScenarioService? pickedSpecialtyThuThuat = null) => code switch
+        ScenarioService? pickedSpecialtyThuThuat = null,
+        IReadOnlyList<ScenarioService>? orderedServices = null) => code switch
     {
         "LT_BAN_PHIEU_KHAM" => BuildLtBanPhieuKhamInstruction(patient, secondPatient, examDate),
-        "LT_THU_PHI_VA_CLS" => BuildLtThuPhiClsInstruction(pickedSieuAm, allServices),
-        "LT_THU_TAM_UNG_NOI_TRU" => $"Thu tạm ứng cho các bệnh nhân sau:\n© Bệnh nhân nội trú có số bệnh án : {advanceCase1?.SoBenhAn ?? "21.004865"}, Số tiền tạm ứng : 1.500.000 đồng (1đ)\n© Bệnh nhân bệnh án ngoại trú có số bệnh án : {advanceOutpatientCase?.SoBenhAn ?? "21001726/NG"}, Số tiền tạm ứng : 500.000 đồng (1đ)\nSố điểm đạt được : ………",
+        "LT_THU_PHI_VA_CLS" => BuildLtThuPhiClsInstruction(pickedSieuAm, orderedServices, allServices, rng),
+        "LT_THU_TAM_UNG_NOI_TRU" => $"Thu tạm ứng cho các bệnh nhân sau:\n© Bệnh nhân nội trú có số bệnh án : {advanceCase1?.SoBenhAn ?? "CHƯA_CÓ_SỐ_BA"}, Số tiền tạm ứng : 1.500.000 đồng (1đ)\n© Bệnh nhân bệnh án ngoại trú có số bệnh án : {(advanceOutpatientCase?.SoBenhAn ?? advanceCase2?.SoBenhAn ?? "CHƯA_CÓ_SỐ_BA")}, Số tiền tạm ứng : 500.000 đồng (1đ)\nSố điểm đạt được : ………",
         "LT_DOI_DICH_VU_CLS" => $"Chọn quyển hóa đơn ký hiệu:  THI để thu\n© Huỷ và đổi dịch vụ {pickedSieuAm?.Name ?? "Siêu âm ổ bụng"} thành dịch vụ : {(pickedXquang?.Name ?? "Chụp Xquang cột sống cổ chếch hai bên [Số hoá 2 phim]")} và thu tiền lại (1đ)\nSố điểm đạt được : ………",
-        "LT_TRA_CUU_THONG_TIN" => $"Tìm thông tin của bệnh nhân\n© Đang điều trị nội trú có họ và tên : {inLookupCase?.FullName ?? "Lê Văn Dũng"} sinh năm {GetBirthYear(inLookupCase?.DateOfBirth ?? "1989")} (1đ)\nKhoa điều trị : ………………………………………………………………………...\nPhòng bệnh   : ………………………………………………………………………...\nSố giường      : ………………………………………………………………………..;\n© Tìm bệnh nhân có thông tin như sau: {outLookupCase?.FullName ?? "Đỗ Phúc Huy"}, Năm sinh: {GetBirthYear(outLookupCase?.DateOfBirth ?? "1973")} {outLookupCase?.Address ?? "23 Trần Phú , P.Thắng Lợi, Tp.BMT, Đắk Lắk"} và ghi lại các thông tin sau :(1đ)\nSố lượt khám (nếu có):………………………………………………………………………\nNgày điều trị Nội trú gần nhất(nếu có):……………………………………………\nNgày điều trị Ngoại trú gần nhất (nếu có):………………………………………...........\nSố điểm đạt được : ………",
-        "LT_THANH_TOAN_RA_VIEN" => $"Thu Thanh Toán Ra viện cho bệnh nhân nội trú có số bệnh án: {dischargeCase?.SoBenhAn ?? "21.004266"} (1đ)\n(Dùng quyển hóa đơn VAT_THI)\nSố điểm đạt được : ………",
+        "LT_TRA_CUU_THONG_TIN" => $"Tìm thông tin của bệnh nhân\n© Đang điều trị nội trú có họ và tên : {inLookupCase?.FullName ?? patient.FullName} sinh năm {GetBirthYear(inLookupCase?.DateOfBirth ?? "1989")} (1đ)\nKhoa điều trị : ………………………………………………………………………...\nPhòng bệnh   : ………………………………………………………………………...\nSố giường      : ………………………………………………………………………..;\n© Tìm bệnh nhân có thông tin như sau: {outLookupCase?.FullName ?? (secondPatient ?? patient).FullName}, Năm sinh: {GetBirthYear(outLookupCase?.DateOfBirth ?? "1973")} {outLookupCase?.Address ?? (secondPatient ?? patient).Address} và ghi lại các thông tin sau :(1đ)\nSố lượt khám (nếu có):………………………………………………………………………\nNgày điều trị Nội trú gần nhất(nếu có):……………………………………………\nNgày điều trị Ngoại trú gần nhất (nếu có):………………………………………...........\nSố điểm đạt được : ………",
+        "LT_THANH_TOAN_RA_VIEN" => $"Thu Thanh Toán Ra viện cho bệnh nhân nội trú có số bệnh án: {dischargeCase?.SoBenhAn ?? "CHƯA_CÓ_SỐ_BA"} (1đ)\n(Dùng quyển hóa đơn VAT_THI)\nSố điểm đạt được : ………",
         "LT_TAO_THE_TAM_BHYT" => BuildLtTaoTheTamInstruction(examDate, rng),
-        "TC_THU_TAM_UNG" => $"Thu tạm ứng viện phí cho bệnh nhân có số bệnh án nội trú : {advanceCase1?.SoBenhAn ?? "21.004865"}, số tiền tạm ứng : 1.500.000 đồng.\nSố điểm đạt được:………(đ)",
-        "TC_THANH_TOAN_RA_VIEN" => $"Thực hiện quyết toán và in hóa đơn thanh toán viện phí ra viện cho bệnh nhân nội trú có số bệnh án: {dischargeCase?.SoBenhAn ?? "21.004266"} (Dùng quyển hóa đơn VAT_THI).\nSố điểm đạt được:………(đ)",
+        "TC_THU_TAM_UNG" => $"Thu tạm ứng viện phí cho bệnh nhân có số bệnh án nội trú : {advanceCase1?.SoBenhAn ?? "CHƯA_CÓ_SỐ_BA"}, số tiền tạm ứng : 1.500.000 đồng.\nSố điểm đạt được:………(đ)",
+        "TC_THANH_TOAN_RA_VIEN" => $"Thực hiện quyết toán và in hóa đơn thanh toán viện phí ra viện cho bệnh nhân nội trú có số bệnh án: {dischargeCase?.SoBenhAn ?? "CHƯA_CÓ_SỐ_BA"} (Dùng quyển hóa đơn VAT_THI).\nSố điểm đạt được:………(đ)",
         "TC_TRA_CUU_BENH_SU" => isLienChuyenKhoa
-            ? $"Tra cứu lịch sử KCB/ Bệnh sử của bệnh nhân  {outLookupCase?.FullName ?? "Lê Cao Nguyên"}, Mã y tế : {outLookupCase?.MedicalCode ?? "21116310"}:  ({score:0} đ)\nĐợt khám bệnh gần nhất: ngày thực hiện:............ Nội dung:.....................\nCLS thực hiện gần nhất: ngày thực hiện:............ Nội dung:......................\nSố điểm đạt được : ……………"
-            : $"Tra cứu lịch sử khám chữa bệnh của bệnh nhân: {outLookupCase?.FullName ?? "Đỗ Phúc Huy"}, Mã y tế : {outLookupCase?.MedicalCode ?? "23000059"}.\n- Tổng số lượt khám : …………………………………\n- Ngày điều trị nội trú gần nhất : …………………………………\n- Ngày khám ngoại trú gần nhất : …………………………………\nSố điểm đạt được:………(đ)",
+            ? $"Tra cứu lịch sử KCB/ Bệnh sử của bệnh nhân  {outLookupCase?.FullName ?? patient.FullName}, Mã y tế : {outLookupCase?.MedicalCode ?? patient.MedicalCode}:  ({score:0} đ)\nĐợt khám bệnh gần nhất: ngày thực hiện:............ Nội dung:.....................\nCLS thực hiện gần nhất: ngày thực hiện:............ Nội dung:......................\nSố điểm đạt được : ……………"
+            : $"Tra cứu lịch sử khám chữa bệnh của bệnh nhân: {outLookupCase?.FullName ?? patient.FullName}, Mã y tế : {outLookupCase?.MedicalCode ?? patient.MedicalCode}.\n- Tổng số lượt khám : …………………………………\n- Ngày điều trị nội trú gần nhất : …………………………………\n- Ngày khám ngoại trú gần nhất : …………………………………\nSố điểm đạt được:………(đ)",
         "TN_TIEP_NHAN" or _ when isDirectReception && code.StartsWith("TN_", StringComparison.OrdinalIgnoreCase) => BuildDirectReceptionInstruction(patient, secondPatient, examDate),
         "NT_NHAN_BENH_KHOA" => $"* {secondPatient.FullName} ; Mã y tế: {secondPatient.MedicalCode}\n* {patient.FullName} ; Mã y tế: {patient.MedicalCode}\n- SVV Bn VP       : ………………………………\n- SVV Bn BHYT : ……………………………….\nSố điểm đạt được:………(đ)",
         "NT_CAP_GIUONG" => "Cấp giường cho các bệnh nhân được tiếp nhận ở câu 1.\nSố điểm đạt được:………(đ)",
@@ -948,11 +1685,11 @@ public sealed class ExamScenarioAllocator
                 ? $"Nhận bệnh nhân vào khoa - tạo Bệnh án ngoại trú, nhập nội dung bệnh án ({score:0}đ):\n\t* {patient.FullName}; Mã y tế: {patient.MedicalCode}\n- Số bệnh án : ………………………………………………………………………………………\nSố điểm đạt được:………(đ)"
                 : "Chỉ định điều trị ngoại trú và lập bệnh án ngoại trú cho bệnh nhân : ……………………………………, Mã Y tế : …………………… (2 đ)\n- Số bệnh án ngoại trú : …………………………………………………\nSố điểm đạt được:………(đ)"),
         "KB_CHI_DINH_NOI_TRU" => isLienChuyenKhoa
-            ? $"Chỉ định nhập viện điều trị nội trú cho bệnh nhân : {advanceCase1?.FullName ?? "Trần Thị Phụng"}, Mã y tế : {advanceCase1?.MedicalCode ?? "22087283"} ({score:0} đ)\nNhập khoa : Khoa phẫu thuật GMHS\nSố bệnh án nội trú : ……………………………………………………\nSố điểm đạt được : ……………"
+            ? $"Chỉ định nhập viện điều trị nội trú cho bệnh nhân : {advanceCase1?.FullName ?? patient.FullName}, Mã y tế : {advanceCase1?.MedicalCode ?? patient.MedicalCode} ({score:0} đ)\nNhập khoa : Khoa phẫu thuật GMHS\nSố bệnh án nội trú : ……………………………………………………\nSố điểm đạt được : ……………"
             : $"Chỉ định nhập viện điều trị nội trú cho bệnh nhân : ……………………………………, Mã y tế : …………………… (1 đ)\n- Nhập khoa : {targetTransferDept}\n- Số bệnh án nội trú : ……………………………………………………\nSố điểm đạt được:………(đ)",
         "HC_TRA_CUU_THANH_TOAN" => name.Contains("đang nằm viện", StringComparison.OrdinalIgnoreCase) || name.Contains("viện phí", StringComparison.OrdinalIgnoreCase)
             ? $"Kiểm tra viện phí của bệnh nhân đang nằm viện ({score:0}đ):\n- Tìm 01 bệnh nhân bất kỳ đang nằm điều ngoại trú thuộc {deptName}, có thời gian nhập viện trong khoảng từ ngày 01/03/{examDate.Year} đến ngày 05/03/{examDate.Year}.\n- Tra cứu chi tiết viện phí và ghi lại các thông tin sau:\n+ Họ và tên bệnh nhân                : ………………………………………………………………………………………\n+ Mã y tế / Số bệnh án               : ………………………………………………………………………………………\n+ Tổng chi phí điều trị đến hiện tại  : ………………………………………………………………………………… đồng\n+ Số tiền đã tạm ứng                  : ………………………………………………………………………………… đồng\n+ Số tiền còn phải thanh toán/hoàn trả: ………………………………………………………………………………… đồng\nSố điểm đạt được:………(đ)"
-            : $"Kiểm tra thông tin thanh toán cho bệnh nhân : {inLookupCase?.FullName ?? "................"}, Mã y tế : {inLookupCase?.MedicalCode ?? "................"}\n- Số bệnh án nội trú : {inLookupCase?.SoBenhAn ?? "…………………………………………"}\n- Số tiền người bệnh đã thanh toán : ……………………………………………………\n- Số tiền người bệnh đã tạm ứng : ……………………………………………………\n- Số tiền còn phải thu người bệnh : ……………………………………………………\n- Tổng số tiền người bệnh trả : ……………\nSố điểm đạt được:………(đ)",
+            : $"Kiểm tra thông tin thanh toán cho bệnh nhân : {inLookupCase?.FullName ?? patient.FullName}, Mã y tế : {inLookupCase?.MedicalCode ?? patient.MedicalCode}\n- Số bệnh án nội trú : {inLookupCase?.SoBenhAn ?? "…………………………………………"}\n- Số tiền người bệnh đã thanh toán : ……………………………………………………\n- Số tiền người bệnh đã tạm ứng : ……………………………………………………\n- Số tiền còn phải thu người bệnh : ……………………………………………………\n- Tổng số tiền người bệnh trả : ……………\nSố điểm đạt được:………(đ)",
         "TT_TUONG_TRINH_PTTT" => isLienChuyenKhoa
             ? $"Viết  tường trình cho thủ thuật {pickedSpecialtyThuThuat?.Name ?? "Rạch áp xe mi"} cho bệnh nhân ở câu 1 ({score:0}đ)\nSố điểm đạt được : ……………"
             : $"Nhập nội dung tường trình PT-TT cho các dịch vụ đã chỉ định cho bệnh nhân {patient.FullName} ({patient.MedicalCode}/NG) ({score:0}đ)\nSố điểm đạt được:………(đ)",
@@ -969,16 +1706,52 @@ public sealed class ExamScenarioAllocator
         "TK_KIEM_TON_KHO" => isGmhs
             ? (inventoryPeriodItem is not null
                 ? $"Báo số tồn kho của {inventoryPeriodItem.DrugName} trong {targetWarehouseName ?? "kho Gây mê"} từ ngày {inventoryPeriodItem.FromDate:dd/MM/yyyy} đến ngày {inventoryPeriodItem.ToDate:dd/MM/yyyy} (Nguồn {inventoryPeriodItem.FundingSource}), số lượng tồn : ………… (2 đ)\nSố điểm đạt được:………(đ)"
-                : $"Báo số tồn kho của {inventoryDrug?.Name ?? "Kim tiêm nhựa G18; G26"} trong {targetWarehouseName ?? "kho Gây mê"} từ ngày 01/01/{examDate.Year} đến ngày {examDate:dd/MM/yyyy} (Nguồn {inventoryDrug?.FundingSource ?? "Viện phí"}), số lượng tồn : ………… (2 đ)\nSố điểm đạt được:………(đ)")
+                : $"Báo số lượng tồn kho của {inventoryDrug?.Name ?? "Kim tiêm nhựa G18; G26"} trong {targetWarehouseName ?? "kho Gây mê"} tại thời điểm hiện tại / ngày thi {examDate:dd/MM/yyyy} (Nguồn {inventoryDrug?.FundingSource ?? "Viện phí"}), số lượng tồn : ………… (2 đ)\nSố điểm đạt được:………(đ)")
             : (inventoryPeriodItem is not null
                 ? $"Báo số tồn kho của một loại dược trong kho cơ số (Nguồn {inventoryPeriodItem.FundingSource}) từ ngày {inventoryPeriodItem.FromDate:dd/MM/yyyy} đến ngày {inventoryPeriodItem.ToDate:dd/MM/yyyy} : Tên dược: {inventoryPeriodItem.DrugName}  số lượng tồn cuối : …………….\nSố điểm đạt được:………(đ)"
-                : $"Báo số tồn kho của một loại dược trong kho cơ số (Nguồn {inventoryDrug?.FundingSource ?? "Viện phí"}) từ ngày 01/02/2026 đến ngày 28/02/2026 : Tên dược: {inventoryDrug?.Name ?? "Thuốc/VTYT"}  số lượng tồn cuối : …………….\nSố điểm đạt được:………(đ)"),
+                : $"Báo số lượng tồn kho của một loại dược trong kho cơ số (Nguồn {inventoryDrug?.FundingSource ?? "Viện phí"}) tại thời điểm hiện tại / ngày thi {examDate:dd/MM/yyyy} : Tên dược: {inventoryDrug?.Name ?? "Thuốc/VTYT"}  số lượng tồn hiện tại : …………….\nSố điểm đạt được:………(đ)"),
         "CK_CHUYEN_KHOA" => $"Chuyển một bệnh nhân bất kỳ từ khoa {deptName} đến {targetTransferDept}(bệnh nhân nhập viện trước {cutoffDate:dd/MM/yyyy}), Số vào viện của BN: …………………, Mã y tế :…………………., họ tên bệnh nhân:……………………………………\nSố điểm đạt được:………(đ)",
         "RV_CHO_RA_VIEN" => $"Thực hiện thao tác cho bệnh nhân ra viện(bệnh nhân nhập viện trước {cutoffDate:dd/MM/yyyy}) : Số vào viện của BN: ………………………\nSố điểm đạt được:………(đ)",
         _ => actionDescMap.TryGetValue(code, out var customDesc) && !string.IsNullOrWhiteSpace(customDesc)
             ? $"{customDesc}\nSố điểm đạt được:………(đ)"
             : $"Thực hiện nghiệp vụ chuyên môn '{name}' trên phần mềm HIS theo quy định của Bệnh viện Đa khoa Thiện Hạnh.\nSố điểm đạt được:………(đ)"
     };
+
+    private static SnapshotInpatientRow PickDistinctInpatient(
+        IReadOnlyList<SnapshotInpatientRow> pool,
+        HashSet<string> candidateUsedSoBenhAn,
+        Func<SnapshotInpatientRow, bool>? predicate = null,
+        HashSet<string>? markGlobal = null)
+    {
+        SnapshotInpatientRow? picked = null;
+
+        if (predicate is not null)
+        {
+            picked = pool.FirstOrDefault(c =>
+                !string.IsNullOrWhiteSpace(c.SoBenhAn) &&
+                !candidateUsedSoBenhAn.Contains(c.SoBenhAn) &&
+                predicate(c));
+        }
+
+        picked ??= pool.FirstOrDefault(c =>
+            !string.IsNullOrWhiteSpace(c.SoBenhAn) &&
+            !candidateUsedSoBenhAn.Contains(c.SoBenhAn));
+
+        if (picked is null && predicate is not null)
+        {
+            picked = pool.FirstOrDefault(predicate);
+        }
+
+        picked ??= pool[0];
+
+        if (!string.IsNullOrWhiteSpace(picked.SoBenhAn))
+        {
+            candidateUsedSoBenhAn.Add(picked.SoBenhAn);
+            markGlobal?.Add(picked.SoBenhAn);
+        }
+
+        return picked;
+    }
 
     private static InpatientCase MapInpatientRow(SnapshotInpatientRow r) => new(
         r.BenhAnId,
@@ -1072,9 +1845,10 @@ public sealed class ExamScenarioAllocator
             $"+ Đối tượng: BHYT"
         };
 
-        if (!string.IsNullOrWhiteSpace(patient.InsuranceNumber))
+        var bhytNumber = ScenarioPatient.NormalizeInsuranceNumber(patient.InsuranceNumber);
+        if (!string.IsNullOrWhiteSpace(bhytNumber))
         {
-            lines.Add($"+ Số thẻ BHYT: {patient.InsuranceNumber}");
+            lines.Add($"+ Số thẻ BHYT: {bhytNumber}");
             if (patient.InsurancePeriod is not null)
             {
                 lines.Add($"+ Hạn thẻ: Từ ngày {patient.InsurancePeriod.From:dd/MM/yyyy} đến ngày {patient.InsurancePeriod.To:dd/MM/yyyy}");
@@ -1111,17 +1885,42 @@ Số điểm đạt được : ………
 
     private static string BuildLtThuPhiClsInstruction(
         ScenarioService? pickedSieuAm,
-        IReadOnlyList<(string Code, string Name, string GroupName)>? allServices)
+        IReadOnlyList<ScenarioService>? orderedServices,
+        IReadOnlyList<(string Code, string Name, string GroupName)>? allServices,
+        Random? rng = null)
     {
         var sa = pickedSieuAm?.Name ?? "Siêu âm ổ bụng";
         var xn1 = "Định lượng Vitamin B12 [Máu]";
         var xn2 = "Tìm ký sinh trùng sốt rét trong máu (bằng phương pháp thủ công)";
-        if (allServices is not null && allServices.Count > 0)
+
+        var labFromOrdered = orderedServices?
+            .Where(s => (pickedSieuAm is null || !s.Code.Equals(pickedSieuAm.Code, StringComparison.OrdinalIgnoreCase)) &&
+                        IsLaboratoryService(s.Name, s.GroupName))
+            .ToList() ?? new List<ScenarioService>();
+
+        if (labFromOrdered.Count >= 2)
         {
-            var match1 = allServices.FirstOrDefault(s => s.Name.Contains("Vitamin", StringComparison.OrdinalIgnoreCase));
-            if (match1.Name != null) xn1 = match1.Name;
-            var match2 = allServices.FirstOrDefault(s => s.Name.Contains("sốt rét", StringComparison.OrdinalIgnoreCase) || s.Name.Contains("Ký sinh trùng", StringComparison.OrdinalIgnoreCase));
-            if (match2.Name != null) xn2 = match2.Name;
+            xn1 = labFromOrdered[0].Name;
+            xn2 = labFromOrdered[1].Name;
+        }
+        else if (allServices is not null && allServices.Count > 0)
+        {
+            var labPool = allServices
+                .Where(s => !IsExcludedFromRoutineCls(s.Name, s.GroupName) && IsLaboratoryService(s.Name, s.GroupName))
+                .ToList();
+
+            if (labPool.Count >= 2)
+            {
+                var idx1 = rng is not null ? rng.Next(labPool.Count) : 0;
+                var idx2 = rng is not null ? rng.Next(labPool.Count - 1) : 1;
+                if (idx2 >= idx1) idx2++;
+                xn1 = labPool[idx1].Name;
+                xn2 = labPool[idx2].Name;
+            }
+            else if (labPool.Count == 1)
+            {
+                xn1 = labPool[0].Name;
+            }
         }
 
         return $"""
@@ -1135,7 +1934,8 @@ Số điểm đạt được : ………
 
     private static string BuildDirectReceptionInstruction(ScenarioPatient patient, ScenarioPatient secondPatient, DateOnly examDate)
     {
-        var isBhyt = patient.PaymentType == PatientPaymentType.Insurance && !string.IsNullOrWhiteSpace(patient.InsuranceNumber);
+        var bhytNumber = ScenarioPatient.NormalizeInsuranceNumber(patient.InsuranceNumber);
+        var isBhyt = patient.PaymentType == PatientPaymentType.Insurance && !string.IsNullOrWhiteSpace(bhytNumber);
         var dobStr = patient.DateOfBirth.HasValue
             ? patient.DateOfBirth.Value.ToString("dd/MM/yyyy")
             : $"Năm sinh: {examDate.Year - patient.Age}";
@@ -1156,7 +1956,7 @@ Số điểm đạt được : ………
 
         if (isBhyt)
         {
-            lines.Add($"+ Số thẻ BHYT: {patient.InsuranceNumber}");
+            lines.Add($"+ Số thẻ BHYT: {bhytNumber}");
             if (patient.InsurancePeriod is not null)
             {
                 lines.Add($"+ Hạn thẻ BHYT: Từ ngày {patient.InsurancePeriod.From:dd/MM/yyyy} đến ngày {patient.InsurancePeriod.To:dd/MM/yyyy}");

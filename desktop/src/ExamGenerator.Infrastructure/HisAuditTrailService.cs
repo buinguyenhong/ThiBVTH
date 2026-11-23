@@ -48,41 +48,62 @@ public sealed class HisAuditTrailService
             await using var conn = new SqlConnection(connStr);
             await conn.OpenAsync(cancellationToken);
 
-            // 1. Resolve NhanVien_Id
+            // 1. Resolve NhanVien_Id and User_Id (supports both User_Code from Sys_Users and MaNhanVien from NhanVien)
             int? nhanVienId = null;
+            int? sysUserId = null;
             await using (var cmdNv = conn.CreateCommand())
             {
-                cmdNv.CommandText = "SELECT TOP 1 NhanVien_Id FROM dbo.NhanVien WHERE MaNhanVien = @code";
+                cmdNv.CommandText = @"
+                    SELECT TOP 1
+                        COALESCE(nv.NhanVien_Id, map.NhanVien_Id) AS NhanVien_Id,
+                        u.User_Id
+                    FROM dbo.Sys_Users u
+                    LEFT JOIN dbo.NhanVien_User_Mapping map ON u.User_Id = map.User_Id
+                    LEFT JOIN dbo.NhanVien nv ON map.NhanVien_Id = nv.NhanVien_Id
+                    WHERE u.User_Code = @code OR nv.MaNhanVien = @code
+                    UNION ALL
+                    SELECT TOP 1
+                        nv2.NhanVien_Id,
+                        map2.User_Id
+                    FROM dbo.NhanVien nv2
+                    LEFT JOIN dbo.NhanVien_User_Mapping map2 ON nv2.NhanVien_Id = map2.NhanVien_Id
+                    WHERE nv2.MaNhanVien = @code";
                 cmdNv.Parameters.Add(new SqlParameter("@code", SqlDbType.VarChar) { Value = hisUserCode.Trim() });
-                var res = await cmdNv.ExecuteScalarAsync(cancellationToken);
-                if (res != null && res != DBNull.Value)
+                await using var nvReader = await cmdNv.ExecuteReaderAsync(cancellationToken);
+                if (await nvReader.ReadAsync(cancellationToken))
                 {
-                    nhanVienId = Convert.ToInt32(res);
+                    if (!nvReader.IsDBNull(0)) nhanVienId = Convert.ToInt32(nvReader.GetValue(0));
+                    if (!nvReader.IsDBNull(1)) sysUserId = Convert.ToInt32(nvReader.GetValue(1));
                 }
             }
 
-            if (nhanVienId is null)
+            if (nhanVienId is null && sysUserId is null)
             {
-                return $"(Không tìm thấy nhân viên HIS có mã: {hisUserCode})";
+                return $"(Không tìm thấy tài khoản / nhân viên HIS có mã: {hisUserCode})";
             }
 
             // Extend start and end buffer slightly by 5 minutes for safety
             var windowStart = startedAt.AddMinutes(-5);
             var windowEnd = submittedAt.AddMinutes(5);
+            var effectiveActorId = nhanVienId ?? sysUserId!.Value;
+            var effectiveUserId = sysUserId ?? nhanVienId!.Value;
 
             switch (actionCode)
             {
                 case "LT_BAN_PHIEU_KHAM":
                 case "TK_TIEP_NHAN":
+                case "TN_TIEP_NHAN":
                 {
                     await using var cmd = conn.CreateCommand();
                     cmd.CommandText = @"
                         SELECT tn.SoTiepNhan, tn.NgayTiepNhan, bn.MaBenhNhan, bn.TenBenhNhan, tn.LoaiKham_Id
                         FROM dbo.TiepNhan tn
                         LEFT JOIN dbo.BenhNhan bn ON tn.BenhNhan_Id = bn.BenhNhan_Id
-                        WHERE tn.NguoiTao_Id = @nvId AND tn.NgayTiepNhan BETWEEN @start AND @end
+                        WHERE (tn.NguoiTao_Id = @nvId OR tn.NguoiTao_Id = @userId)
+                          AND tn.NgayTiepNhan BETWEEN @start AND @end
                         ORDER BY tn.NgayTiepNhan ASC";
-                    cmd.Parameters.Add(new SqlParameter("@nvId", SqlDbType.Int) { Value = nhanVienId.Value });
+                    cmd.Parameters.Add(new SqlParameter("@nvId", SqlDbType.Int) { Value = effectiveActorId });
+                    cmd.Parameters.Add(new SqlParameter("@userId", SqlDbType.Int) { Value = effectiveUserId });
                     cmd.Parameters.Add(new SqlParameter("@start", SqlDbType.DateTime) { Value = windowStart });
                     cmd.Parameters.Add(new SqlParameter("@end", SqlDbType.DateTime) { Value = windowEnd });
 
@@ -106,15 +127,21 @@ public sealed class HisAuditTrailService
 
                 case "LT_THU_PHI_VA_CLS":
                 case "LT_THU_TAM_UNG_NOI_TRU":
+                case "TC_THU_TAM_UNG":
+                case "LT_THANH_TOAN_RA_VIEN":
+                case "TC_THANH_TOAN_RA_VIEN":
+                case "LT_DOI_DICH_VU_CLS":
                 {
                     await using var cmd = conn.CreateCommand();
                     cmd.CommandText = @"
                         SELECT hd.SoHoaDon, hd.NgayTao, bn.TenBenhNhan, hd.GiaTriThucThu, hd.HuyHoaDon
                         FROM dbo.HoaDon hd
                         LEFT JOIN dbo.BenhNhan bn ON hd.BenhNhan_Id = bn.BenhNhan_Id
-                        WHERE hd.NguoiTao_Id = @nvId AND hd.NgayTao BETWEEN @start AND @end
+                        WHERE (hd.NguoiTao_Id = @nvId OR hd.NguoiTao_Id = @userId)
+                          AND hd.NgayTao BETWEEN @start AND @end
                         ORDER BY hd.NgayTao ASC";
-                    cmd.Parameters.Add(new SqlParameter("@nvId", SqlDbType.Int) { Value = nhanVienId.Value });
+                    cmd.Parameters.Add(new SqlParameter("@nvId", SqlDbType.Int) { Value = effectiveActorId });
+                    cmd.Parameters.Add(new SqlParameter("@userId", SqlDbType.Int) { Value = effectiveUserId });
                     cmd.Parameters.Add(new SqlParameter("@start", SqlDbType.DateTime) { Value = windowStart });
                     cmd.Parameters.Add(new SqlParameter("@end", SqlDbType.DateTime) { Value = windowEnd });
 

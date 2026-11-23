@@ -309,3 +309,69 @@
   - Tieu chuan: `desktop/publish/ExamClient/ExamGenerator.Client.exe` (148.5 KB)
   - Standalone: `desktop/publish/ExamClient-Standalone/ExamGenerator.Client.exe` (148.5 KB)
 - **Ghi chu thay doi:** Automated release build
+
+### Build [2026-10-29 10:00:15] - Commit [9120a32]
+- **Trang thai:** Thanh cong (61/61 Tests Passed)
+- **Cau hinh:** .NET 8 LTS (Release) + Standalone (Self-Contained win-x64)
+- **Duong dan chay ExamOperationsDesktop (Hoi dong / Giam khao):**
+  - Tieu chuan: `desktop/publish/ExamOperationsDesktop/ExamGenerator.Desktop.exe` (148.5 KB)
+  - Standalone: `desktop/publish/ExamOperationsDesktop-Standalone/ExamGenerator.Desktop.exe` (148.5 KB)
+- **Duong dan chay ExamClient (May tram Thi sinh):**
+  - Tieu chuan: `desktop/publish/ExamClient/ExamGenerator.Client.exe` (148.5 KB)
+  - Standalone: `desktop/publish/ExamClient-Standalone/ExamGenerator.Client.exe` (148.5 KB)
+- **Ghi chu thay doi:** Cap nhat cat the BHYT 15 ky tu, SQL ra vien cau 6 Thu ngan doc lap, SQL gop toan dot thi, toi uu UsedPatient, luu GeneratedScenario SQLite, va nang cap co che random CLS
+
+### Build [2026-10-29 10:19:53] - Commit [9120a32]
+- **Trang thai:** Thanh cong (62/62 Tests Passed)
+- **Cau hinh:** .NET 8 LTS (Release) + Standalone (Self-Contained win-x64)
+- **Duong dan chay ExamOperationsDesktop (Hoi dong / Giam khao):**
+  - Tieu chuan: `desktop/publish/ExamOperationsDesktop/ExamGenerator.Desktop.exe` (148.5 KB)
+  - Standalone: `desktop/publish/ExamOperationsDesktop-Standalone/ExamGenerator.Desktop.exe` (148.5 KB)
+- **Duong dan chay ExamClient (May tram Thi sinh):**
+  - Tieu chuan: `desktop/publish/ExamClient/ExamGenerator.Client.exe` (148.5 KB)
+  - Standalone: `desktop/publish/ExamClient-Standalone/ExamGenerator.Client.exe` (148.5 KB)
+- **Ghi chu thay doi:** Bo sung cau hinh thu muc De thi (.exam_pkg) va Bai da lam de cham (.sub_pkg) cho ca ExamOperationsDesktop va ExamClient Standalone
+
+### Build [2026-10-30 13:34:29] - Commit [9120a32]
+- **Trang thai:** Thanh cong (62/62 Tests Passed)
+- **Cau hinh:** .NET 8 LTS (Release) + Standalone (Self-Contained win-x64)
+- **Duong dan chay ExamOperationsDesktop (Hoi dong / Giam khao):**
+  - Tieu chuan: `desktop/publish/ExamOperationsDesktop/ExamGenerator.Desktop.exe` (148.5 KB)
+  - Standalone: `desktop/publish/ExamOperationsDesktop-Standalone/ExamGenerator.Desktop.exe` (148.5 KB)
+- **Duong dan chay ExamClient (May tram Thi sinh):**
+  - Tieu chuan: `desktop/publish/ExamClient/ExamGenerator.Client.exe` (148.5 KB)
+  - Standalone: `desktop/publish/ExamClient-Standalone/ExamGenerator.Client.exe` (148.5 KB)
+- **Ghi chu thay doi:** Automated release build
+
+### Build [2026-10-30 14:13:04] - Commit [9120a32]
+- **Trang thai:** Thanh cong (62/62 Tests Passed)
+- **Cau hinh:** .NET 8 LTS (Release) + Standalone (Self-Contained win-x64)
+- **Duong dan chay ExamOperationsDesktop (Hoi dong / Giam khao):**
+  - Tieu chuan: `desktop/publish/ExamOperationsDesktop/ExamGenerator.Desktop.exe` (148.5 KB)
+  - Standalone: `desktop/publish/ExamOperationsDesktop-Standalone/ExamGenerator.Desktop.exe` (148.5 KB)
+- **Duong dan chay ExamClient (May tram Thi sinh):**
+  - Tieu chuan: `desktop/publish/ExamClient/ExamGenerator.Client.exe` (148.5 KB)
+  - Standalone: `desktop/publish/ExamClient-Standalone/ExamGenerator.Client.exe` (148.5 KB)
+- **Ghi chu thay doi:** Automated release build
+
+### Build [2026-10-30 14:22:05] - Commit [9120a32]
+- **Trang thai:** Thanh cong (62/62 Tests Passed)
+- **Cau hinh:** .NET 8 LTS (Release) + Standalone (Self-Contained win-x64)
+- **Duong dan chay ExamOperationsDesktop (Hoi dong / Giam khao):**
+  - Tieu chuan: `desktop/publish/ExamOperationsDesktop/ExamGenerator.Desktop.exe` (148.5 KB)
+  - Standalone: `desktop/publish/ExamOperationsDesktop-Standalone/ExamGenerator.Desktop.exe` (148.5 KB)
+- **Duong dan chay ExamClient (May tram Thi sinh):**
+  - Tieu chuan: `desktop/publish/ExamClient/ExamGenerator.Client.exe` (148.5 KB)
+  - Standalone: `desktop/publish/ExamClient-Standalone/ExamGenerator.Client.exe` (148.5 KB)
+- **Ghi chu thay doi:** Automated release build
+
+### Build [2026-11-23 16:01:25] - Commit [4910969]
+- **Trang thai:** Thanh cong (62/62 Tests Passed)
+- **Cau hinh:** .NET 8 LTS (Release) + Standalone (Self-Contained win-x64)
+- **Duong dan chay ExamOperationsDesktop (Hoi dong / Giam khao):**
+  - Tieu chuan: `desktop/publish/ExamOperationsDesktop/ExamGenerator.Desktop.exe` (148.5 KB)
+  - Standalone: `desktop/publish/ExamOperationsDesktop-Standalone/ExamGenerator.Desktop.exe` (148.5 KB)
+- **Duong dan chay ExamClient (May tram Thi sinh):**
+  - Tieu chuan: `desktop/publish/ExamClient/ExamGenerator.Client.exe` (148.5 KB)
+  - Standalone: `desktop/publish/ExamClient-Standalone/ExamGenerator.Client.exe` (148.5 KB)
+- **Ghi chu thay doi:** Fix Invalid column name TamNgung on DM_PhongBan_DichVu during HIS catalog sync

@@ -112,7 +112,8 @@ public sealed class SqliteDatabase
                 FundingSource TEXT NOT NULL,
                 QuantityOnHand REAL NOT NULL,
                 DepartmentCode TEXT NULL,
-                DepartmentName TEXT NULL
+                DepartmentName TEXT NULL,
+                ItemType TEXT NULL
             );
             CREATE TABLE IF NOT EXISTS SnapshotPatient (
                 PatientId TEXT PRIMARY KEY NOT NULL,
@@ -218,6 +219,15 @@ public sealed class SqliteDatabase
                 ItemsJson TEXT NOT NULL
             );
             CREATE INDEX IF NOT EXISTS IX_CandidateGrading_Cand ON CandidateGrading(CandidateId);
+
+            CREATE TABLE IF NOT EXISTS GeneratedScenario (
+                ScenarioId TEXT PRIMARY KEY NOT NULL,
+                CandidateId TEXT NOT NULL,
+                PaperCode TEXT NOT NULL,
+                ScenarioJson TEXT NOT NULL,
+                CreatedAt TEXT NOT NULL
+            );
+            CREATE INDEX IF NOT EXISTS IX_GeneratedScenario_Cand ON GeneratedScenario(CandidateId);
             """;
         await command.ExecuteNonQueryAsync(cancellationToken);
 
@@ -235,6 +245,14 @@ public sealed class SqliteDatabase
             var alter2 = connection.CreateCommand();
             alter2.CommandText = "ALTER TABLE SnapshotDrug ADD COLUMN DepartmentName TEXT NULL";
             await alter2.ExecuteNonQueryAsync(cancellationToken);
+        }
+        catch { /* column may already exist */ }
+
+        try
+        {
+            var alterItemType = connection.CreateCommand();
+            alterItemType.CommandText = "ALTER TABLE SnapshotDrug ADD COLUMN ItemType TEXT NULL";
+            await alterItemType.ExecuteNonQueryAsync(cancellationToken);
         }
         catch { /* column may already exist */ }
 
@@ -714,7 +732,7 @@ public sealed class SqliteDatabase
         {
             var insert = connection.CreateCommand();
             insert.Transaction = transaction;
-            insert.CommandText = "INSERT OR REPLACE INTO SnapshotDrug (DrugId, DrugCode, DrugName, Unit, WarehouseCode, WarehouseName, FundingSource, QuantityOnHand, DepartmentCode, DepartmentName) VALUES ($id, $code, $name, $unit, $whCode, $whName, $src, $qty, $deptCode, $deptName)";
+            insert.CommandText = "INSERT OR REPLACE INTO SnapshotDrug (DrugId, DrugCode, DrugName, Unit, WarehouseCode, WarehouseName, FundingSource, QuantityOnHand, DepartmentCode, DepartmentName, ItemType) VALUES ($id, $code, $name, $unit, $whCode, $whName, $src, $qty, $deptCode, $deptName, $itemType)";
             insert.Parameters.AddWithValue("$id", d.DrugId);
             insert.Parameters.AddWithValue("$code", d.DrugCode);
             insert.Parameters.AddWithValue("$name", d.DrugName);
@@ -725,6 +743,7 @@ public sealed class SqliteDatabase
             insert.Parameters.AddWithValue("$qty", d.QuantityOnHand);
             insert.Parameters.AddWithValue("$deptCode", (object?)d.DepartmentCode ?? DBNull.Value);
             insert.Parameters.AddWithValue("$deptName", (object?)d.DepartmentName ?? DBNull.Value);
+            insert.Parameters.AddWithValue("$itemType", (object?)d.ItemType ?? DBNull.Value);
             await insert.ExecuteNonQueryAsync(cancellationToken);
         }
         await transaction.CommitAsync(cancellationToken);
@@ -1123,7 +1142,7 @@ public sealed class SqliteDatabase
         await using var connection = new SqliteConnection($"Data Source={DatabasePath}");
         await connection.OpenAsync(cancellationToken);
         var command = connection.CreateCommand();
-        command.CommandText = "SELECT DrugId, DrugCode, DrugName, Unit, WarehouseCode, WarehouseName, FundingSource, QuantityOnHand, DepartmentCode, DepartmentName FROM SnapshotDrug WHERE WarehouseCode = $code AND QuantityOnHand > 0 ORDER BY DrugName";
+        command.CommandText = "SELECT DrugId, DrugCode, DrugName, Unit, WarehouseCode, WarehouseName, FundingSource, QuantityOnHand, DepartmentCode, DepartmentName, ItemType FROM SnapshotDrug WHERE WarehouseCode = $code AND QuantityOnHand > 0 ORDER BY DrugName";
         command.Parameters.AddWithValue("$code", warehouseCode);
         await using var reader = await command.ExecuteReaderAsync(cancellationToken);
         while (await reader.ReadAsync(cancellationToken))
@@ -1137,7 +1156,33 @@ public sealed class SqliteDatabase
                 reader.GetString(6),
                 reader.GetDouble(7),
                 reader.IsDBNull(8) ? null : reader.GetString(8),
-                reader.IsDBNull(9) ? null : reader.GetString(9)
+                reader.IsDBNull(9) ? null : reader.GetString(9),
+                reader.IsDBNull(10) ? null : reader.GetString(10)
+            ));
+        return rows;
+    }
+
+    public async Task<IReadOnlyList<SnapshotDrugRow>> GetAllSnapshotDrugsAsync(CancellationToken cancellationToken = default)
+    {
+        var rows = new List<SnapshotDrugRow>();
+        await using var connection = new SqliteConnection($"Data Source={DatabasePath}");
+        await connection.OpenAsync(cancellationToken);
+        var command = connection.CreateCommand();
+        command.CommandText = "SELECT DrugId, DrugCode, DrugName, Unit, WarehouseCode, WarehouseName, FundingSource, QuantityOnHand, DepartmentCode, DepartmentName, ItemType FROM SnapshotDrug ORDER BY WarehouseName, DrugName";
+        await using var reader = await command.ExecuteReaderAsync(cancellationToken);
+        while (await reader.ReadAsync(cancellationToken))
+            rows.Add(new SnapshotDrugRow(
+                reader.GetString(0),
+                reader.GetString(1),
+                reader.GetString(2),
+                reader.GetString(3),
+                reader.GetString(4),
+                reader.GetString(5),
+                reader.GetString(6),
+                reader.GetDouble(7),
+                reader.IsDBNull(8) ? null : reader.GetString(8),
+                reader.IsDBNull(9) ? null : reader.GetString(9),
+                reader.IsDBNull(10) ? null : reader.GetString(10)
             ));
         return rows;
     }
@@ -1166,7 +1211,8 @@ public sealed class SqliteDatabase
             SELECT 
                 d.DrugId, d.DrugCode, d.DrugName, d.Unit, d.WarehouseCode, d.WarehouseName, d.FundingSource, d.QuantityOnHand,
                 COALESCE(NULLIF(d.DepartmentCode, ''), cDept.ItemCode, '') AS DepartmentCode,
-                COALESCE(NULLIF(d.DepartmentName, ''), cDept.ItemName, '') AS DepartmentName
+                COALESCE(NULLIF(d.DepartmentName, ''), cDept.ItemName, '') AS DepartmentName,
+                d.ItemType
             FROM SnapshotDrug d
             LEFT JOIN CatalogItem cWh ON cWh.CatalogType = 'Warehouses' AND (cWh.ItemCode = d.WarehouseCode OR cWh.ItemId = d.WarehouseCode)
             LEFT JOIN CatalogItem cDept ON cDept.CatalogType = 'Departments' AND cDept.ItemId = cWh.ParentId
@@ -1209,7 +1255,8 @@ public sealed class SqliteDatabase
                 reader.GetString(6),
                 reader.GetDouble(7),
                 reader.IsDBNull(8) ? null : reader.GetString(8),
-                reader.IsDBNull(9) ? null : reader.GetString(9)
+                reader.IsDBNull(9) ? null : reader.GetString(9),
+                reader.IsDBNull(10) ? null : reader.GetString(10)
             ));
         }
         return rows;
@@ -1729,10 +1776,58 @@ public sealed class SqliteDatabase
         }
         return list;
     }
+
+    public async Task SaveGeneratedScenarioAsync(ExamScenario scenario, CancellationToken cancellationToken = default)
+    {
+        await using var connection = new SqliteConnection($"Data Source={DatabasePath}");
+        await connection.OpenAsync(cancellationToken);
+
+        var command = connection.CreateCommand();
+        command.CommandText = """
+            INSERT OR REPLACE INTO GeneratedScenario (ScenarioId, CandidateId, PaperCode, ScenarioJson, CreatedAt)
+            VALUES ($id, $candId, $paperCode, $json, $createdAt)
+            """;
+        command.Parameters.AddWithValue("$id", scenario.ScenarioId);
+        command.Parameters.AddWithValue("$candId", scenario.CandidateId);
+        command.Parameters.AddWithValue("$paperCode", $"{scenario.DepartmentCode}_{scenario.ScenarioId[..Math.Min(6, scenario.ScenarioId.Length)].ToUpperInvariant()}");
+        command.Parameters.AddWithValue("$json", System.Text.Json.JsonSerializer.Serialize(scenario));
+        command.Parameters.AddWithValue("$createdAt", DateTime.UtcNow.ToString("O"));
+        await command.ExecuteNonQueryAsync(cancellationToken);
+    }
+
+    public async Task<IReadOnlyList<ExamScenario>> GetLatestGeneratedScenariosAsync(int limit = 300, CancellationToken cancellationToken = default)
+    {
+        await using var connection = new SqliteConnection($"Data Source={DatabasePath}");
+        await connection.OpenAsync(cancellationToken);
+
+        var command = connection.CreateCommand();
+        command.CommandText = "SELECT ScenarioJson FROM GeneratedScenario ORDER BY CreatedAt DESC LIMIT $limit";
+        command.Parameters.AddWithValue("$limit", limit);
+
+        var list = new List<ExamScenario>();
+        await using var reader = await command.ExecuteReaderAsync(cancellationToken);
+        while (await reader.ReadAsync(cancellationToken))
+        {
+            var json = reader.GetString(0);
+            if (!string.IsNullOrWhiteSpace(json))
+            {
+                try
+                {
+                    var sc = System.Text.Json.JsonSerializer.Deserialize<ExamScenario>(json);
+                    if (sc is not null)
+                    {
+                        list.Add(sc);
+                    }
+                }
+                catch { /* ignore malformed json */ }
+            }
+        }
+        return list;
+    }
 }
 
 public sealed record SnapshotUserRow(string UserId, string UserName, string FullName, string DepartmentCode, string DepartmentName);
-public sealed record SnapshotDrugRow(string DrugId, string DrugCode, string DrugName, string Unit, string WarehouseCode, string WarehouseName, string FundingSource, double QuantityOnHand, string? DepartmentCode = null, string? DepartmentName = null);
+public sealed record SnapshotDrugRow(string DrugId, string DrugCode, string DrugName, string Unit, string WarehouseCode, string WarehouseName, string FundingSource, double QuantityOnHand, string? DepartmentCode = null, string? DepartmentName = null, string? ItemType = null);
 public sealed record SnapshotPatientRow(string PatientId, string MedicalCode, string FullName, string DateOfBirth, string Gender, string Address, string? InsuranceNumber, string Diagnosis, string PaymentType);
 
 public sealed record SnapshotInpatientRow(

@@ -61,6 +61,21 @@
    * `requires_exam_setup_sql`: đề cần SQL chuẩn bị ca nhận vào khoa.
    * Hai cờ loại trừ nhau.
 
+### 3.5. Chuyển khoa, Tồn kho thực tế và Phiếu lĩnh Dược - VTYT qua Kho lẻ
+
+1. **Chuyển khoa nội trú (`CK_CHUYEN_KHOA`):**
+   * Chỉ cho phép chuyển đến khoa khác với khoa hiện tại của thí sinh và bắt buộc nằm trong danh sách 7 khoa nội trú: *Khoa Nội, Khoa Ngoại tổng hợp, Khoa Chấn thương chỉnh hình, Khoa Thần kinh, Gây mê hồi sức, Hồi sức tích cực, Khoa Tim mạch*.
+   * Khoa chuyển đến được chọn ngẫu nhiên độc lập cho từng thí sinh và in rõ trong đề thi, file Word đáp án và hệ thống chấm thi Client.
+2. **Kiểm tra tồn kho Dược / VTYT (`TK_KIEM_TON_KHO`):**
+   * Bắt buộc kiểm tra mặt hàng có số liệu tồn thực tế tại đúng kho của khoa dự thi (`targetWh`), không fallback sang kho khoa khác.
+   * Ưu tiên chọn mặt hàng ngoài danh mục lên y lệnh của Câu 3 để tránh biến động tồn kho khi thi.
+   * Ghi rõ số lượng tồn kho chuẩn vào đáp án Word (`-> ĐÁP ÁN TỒN KHO: ...`) và màn hình chấm thi Client (`-> TỒN KHO CHUẨN: ...`).
+   * Đồng bộ loại trừ thuốc tạm ngưng dự trù (`TamNgungDuTru = 0`).
+3. **Lên phiếu lĩnh Dược / VTYT theo danh sách (`YL_CHI_DINH_THUOC_VTYT`):**
+   * Tự động kiểm tra và khấu trừ tồn kho tại **Kho lẻ thuốc nội trú** (đối với *Thuốc*) và **Kho lẻ vật tư** (đối với *Vật tư y tế*).
+   * Khấu trừ tồn kho lũy kế đồng thời trên cả kho thi của khoa và kho lẻ trung tâm qua từng thí sinh.
+   * Cảnh báo fail-fast nếu tồn kho tại Kho lẻ thuốc nội trú hoặc Kho lẻ vật tư không đủ để xuất cho toàn bộ thí sinh trong đợt thi.
+
 ## 4. Họ đề chuẩn
 
 Mỗi họ đề có Word template riêng; không dùng một template tổng quát với nhiều cờ điều kiện.

@@ -7,6 +7,7 @@
         MinHeight="650"
         MinWidth="900"
         WindowStartupLocation="CenterScreen"
+        Closing="MainWindow_Closing"
         Background="#F1F5F9">
 
     <Grid>
@@ -36,16 +37,76 @@
                                HorizontalAlignment="Center"
                                Margin="0,4,0,20"/>
 
-                    <Border Height="1" Background="{StaticResource BorderSubtle}" Margin="0,0,0,20"/>
+                    <Border Height="1" Background="{StaticResource BorderSubtle}" Margin="0,0,0,16"/>
 
-                    <TextBlock Text="CHỌN HOẶC TẢI ĐỀ THI"
-                               FontSize="14"
-                               FontWeight="SemiBold"
-                               Foreground="{StaticResource TextSecondary}"
-                               Margin="0,0,0,8"/>
+                    <Grid Margin="0,0,0,8">
+                        <TextBlock Text="CHỌN HOẶC TẢI ĐỀ THI"
+                                   FontSize="14"
+                                   FontWeight="SemiBold"
+                                   Foreground="{StaticResource TextSecondary}"
+                                   VerticalAlignment="Center"/>
+                        <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+                            <Button Content="🔄 Làm mới"
+                                    Style="{StaticResource SecondaryButton}"
+                                    Height="30"
+                                    Padding="10,0"
+                                    Margin="0,0,6,0"
+                                    Click="RefreshExamPackages_Click"/>
+                            <Button Content="⚙ Cấu hình thư mục"
+                                    Style="{StaticResource SecondaryButton}"
+                                    Height="30"
+                                    Padding="10,0"
+                                    Click="ToggleClientSettings_Click"/>
+                        </StackPanel>
+                    </Grid>
+
+                    <!-- Collapsible Directory Configuration Panel -->
+                    <Border x:Name="ClientSettingsBorder"
+                            Background="#F8FAFC"
+                            BorderBrush="{StaticResource BrandTeal}"
+                            BorderThickness="1"
+                            CornerRadius="8"
+                            Padding="14"
+                            Margin="0,0,0,12"
+                            Visibility="Collapsed">
+                        <StackPanel>
+                            <TextBlock Text="CẤU HÌNH THƯ MỤC LẤY ĐỀ THI &amp; NỘP BÀI LÀM"
+                                       FontSize="12"
+                                       FontWeight="Bold"
+                                       Foreground="{StaticResource BrandTealDark}"
+                                       Margin="0,0,0,8"/>
+
+                            <TextBlock Text="1. Thư mục truy xuất đề thi (.exam_pkg):" FontSize="11.5" FontWeight="SemiBold" Foreground="{StaticResource BrandNavy}"/>
+                            <Grid Margin="0,3,0,8">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="Auto"/>
+                                </Grid.ColumnDefinitions>
+                                <TextBox x:Name="ClientExamsDirTextBox" Grid.Column="0" Height="32" FontSize="12.5" Padding="6,4" Margin="0,0,6,0"/>
+                                <Button Grid.Column="1" Content="📂 Chọn..." Style="{StaticResource SecondaryButton}" Height="32" Padding="10,0" Click="BrowseClientExamsDir_Click"/>
+                            </Grid>
+
+                            <TextBlock Text="2. Thư mục gửi bài đã làm để chấm (.sub_pkg):" FontSize="11.5" FontWeight="SemiBold" Foreground="{StaticResource BrandNavy}"/>
+                            <Grid Margin="0,3,0,10">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="Auto"/>
+                                </Grid.ColumnDefinitions>
+                                <TextBox x:Name="ClientSubmissionsDirTextBox" Grid.Column="0" Height="32" FontSize="12.5" Padding="6,4" Margin="0,0,6,0"/>
+                                <Button Grid.Column="1" Content="📂 Chọn..." Style="{StaticResource SecondaryButton}" Height="32" Padding="10,0" Click="BrowseClientSubmissionsDir_Click"/>
+                            </Grid>
+
+                            <Button Content="💾 Lưu cấu hình &amp; Tải lại đề thi"
+                                    Style="{StaticResource PrimaryButton}"
+                                    Height="34"
+                                    HorizontalAlignment="Right"
+                                    Padding="14,0"
+                                    Click="SaveClientSettings_Click"/>
+                        </StackPanel>
+                    </Border>
 
                     <!-- Candidate Selector -->
-                    <Grid Margin="0,0,0,12">
+                    <Grid Margin="0,0,0,6">
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="*"/>
                             <ColumnDefinition Width="Auto"/>
@@ -57,13 +118,20 @@
                                   DisplayMemberPath="DisplayText"
                                   SelectionChanged="CandidatePackageComboBox_SelectionChanged"/>
                         <Button Grid.Column="1"
-                                Content="📂 Mở file đề (.exam_pkg)..."
+                                Content="📂 Mở file đề lẻ..."
                                 Style="{StaticResource SecondaryButton}"
                                 Height="40"
                                 Margin="8,0,0,8"
                                 Padding="12,0"
                                 Click="BrowseExamPackage_Click"/>
                     </Grid>
+
+                    <TextBlock x:Name="ClientFolderStatusTextBlock"
+                               Text="Đang lấy đề từ: .\exams | Nộp bài về: .\submissions"
+                               FontSize="11"
+                               Foreground="{StaticResource TextSecondary}"
+                               TextWrapping="Wrap"
+                               Margin="0,0,0,10"/>
 
                     <!-- Exam Details Card -->
                     <Border x:Name="PackageInfoBorder"
@@ -439,9 +507,13 @@
                                 <TextBlock Text="Thời gian bù giờ:" FontWeight="SemiBold" Foreground="{StaticResource TextSecondary}"/>
                                 <TextBlock x:Name="SummaryExtraMinutesTextBlock" HorizontalAlignment="Right" FontWeight="Bold" Foreground="{StaticResource WarningAmber}"/>
                             </Grid>
-                            <Grid>
+                            <Grid Margin="0,0,0,8">
                                 <TextBlock Text="Mã gói bài nộp:" FontWeight="SemiBold" Foreground="{StaticResource TextSecondary}"/>
                                 <TextBlock x:Name="SummarySubmissionIdTextBlock" HorizontalAlignment="Right" FontFamily="Consolas" Foreground="{StaticResource BrandNavy}"/>
+                            </Grid>
+                            <Grid>
+                                <TextBlock Text="Đã lưu tại:" FontWeight="SemiBold" Foreground="{StaticResource TextSecondary}"/>
+                                <TextBlock x:Name="SummarySavedPathTextBlock" HorizontalAlignment="Right" FontSize="11.5" Foreground="{StaticResource BrandTealDark}" TextWrapping="Wrap" MaxWidth="380" TextAlignment="Right"/>
                             </Grid>
                         </StackPanel>
                     </Border>

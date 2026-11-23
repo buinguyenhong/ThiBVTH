@@ -36,7 +36,8 @@ public partial class MainWindow : Window
     private readonly ObservableCollection<SubmissionRowViewModel> _submissions = [];
     private readonly ObservableCollection<GradingItemViewModel> _currentGradingItems = [];
     private SubmissionRowViewModel? _selectedSubmission;
-    private string _submissionsDirectory = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "submissions");
+    private string _examPackagesDirectory;
+    private string _submissionsDirectory;
     private List<ExamScenario> _lastGeneratedScenarios = [];
     private readonly HisAuditTrailService _auditTrailService = new();
 
@@ -46,6 +47,9 @@ public partial class MainWindow : Window
         _database = new SqliteDatabase(_storage);
         _settingsStore = new JsonApplicationSettingsStore(_storage);
         _credentialStore = new ProtectedCredentialStore(_storage);
+
+        _examPackagesDirectory = Path.Combine(_storage.DataDirectory, "exams");
+        _submissionsDirectory = Path.Combine(_storage.DataDirectory, "submissions");
 
         SubmissionsGrid.ItemsSource = _submissions;
         GradingItemsControl.ItemsSource = _currentGradingItems;
@@ -70,6 +74,19 @@ public partial class MainWindow : Window
                 SqlPasswordBox.Password = _credentialStore.Load(profile.Name) ?? string.Empty;
             }
             AuthenticationChanged(this, null!);
+
+            if (!string.IsNullOrWhiteSpace(settings.ExamPackagesDirectory))
+            {
+                _examPackagesDirectory = settings.ExamPackagesDirectory.Trim();
+            }
+            if (!string.IsNullOrWhiteSpace(settings.SubmissionsDirectory))
+            {
+                _submissionsDirectory = settings.SubmissionsDirectory.Trim();
+            }
+
+            ExamPackagesDirTextBox.Text = _examPackagesDirectory;
+            SubmissionsDirTextBox.Text = _submissionsDirectory;
+            GradingSubmissionsPathTextBlock.Text = $"Thư mục chấm: {_submissionsDirectory}";
 
             await ReloadActionLibraryAsync();
 
@@ -97,6 +114,11 @@ public partial class MainWindow : Window
             await LoadMappingsAsync();
             await RefreshDashboardCardsAsync();
             await ReloadHistoryDataAsync();
+            var storedScenarios = await _database.GetLatestGeneratedScenariosAsync();
+            if (storedScenarios.Count > 0)
+            {
+                _lastGeneratedScenarios = storedScenarios.ToList();
+            }
             HeaderStatusText.Text = "Hệ thống sẵn sàng";
             FooterStatusText.Text = "Khởi tạo thành công CSDL SQLite cục bộ.";
         }
@@ -429,47 +451,35 @@ public partial class MainWindow : Window
                     ExamPackageService.SavePackage(clientPkg, pkgPath);
                     archive.CreateEntryFromFile(pkgPath, $"ExamClient_Packages/{pkgName}");
 
-                    // Also copy to local exams directory for instant ExamClient availability
+                    // Copy to configured ExamPackagesDirectory & local exams directory for ExamClient availability
+                    try
+                    {
+                        if (!string.IsNullOrWhiteSpace(_examPackagesDirectory))
+                        {
+                            if (!Directory.Exists(_examPackagesDirectory)) Directory.CreateDirectory(_examPackagesDirectory);
+                            File.Copy(pkgPath, Path.Combine(_examPackagesDirectory, pkgName), true);
+                        }
+                    }
+                    catch { /* ignore network folder write error during zip generation */ }
+
                     var clientExamsDir = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "exams");
                     if (!Directory.Exists(clientExamsDir)) Directory.CreateDirectory(clientExamsDir);
-                    File.Copy(pkgPath, Path.Combine(clientExamsDir, pkgName), true);
+                    if (!string.Equals(Path.GetFullPath(clientExamsDir), Path.GetFullPath(_examPackagesDirectory), StringComparison.OrdinalIgnoreCase))
+                    {
+                        File.Copy(pkgPath, Path.Combine(clientExamsDir, pkgName), true);
+                    }
 
-                    // Mark patient used in database
-                    if (!string.IsNullOrWhiteSpace(scenario.Patient.MedicalCode))
+                    // Persist scenario into SQLite for assisted grading even after app restart
+                    await _database.SaveGeneratedScenarioAsync(scenario);
+
+                    // Mark only actually used patients in database
+                    foreach (var (medCode, fullName) in scenario.GetActuallyUsedPatients())
                     {
-                        await _database.MarkPatientUsedAsync(scenario.Patient.MedicalCode, scenario.Patient.FullName, batchName);
-                    }
-                    if (scenario.SecondPatient is not null && !string.IsNullOrWhiteSpace(scenario.SecondPatient.MedicalCode))
-                    {
-                        await _database.MarkPatientUsedAsync(scenario.SecondPatient.MedicalCode, scenario.SecondPatient.FullName, batchName);
-                    }
-                    if (scenario.InpatientLookupCase is not null && !string.IsNullOrWhiteSpace(scenario.InpatientLookupCase.MedicalCode))
-                    {
-                        await _database.MarkPatientUsedAsync(scenario.InpatientLookupCase.MedicalCode, scenario.InpatientLookupCase.FullName, batchName);
-                    }
-                    if (scenario.AdvancePaymentCase1 is not null && !string.IsNullOrWhiteSpace(scenario.AdvancePaymentCase1.MedicalCode))
-                    {
-                        await _database.MarkPatientUsedAsync(scenario.AdvancePaymentCase1.MedicalCode, scenario.AdvancePaymentCase1.FullName, batchName);
-                    }
-                    if (scenario.AdvancePaymentCase2 is not null && !string.IsNullOrWhiteSpace(scenario.AdvancePaymentCase2.MedicalCode))
-                    {
-                        await _database.MarkPatientUsedAsync(scenario.AdvancePaymentCase2.MedicalCode, scenario.AdvancePaymentCase2.FullName, batchName);
-                    }
-                    if (scenario.DischargeCase is not null && !string.IsNullOrWhiteSpace(scenario.DischargeCase.MedicalCode))
-                    {
-                        await _database.MarkPatientUsedAsync(scenario.DischargeCase.MedicalCode, scenario.DischargeCase.FullName, batchName);
-                    }
-                    if (scenario.OutpatientLookupCase is not null && !string.IsNullOrWhiteSpace(scenario.OutpatientLookupCase.MedicalCode))
-                    {
-                        await _database.MarkPatientUsedAsync(scenario.OutpatientLookupCase.MedicalCode, scenario.OutpatientLookupCase.FullName, batchName);
-                    }
-                    if (scenario.AdvancePaymentOutpatientCase is not null && !string.IsNullOrWhiteSpace(scenario.AdvancePaymentOutpatientCase.MedicalCode))
-                    {
-                        await _database.MarkPatientUsedAsync(scenario.AdvancePaymentOutpatientCase.MedicalCode, scenario.AdvancePaymentOutpatientCase.FullName, batchName);
+                        await _database.MarkPatientUsedAsync(medCode, fullName, batchName);
                     }
                 }
 
-                // 3. Generate Merged Word Document (.docx) for one-click printing of all candidates
+                // 3. Generate Merged Word Document (.docx), Answer Key (.docx), and Merged SQL (.sql) for all candidates
                 if (scenarios.Count >= 1)
                 {
                     var mergedDocxName = $"_InGop_TatCaDeThi_{batchName}_{examDate:yyyyMMdd}.docx";
@@ -482,6 +492,13 @@ public partial class MainWindow : Window
                     var answerKeyDocxPath = Path.Combine(outputDir, answerKeyDocxName);
                     _wordWriter.CreateAnswerKeyDocument(answerKeyDocxPath, scenarios);
                     archive.CreateEntryFromFile(answerKeyDocxPath, answerKeyDocxName);
+
+                    // 5. Generate Merged SQL script for one-click DB preparation
+                    var mergedSqlName = $"_SQL_TongHop_TatCaThiSinh_{batchName}_{examDate:yyyyMMdd}.sql";
+                    var mergedSqlPath = Path.Combine(outputDir, mergedSqlName);
+                    var mergedSqlContent = _sqlGenerator.GenerateMerged(scenarios);
+                    await File.WriteAllTextAsync(mergedSqlPath, mergedSqlContent);
+                    archive.CreateEntryFromFile(mergedSqlPath, mergedSqlName);
                 }
             }
 
@@ -769,20 +786,144 @@ public partial class MainWindow : Window
     {
         try
         {
-            var p = new SqlServerConnectionProfile(
-                ProfileNameTextBox.Text.Trim(),
-                ServerTextBox.Text.Trim(),
-                DatabaseTextBox.Text.Trim(),
-                WindowsAuthenticationCheckBox.IsChecked == true,
-                SqlUserTextBox.Text.Trim());
-
-            await _settingsStore.SaveAsync(new ApplicationSettings("exam-generator.sqlite", new[] { p }, p.Name));
-            if (!p.UseWindowsAuthentication) _credentialStore.Save(p.Name, SqlPasswordBox.Password);
-            ConnectionStatusText.Text = "Đã lưu Profile kết nối SQL Server thành công.";
+            await SaveAllSettingsInternalAsync();
+            ConnectionStatusText.Text = "Đã lưu Profile kết nối SQL Server và cấu hình thư mục thành công.";
         }
         catch (Exception ex)
         {
             ConnectionStatusText.Text = "Lỗi lưu cấu hình: " + ex.Message;
+        }
+    }
+
+    private async Task SaveAllSettingsInternalAsync()
+    {
+        if (!string.IsNullOrWhiteSpace(ExamPackagesDirTextBox?.Text))
+        {
+            _examPackagesDirectory = ExamPackagesDirTextBox.Text.Trim();
+        }
+        if (!string.IsNullOrWhiteSpace(SubmissionsDirTextBox?.Text))
+        {
+            _submissionsDirectory = SubmissionsDirTextBox.Text.Trim();
+        }
+
+        try
+        {
+            if (!string.IsNullOrWhiteSpace(_examPackagesDirectory) && !Directory.Exists(_examPackagesDirectory))
+                Directory.CreateDirectory(_examPackagesDirectory);
+            if (!string.IsNullOrWhiteSpace(_submissionsDirectory) && !Directory.Exists(_submissionsDirectory))
+                Directory.CreateDirectory(_submissionsDirectory);
+        }
+        catch { /* ignore folder creation errors for offline network shares */ }
+
+        if (GradingSubmissionsPathTextBlock is not null)
+        {
+            GradingSubmissionsPathTextBlock.Text = $"Thư mục chấm: {_submissionsDirectory}";
+        }
+
+        var p = new SqlServerConnectionProfile(
+            ProfileNameTextBox.Text.Trim(),
+            ServerTextBox.Text.Trim(),
+            DatabaseTextBox.Text.Trim(),
+            WindowsAuthenticationCheckBox.IsChecked == true,
+            SqlUserTextBox.Text.Trim());
+
+        await _settingsStore.SaveAsync(new ApplicationSettings(
+            "exam-generator.sqlite",
+            new[] { p },
+            p.Name,
+            _examPackagesDirectory,
+            _submissionsDirectory));
+
+        if (!p.UseWindowsAuthentication)
+        {
+            _credentialStore.Save(p.Name, SqlPasswordBox.Password);
+        }
+    }
+
+    private void BrowseExamPackagesDir_Click(object sender, RoutedEventArgs e)
+    {
+        var dialog = new Microsoft.Win32.OpenFolderDialog
+        {
+            Title = "Chọn thư mục chứa đề thi (.exam_pkg) cho ExamClient"
+        };
+        if (Directory.Exists(_examPackagesDirectory))
+        {
+            dialog.InitialDirectory = _examPackagesDirectory;
+        }
+        if (dialog.ShowDialog() == true && !string.IsNullOrWhiteSpace(dialog.FolderName))
+        {
+            _examPackagesDirectory = dialog.FolderName;
+            ExamPackagesDirTextBox.Text = _examPackagesDirectory;
+            DirectoriesStatusText.Text = "Đã chọn thư mục đề thi mới. Bấm 'Lưu Cấu Hình Thư Mục' để ghi nhớ.";
+        }
+    }
+
+    private void OpenExamPackagesDir_Click(object sender, RoutedEventArgs e)
+    {
+        var dir = !string.IsNullOrWhiteSpace(ExamPackagesDirTextBox.Text) ? ExamPackagesDirTextBox.Text.Trim() : _examPackagesDirectory;
+        try
+        {
+            if (!Directory.Exists(dir)) Directory.CreateDirectory(dir);
+            System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo("explorer.exe", dir) { UseShellExecute = true });
+        }
+        catch (Exception ex)
+        {
+            MessageBox.Show($"Không thể mở thư mục '{dir}': {ex.Message}", "Lỗi mở thư mục", MessageBoxButton.OK, MessageBoxImage.Warning);
+        }
+    }
+
+    private void BrowseSubmissionsDir_Click(object sender, RoutedEventArgs e)
+    {
+        var dialog = new Microsoft.Win32.OpenFolderDialog
+        {
+            Title = "Chọn thư mục chứa bài đã làm (.sub_pkg) để chấm thi"
+        };
+        if (Directory.Exists(_submissionsDirectory))
+        {
+            dialog.InitialDirectory = _submissionsDirectory;
+        }
+        if (dialog.ShowDialog() == true && !string.IsNullOrWhiteSpace(dialog.FolderName))
+        {
+            _submissionsDirectory = dialog.FolderName;
+            SubmissionsDirTextBox.Text = _submissionsDirectory;
+            GradingSubmissionsPathTextBlock.Text = $"Thư mục chấm: {_submissionsDirectory}";
+            DirectoriesStatusText.Text = "Đã chọn thư mục bài nộp mới. Bấm 'Lưu Cấu Hình Thư Mục' để ghi nhớ.";
+        }
+    }
+
+    private void OpenSubmissionsDir_Click(object sender, RoutedEventArgs e)
+    {
+        var dir = !string.IsNullOrWhiteSpace(SubmissionsDirTextBox?.Text) ? SubmissionsDirTextBox.Text.Trim() : _submissionsDirectory;
+        try
+        {
+            if (!Directory.Exists(dir)) Directory.CreateDirectory(dir);
+            System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo("explorer.exe", dir) { UseShellExecute = true });
+        }
+        catch (Exception ex)
+        {
+            MessageBox.Show($"Không thể mở thư mục '{dir}': {ex.Message}", "Lỗi mở thư mục", MessageBoxButton.OK, MessageBoxImage.Warning);
+        }
+    }
+
+    private async void SaveDirectoriesConfig_Click(object sender, RoutedEventArgs e)
+    {
+        try
+        {
+            await SaveAllSettingsInternalAsync();
+            DirectoriesStatusText.Text = "✓ Đã lưu cấu hình thư mục Đề thi & Bài nộp thành công!";
+            await ReloadSubmissionsAsync();
+            MessageBox.Show(
+                $"Đã lưu cấu hình thư mục thành công!\n\n" +
+                $"• Thư mục xuất đề thi (.exam_pkg):\n  {_examPackagesDirectory}\n\n" +
+                $"• Thư mục chấm bài nộp (.sub_pkg):\n  {_submissionsDirectory}",
+                "Lưu cấu hình thư mục",
+                MessageBoxButton.OK,
+                MessageBoxImage.Information);
+        }
+        catch (Exception ex)
+        {
+            DirectoriesStatusText.Text = "Lỗi lưu cấu hình thư mục: " + ex.Message;
+            MessageBox.Show($"Lỗi khi lưu cấu hình thư mục: {ex.Message}", "Lỗi", MessageBoxButton.OK, MessageBoxImage.Error);
         }
     }
 
@@ -1519,20 +1660,25 @@ public partial class MainWindow : Window
                 return;
             }
 
-            var defaultDir = Path.Combine(_storage.OutputDirectory, "ExamClient_Packages");
-            var exported = ExamPackageService.ExportPackages(scenarios, defaultDir);
+            var targetDir = !string.IsNullOrWhiteSpace(_examPackagesDirectory)
+                ? _examPackagesDirectory
+                : Path.Combine(_storage.OutputDirectory, "ExamClient_Packages");
+            var exported = ExamPackageService.ExportPackages(scenarios, targetDir);
 
-            // Also copy to local exams folder for instant ExamClient availability
+            // Also copy to local exams folder for instant local ExamClient availability
             var clientExamsDir = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "exams");
             if (!Directory.Exists(clientExamsDir)) Directory.CreateDirectory(clientExamsDir);
-            foreach (var f in exported)
+            if (!string.Equals(Path.GetFullPath(clientExamsDir), Path.GetFullPath(targetDir), StringComparison.OrdinalIgnoreCase))
             {
-                File.Copy(f, Path.Combine(clientExamsDir, Path.GetFileName(f)), true);
+                foreach (var f in exported)
+                {
+                    File.Copy(f, Path.Combine(clientExamsDir, Path.GetFileName(f)), true);
+                }
             }
 
-            MessageBox.Show($"Đã xuất thành công {exported.Count} gói đề thi ExamClient (.exam_pkg) vào thư mục:\n{defaultDir}\n\nĐã sẵn sàng chuyển giao cho các máy trạm phòng thi!", "Xuất gói đề thi thành công", MessageBoxButton.OK, MessageBoxImage.Information);
+            MessageBox.Show($"Đã xuất thành công {exported.Count} gói đề thi ExamClient (.exam_pkg) vào thư mục cấu hình:\n{targetDir}\n\nĐã sẵn sàng chuyển giao cho các máy trạm phòng thi!", "Xuất gói đề thi thành công", MessageBoxButton.OK, MessageBoxImage.Information);
 
-            System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo("explorer.exe", defaultDir) { UseShellExecute = true });
+            System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo("explorer.exe", targetDir) { UseShellExecute = true });
         }
         catch (Exception ex)
         {
@@ -1540,17 +1686,33 @@ public partial class MainWindow : Window
         }
     }
 
-    private void BrowseSubmissionsDirectory_Click(object sender, RoutedEventArgs e)
+    private async void BrowseSubmissionsDirectory_Click(object sender, RoutedEventArgs e)
     {
-        var dialog = new Microsoft.Win32.OpenFileDialog
+        var dialog = new Microsoft.Win32.OpenFolderDialog
         {
-            Title = "Chọn một tệp bài nộp (.sub_pkg) để mở thư mục chứa",
-            Filter = "Gói bài nộp (*.sub_pkg)|*.sub_pkg|Tất cả tệp (*.*)|*.*"
+            Title = "Chọn thư mục chứa các bài đã làm (.sub_pkg) để chấm thi"
         };
-        if (dialog.ShowDialog() == true)
+        if (Directory.Exists(_submissionsDirectory))
         {
-            _submissionsDirectory = Path.GetDirectoryName(dialog.FileName) ?? _submissionsDirectory;
-            _ = ReloadSubmissionsAsync();
+            dialog.InitialDirectory = _submissionsDirectory;
+        }
+        if (dialog.ShowDialog() == true && !string.IsNullOrWhiteSpace(dialog.FolderName))
+        {
+            _submissionsDirectory = dialog.FolderName;
+            if (SubmissionsDirTextBox is not null)
+            {
+                SubmissionsDirTextBox.Text = _submissionsDirectory;
+            }
+            if (GradingSubmissionsPathTextBlock is not null)
+            {
+                GradingSubmissionsPathTextBlock.Text = $"Thư mục chấm: {_submissionsDirectory}";
+            }
+            try
+            {
+                await SaveAllSettingsInternalAsync();
+            }
+            catch { /* ignore settings save error */ }
+            await ReloadSubmissionsAsync();
         }
     }
 
@@ -1630,8 +1792,11 @@ public partial class MainWindow : Window
         GradingSubmittedAtTextBlock.Text = sub.SubmittedAt.ToString("HH:mm:ss dd/MM/yyyy");
         GradingExtraTimeTextBlock.Text = sub.TotalExtraMinutes > 0 ? $"+{sub.TotalExtraMinutes} phút" : "Không có";
 
-        // Find scenario if available
-        var scenario = _lastGeneratedScenarios.FirstOrDefault(s => s.CandidateId == sub.CandidateId);
+        // Find scenario if available (match by ExamId/ScenarioId first, then fallback to CandidateId)
+        var scenario = _lastGeneratedScenarios.FirstOrDefault(s =>
+            string.Equals(s.ScenarioId, sub.ExamId, StringComparison.OrdinalIgnoreCase))
+            ?? _lastGeneratedScenarios.FirstOrDefault(s =>
+                string.Equals(s.CandidateId, sub.CandidateId, StringComparison.OrdinalIgnoreCase));
 
         _currentGradingItems.Clear();
 
